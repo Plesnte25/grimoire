@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model MediaItem {
+  id               String      @id @default(cuid())
+  mediaType        String
+  format           String?
+  isAdult          Boolean?
+  episodes         Int?
+  duration         Int?      
+  provider         String
+  providerId       String
+  title            String
+  nativeTitle      String?
+  year             Int?
+  description      String?
+  posterUrl        String?
+  backdropUrl      String?
+
+  // global rating info (provider-based)
+  globalRating     Float?
+  globalRatingText String?
+
+  // your tracking
+  status           String      @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, ON_HOLD, DROPPED
+  yourRating       Float?
+  yourNotes        String?
+
+  // progress (generic + type-specific optional fields)
+  progressText     String?      // e.g. "S2E5", "Page 123", "Listened 10x"
+  progressValue    Int?         // numeric progress optional
+
+  genres           String?      // JSON string array
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  listItems        ListItem[]
+
+  @@unique([provider, providerId])
+}
+
+model CustomList {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  coverColor  String?    // hex or css token
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  items       ListItem[]
+}
+
+model ListItem {
+  id         String    @id @default(cuid())
+  listId     String
+  mediaId    String
+  order      Int       @default(0)
+  createdAt  DateTime  @default(now())
+
+  list       CustomList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  media      MediaItem  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, mediaId])
+}

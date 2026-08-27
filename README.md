@@ -1,0 +1,52 @@
+# Media Vault
+
+A personal media tracker for anime, movies, TV, music, and more — track what you're watching/reading/listening to, rate it, organize custom lists, and pull in provider metadata (e.g. TMDB) for posters and info.
+
+## Stack
+
+- **Backend:** Express + TypeScript, Prisma (SQLite), Zod validation
+- **Frontend:** React + Vite + TypeScript, TanStack Query, Zustand, Tailwind CSS, Framer Motion
+
+## Structure
+
+```
+backend/
+  src/
+    routes/       library, lists, providers, suggestions
+    services/     provider integrations (TMDB, etc.), suggestion logic
+    scripts/      one-off data scripts (e.g. backfillAnime)
+  prisma/         schema + migrations (SQLite)
+frontend/
+  src/
+    pages/        Home, Category, Anime, MusicCategory, Lists, ListDetail, MediaDetail, Settings
+```
+
+## Setup
+
+### Backend
+
+```bash
+cd backend
+cp .env.example .env   # fill in TMDB_API_KEY
+npm install
+npm run prisma:migrate
+npm run dev             # http://localhost:5050
+```
+
+### Frontend
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+## Data model
+
+- `MediaItem` — tracked title (type, provider metadata, your status/rating/progress/notes)
+- `CustomList` / `ListItem` — user-defined lists of media items
+
+## Status
+
+Actively developed, single-user local app (SQLite). No auth yet — assumes a single local user.

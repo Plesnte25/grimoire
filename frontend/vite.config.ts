@@ -1,0 +1,28 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
+
+export default defineConfig({
+    server: {
+        proxy: {
+            "/api": "http://localhost:5050",
+        },
+    },
+    plugins: [
+        react(),
+        VitePWA({
+            registerType: "autoUpdate",
+            includeAssets: ["favicon.svg"],
+            manifest: {
+                name: "MediaVault",
+                short_name: "MediaVault",
+                theme_color: "#0b0b10",
+                background_color: "#0b0b10",
+                display: "standalone",
+                icons: [
+                    { src: "favicon.svg", sizes: "any", type: "image/svg+xml" }
+                ]
+            }
+        })
+    ]
+});

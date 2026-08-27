@@ -1,0 +1,126 @@
+import axios from "axios";
+import type { MediaItem, ProviderSearchResult, MediaType, CustomList } from "../types";
+
+const API_BASE =
+    (import.meta.env.VITE_API_BASE && String(import.meta.env.VITE_API_BASE).trim()) || "";
+
+export const api = axios.create({
+    baseURL: API_BASE,
+    timeout: 20_000,
+});
+
+// --- Providers ---
+
+export async function providerSearch(
+    q: string,
+    mediaType?: MediaType
+): Promise<ProviderSearchResult[]> {
+    const res = await api.get("/api/providers/search", {
+        params: { q, mediaType },
+    });
+    return res.data?.results ?? [];
+}
+
+export async function providerDetails(
+    provider: string,
+    providerId: string,
+    mediaType: MediaType
+) {
+    const res = await api.get("/api/providers/details", {
+        params: { provider, providerId, mediaType },
+    });
+    return res.data?.details ?? null;
+}
+
+// --- Library ---
+
+export async function addToLibrary(
+    payload: ProviderSearchResult &
+        Partial<
+            Pick<
+                MediaItem,
+                "status" | "yourRating" | "yourNotes" | "progressText" | "progressValue"
+            >
+        >
+): Promise<MediaItem> {
+    const res = await api.post("/api/library", payload);
+    return res.data.item;
+}
+
+export async function updateLibrary(id: string, patch: Record<string, any>): Promise<MediaItem> {
+    const res = await api.patch(`/api/library/${id}`, patch);
+    return res.data.item;
+}
+
+export async function fetchLibrary(mediaType?: MediaType): Promise<MediaItem[]> {
+    const res = await api.get("/api/library", { params: { mediaType } });
+    return res.data?.items ?? [];
+}
+
+export async function fetchItem(id: string): Promise<MediaItem> {
+    const res = await api.get(`/api/library/${id}`);
+    return res.data.item;
+}
+
+export async function updateItem(
+    id: string,
+    patch: Partial<
+        Pick<MediaItem, "status" | "yourRating" | "yourNotes" | "progressText" | "progressValue">
+    >
+): Promise<MediaItem> {
+    const res = await api.patch(`/api/library/${id}`, patch);
+    return res.data.item;
+}
+
+export async function deleteLibraryItem(id: string) {
+    const res = await api.delete(`/api/library/${id}`);
+    return res.data;
+}
+
+export async function recategorizeLibrary() {
+    const res = await api.post(`/api/library/recategorize`);
+    return res.data;
+}
+
+// --- Lists ---
+
+export async function fetchLists(): Promise<CustomList[]> {
+    const res = await api.get("/api/lists");
+    return res.data?.lists ?? [];
+}
+
+export async function createList(payload: {
+    name: string;
+    description?: string;
+    coverColor?: string;
+}): Promise<CustomList> {
+    const res = await api.post("/api/lists", payload);
+    return res.data.list;
+}
+
+export async function fetchList(id: string): Promise<CustomList> {
+    const res = await api.get(`/api/lists/${id}`);
+    return res.data.list;
+}
+
+export async function addItemToList(listId: string, mediaId: string) {
+    const res = await api.post(`/api/lists/${listId}/items`, { mediaId });
+    return res.data.item;
+}
+
+// --- Suggestions ---
+
+export async function fetchSuggestions(
+    mediaType: MediaType,
+    cursor?: number,
+    scope?: string
+) {
+    const res = await api.get("/api/suggestions", {
+        params: { mediaType, cursor, scope },
+        timeout: 20_000,
+    });
+    return res.data;
+}
+
+
+
