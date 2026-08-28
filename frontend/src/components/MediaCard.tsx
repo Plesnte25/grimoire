@@ -119,10 +119,18 @@ export function MediaCard({
     const metaRating = ratingText(item);
 
     return (
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onOpen}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpen?.();
+          }
+        }}
         className="
-          group relative shrink-0 text-left
+          group relative shrink-0 text-left cursor-pointer
           w-[120px] sm:w-[140px] md:w-[170px] lg:w-[190px] xl:w-[210px]
           focus:outline-none
         "
@@ -230,7 +238,7 @@ export function MediaCard({
             </div>
           </div>
         </div>
-      </button>
+      </div>
     );
   }
 

@@ -2,18 +2,19 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const listsRouter = Router();
 
-listsRouter.get("/", async (_req, res) => {
+listsRouter.get("/", asyncHandler(async (_req, res) => {
     const lists = await prisma.customList.findMany({
         orderBy: { updatedAt: "desc" },
         include: { items: { include: { media: true }, orderBy: { order: "asc" } } }
     });
     res.json({ lists });
-});
+}));
 
-listsRouter.post("/", async (req, res) => {
+listsRouter.post("/", asyncHandler(async (req, res) => {
     const data = parseOrThrow(z.object({
         name: z.string().min(1),
         description: z.string().optional(),
@@ -22,18 +23,18 @@ listsRouter.post("/", async (req, res) => {
 
     const list = await prisma.customList.create({ data });
     res.json({ list });
-});
+}));
 
-listsRouter.get("/:id", async (req, res) => {
+listsRouter.get("/:id", asyncHandler(async (req, res) => {
     const list = await prisma.customList.findUnique({
         where: { id: req.params.id },
         include: { items: { include: { media: true }, orderBy: { order: "asc" } } }
     });
     if (!list) return res.status(404).json({ error: "Not found" });
     res.json({ list });
-});
+}));
 
-listsRouter.post("/:id/items", async (req, res) => {
+listsRouter.post("/:id/items", asyncHandler(async (req, res) => {
     const data = parseOrThrow(z.object({
         mediaId: z.string().min(1)
     }), req.body);
@@ -44,9 +45,9 @@ listsRouter.post("/:id/items", async (req, res) => {
         data: { listId: req.params.id, mediaId: data.mediaId, order: count }
     });
     res.json({ item });
-});
+}));
 
-listsRouter.delete("/:id/items/:itemId", async (req, res) => {
+listsRouter.delete("/:id/items/:itemId", asyncHandler(async (req, res) => {
     await prisma.listItem.delete({ where: { id: req.params.itemId } });
     res.json({ ok: true });
-});
+}));

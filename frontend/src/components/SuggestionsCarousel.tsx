@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MediaType } from "../types";
-import { addToLibrary, updateItem, fetchSuggestions } from "../app/api";
+import { addToLibrary, fetchSuggestions } from "../app/api";
 
 type SuggestionItem = {
   provider: string;
@@ -110,18 +110,14 @@ export function SuggestionsCarousel({
       globalRatingText: s.globalRatingText ?? undefined,
       genres: normalizedGenres(s.genres),
 
-      status: "COMPLETED" as const,
+      status: "PLANNED" as const,
       yourRating: undefined,
       yourNotes: undefined,
       progressText: undefined,
       progressValue: undefined,
     };
 
-    const created = await addToLibrary(payload);
-
-    try {
-      await updateItem(created.id, { status: "COMPLETED" });
-    } catch {}
+    await addToLibrary(payload);
 
     // refresh library + suggestions
     qc.invalidateQueries({ queryKey: ["library", mediaType] });

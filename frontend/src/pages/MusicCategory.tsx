@@ -8,11 +8,11 @@ import {
   deleteLibraryItem,
   fetchLibrary,
   fetchLists,
+  fetchTrackMeta,
   updateItem,
 } from "../app/api";
 import { SuggestionsCarousel } from "../components/SuggestionsCarousel";
 import { SearchModal } from "../components/SearchModal";
-import { itunesTrackMeta } from "/home/plesnte/Documents/media-vault/backend/src/services/providers/itunes";
 
 type Tab = "library" | "playlists" | "explore";
 type RepeatMode = "OFF" | "ALL" | "ONE";
@@ -200,7 +200,7 @@ export function MusicCategory() {
     async function load() {
       if (!currentSong || !audioRef.current) return;
 
-      const meta = await itunesTrackMeta(String(currentSong.providerId));
+      const meta = await fetchTrackMeta(String(currentSong.providerId));
       setPlayerMeta({
         artist: meta?.artistName ?? parseArtist(currentSong.description),
         album: meta?.collectionName ?? "",

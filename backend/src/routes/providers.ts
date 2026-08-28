@@ -1,14 +1,15 @@
 import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../utils/validate.js";
-import { tmdbSearch } from "../services/providers/tmdb";
-import { anilistSearch, anilistDetails } from "../services/providers/anilist";
-import { googleBooksSearch, googleBooksDetails } from "../services/providers/googleBooks";
-import { itunesSearch } from "../services/providers/itunes";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { tmdbSearch, tmdbDetails } from "../services/providers/tmdb.js";
+import { anilistSearch, anilistDetails } from "../services/providers/anilist.js";
+import { googleBooksSearch, googleBooksDetails } from "../services/providers/googleBooks.js";
+import { itunesSearch, itunesTrackMeta } from "../services/providers/itunes.js";
 
 export const providersRouter = Router();
 
-providersRouter.get("/search", async (req, res) => {
+providersRouter.get("/search", asyncHandler(async (req, res) => {
     const parsed = parseOrThrow(z.object({
         q: z.string().min(1),
         mediaType: z.string().optional()
@@ -50,7 +51,7 @@ providersRouter.get("/search", async (req, res) => {
 
     // Merge results. Frontend will show type badges.
     res.json({ results });
-});
+}));
 
 providersRouter.get("/details", async (req, res) => {
     const data = parseOrThrow(z.object({
@@ -63,7 +64,7 @@ providersRouter.get("/details", async (req, res) => {
     try {
         let details: any = null;
         if (data.provider === "tmdb" && (data.mediaType === "MOVIE" || data.mediaType === "TV")) {
-            details = null;
+            details = await tmdbDetails(data.providerId, data.mediaType === "MOVIE" ? "movie" : "tv");
         } else if (data.provider === "anilist" && data.mediaType === "ANIME") {
             details = await anilistDetails(data.providerId);
         } else if (data.provider === "googlebooks" && data.mediaType === "BOOK") {
@@ -78,3 +79,12 @@ providersRouter.get("/details", async (req, res) => {
         res.status(502).json({ error: "Failed to fetch provider details" });
     }
 });
+
+providersRouter.get("/track-meta", asyncHandler(async (req, res) => {
+    const data = parseOrThrow(z.object({
+        providerId: z.string().min(1)
+    }), req.query);
+
+    const meta = await itunesTrackMeta(data.providerId);
+    res.json({ meta });
+}));

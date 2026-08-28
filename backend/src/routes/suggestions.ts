@@ -2,11 +2,12 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
-import { tmdbDiscoverByGenres } from "../services/providers/tmdb";
-import { anilistDiscoverByGenres } from "../services/providers/anilist";
-import { googleBooksDiscoverByIds } from "../services/providers/googleBooks";
-import { itunesDiscoverByIds } from "../services/providers/itunes";
+import { tmdbDiscoverByGenres } from "../services/providers/tmdb.js";
+import { anilistDiscoverByGenres } from "../services/providers/anilist.js";
+import { googleBooksDiscoverByIds } from "../services/providers/googleBooks.js";
+import { itunesDiscoverByIds } from "../services/providers/itunes.js";
 
 export const suggestionsRouter = Router();
 
@@ -80,7 +81,7 @@ function mulberry32(seed: number) {
     };
 }
 
-suggestionsRouter.get("/", async (req, res) => {
+suggestionsRouter.get("/", asyncHandler(async (req, res) => {
     const q = parseOrThrow(
         z.object({
             mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK", "MUSIC"]).optional(),
@@ -219,6 +220,6 @@ suggestionsRouter.get("/", async (req, res) => {
         // optional aggregate (helps frontend compatibility)
         results: becauseYouLike,
     });
-});
+}));
 
 export default suggestionsRouter;
