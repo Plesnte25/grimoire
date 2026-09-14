@@ -40,9 +40,17 @@ model MediaItem {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
 
+  // Franchise/series grouping ("card stack") — best-effort, provider-sourced.
+  // Movies: TMDB belongs_to_collection. Anime: AniList prequel-chain root.
+  // Music: iTunes album (collectionId). Books/TV: left null, no reliable signal.
+  collectionId     String?
+  collectionName   String?
+  collectionSource String?      // "tmdb" | "anilist" | "itunes"
+
   listItems        ListItem[]
 
   @@unique([provider, providerId])
+  @@index([collectionId])
 }
 
 model CustomList {

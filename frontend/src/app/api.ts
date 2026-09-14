@@ -162,11 +162,11 @@ export async function addItemToList(listId: string, mediaId: string) {
 
 export async function fetchSuggestions(
     mediaType: MediaType,
-    cursor?: number,
-    scope?: string
+    scope?: string,
+    refresh?: number
 ) {
     const res = await api.get("/api/suggestions", {
-        params: { mediaType, cursor, scope },
+        params: { mediaType, scope, refresh },
         timeout: 20_000,
     });
     return res.data;

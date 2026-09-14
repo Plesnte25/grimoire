@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { anilistDetails } from "../services/providers/anilist.js";
+import { tmdbDetails } from "../services/providers/tmdb.js";
 
 export const libraryRouter = Router();
 
@@ -122,6 +123,33 @@ libraryRouter.get(
             );
         }
 
+        if (mediaType === "MOVIE") {
+            // Franchise grouping backfill for items added via search (which lacks
+            // belongs_to_collection — only the full details fetch has it).
+            out = await Promise.all(
+                out.map(async (it: any) => {
+                    if (it.collectionId) return it;
+                    if ((it.provider ?? "").toLowerCase() !== "tmdb") return it;
+
+                    try {
+                        const details = await tmdbDetails(String(it.providerId), "movie");
+                        if (!details?.collectionId) return it;
+                        const patched = await prisma.mediaItem.update({
+                            where: { id: it.id },
+                            data: {
+                                collectionId: details.collectionId,
+                                collectionName: details.collectionName,
+                                collectionSource: "tmdb",
+                            },
+                        });
+                        return withParsedGenres(patched);
+                    } catch {
+                        return it;
+                    }
+                })
+            );
+        }
+
 
         res.json({ items: out });
     })
@@ -138,6 +166,27 @@ libraryRouter.get(
             try {
                 const details = await anilistDetails(String(out.providerId));
                 if (details) out = { ...out, ...details };
+            } catch { }
+        }
+
+        if (
+            out.mediaType === "MOVIE" &&
+            !out.collectionId &&
+            String(out.provider ?? "").toLowerCase() === "tmdb"
+        ) {
+            try {
+                const details = await tmdbDetails(String(out.providerId), "movie");
+                if (details?.collectionId) {
+                    const patched = await prisma.mediaItem.update({
+                        where: { id: out.id },
+                        data: {
+                            collectionId: details.collectionId,
+                            collectionName: details.collectionName,
+                            collectionSource: "tmdb",
+                        },
+                    });
+                    out = withParsedGenres(patched);
+                }
             } catch { }
         }
 
@@ -188,6 +237,9 @@ libraryRouter.post(
                 }),
 
             globalRatingText: nonEmptyString,
+
+            collectionId: nonEmptyString,
+            collectionName: nonEmptyString,
         });
 
         const data = parseOrThrow(schema, req.body);
@@ -203,6 +255,7 @@ libraryRouter.post(
         });
 
         const genreString = serializeGenres(data.genres ?? []);
+        const collectionSource = data.collectionId ? provider : undefined;
 
         const item = await prisma.mediaItem.upsert({
             where: { provider_providerId: { provider: data.provider, providerId: data.providerId } },
@@ -221,6 +274,9 @@ libraryRouter.post(
                 genres: genreString,
                 globalRating: data.globalRating,
                 globalRatingText: data.globalRatingText,
+                collectionId: data.collectionId,
+                collectionName: data.collectionName,
+                collectionSource,
             },
             create: {
                 mediaType: mediaTypeNormalized,
@@ -239,6 +295,9 @@ libraryRouter.post(
                 genres: genreString,
                 globalRating: data.globalRating,
                 globalRatingText: data.globalRatingText,
+                collectionId: data.collectionId,
+                collectionName: data.collectionName,
+                collectionSource,
             },
         });
 

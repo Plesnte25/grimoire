@@ -127,6 +127,61 @@ export async function anilistSearch(search: string) {
   return (data?.data?.Page?.media ?? []).map(mapMedia);
 }
 
+const MAINLINE_FORMATS = new Set(["TV", "TV_SHORT"]);
+
+// Only a mainline TV prequel counts — a side-canon OVA/movie/special can also be
+// tagged PREQUEL (e.g. an "origin story" spinoff), and following those wanders the
+// walk off the main series entirely. No mainline prequel means stop right here.
+function findMainlinePrequel(edges: any[]): { id: number; title: string } | null {
+  const candidate = (edges ?? []).find(
+    (e: any) =>
+      e?.relationType === "PREQUEL" &&
+      e?.node?.type === "ANIME" &&
+      MAINLINE_FORMATS.has(e?.node?.format)
+  );
+  if (!candidate) return null;
+  return { id: candidate.node.id, title: pickTitle(candidate.node.title) };
+}
+
+async function fetchRelationsEdges(id: number): Promise<any[]> {
+  const query = `
+    query ($id: Int) {
+      Media(id: $id, type: ANIME) {
+        relations {
+          edges {
+            relationType(version: 2)
+            node { id type format title { romaji english native } }
+          }
+        }
+      }
+    }
+  `;
+  const cacheKey = `relations:${id}`;
+  const data = await postAniList<any>({ query, variables: { id } }, cacheKey, 24 * 60 * 60 * 1000);
+  return data?.data?.Media?.relations?.edges ?? [];
+}
+
+// Best-effort franchise grouping key: walk PREQUEL edges up to 3 hops to the
+// earliest known ancestor. AniList only exposes one-hop relations per query, so
+// this is an approximation (not a true graph root-find) — good enough for grouping
+// a franchise's entries under one card stack, not authoritative lineage data.
+async function findFranchiseRoot(
+  startEdges: any[]
+): Promise<{ id: string; name: string } | null> {
+  const prequel = findMainlinePrequel(startEdges);
+  if (!prequel) return null;
+
+  let root = prequel;
+  for (let hop = 0; hop < 2; hop++) {
+    const nextEdges = await fetchRelationsEdges(root.id).catch(() => []);
+    const next = findMainlinePrequel(nextEdges);
+    if (!next) break;
+    root = next;
+  }
+
+  return { id: String(root.id), name: root.title };
+}
+
 export async function anilistDetails(providerId: string) {
   const id = Number(providerId);
   if (!Number.isFinite(id)) return null;
@@ -140,6 +195,12 @@ export async function anilistDetails(providerId: string) {
         averageScore genres
         coverImage { extraLarge large }
         bannerImage seasonYear
+        relations {
+          edges {
+            relationType(version: 2)
+            node { id type format title { romaji english native } }
+          }
+        }
       }
     }
   `;
@@ -147,7 +208,31 @@ export async function anilistDetails(providerId: string) {
   const cacheKey = `details:${id}`;
   const data = await postAniList<any>({ query, variables: { id } }, cacheKey, 24 * 60 * 60 * 1000);
   const m = data?.data?.Media;
-  return m ? mapMedia(m) : null;
+  if (!m) return null;
+
+  const edges = m?.relations?.edges ?? [];
+  let root = await findFranchiseRoot(edges).catch(() => null);
+
+  // No prequel found — this item might itself BE the franchise root. If it has a
+  // mainline sequel, self-reference so the sequel's collectionId (which points
+  // back to this id) actually matches something on the root's own record too.
+  if (!root) {
+    const hasMainlineSequel = edges.some(
+      (e: any) =>
+        e?.relationType === "SEQUEL" &&
+        e?.node?.type === "ANIME" &&
+        MAINLINE_FORMATS.has(e?.node?.format)
+    );
+    if (hasMainlineSequel) {
+      root = { id: String(m.id), name: pickTitle(m.title) };
+    }
+  }
+
+  return {
+    ...mapMedia(m),
+    collectionId: root?.id,
+    collectionName: root?.name,
+  };
 }
 
 export async function anilistDiscoverByIds(ids: string[]) {

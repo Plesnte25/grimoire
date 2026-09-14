@@ -145,6 +145,13 @@ export async function tmdbDetails(providerId: string, type: "movie" | "tv") {
             type === "tv"
                 ? (typeof r.number_of_episodes === "number" ? r.number_of_episodes : undefined)
                 : undefined,
+        // Franchise grouping — TMDB only has a "collection" concept for movies, not TV.
+        collectionId:
+            type === "movie" && r.belongs_to_collection?.id != null
+                ? String(r.belongs_to_collection.id)
+                : undefined,
+        collectionName:
+            type === "movie" ? r.belongs_to_collection?.name ?? undefined : undefined,
     };
 }
 

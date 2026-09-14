@@ -37,6 +37,11 @@ export type MediaItem = {
     genres?: string | null; // JSON string array from backend
     createdAt: string;
     updatedAt: string;
+
+    // Franchise/series grouping ("card stack") — best-effort, provider-sourced.
+    collectionId?: string | null;
+    collectionName?: string | null;
+    collectionSource?: string | null;
 };
 
 export type CustomList = {

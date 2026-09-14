@@ -4,9 +4,11 @@ import type { MediaType } from "../types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchLibrary } from "../app/api";
 import { MediaCard, safeParseGenres } from "../components/MediaCard";
+import { CardStack } from "../components/ui/CardStack";
 import { SearchModal } from "../components/SearchModal";
 import { SuggestionsCarousel } from "../components/SuggestionsCarousel";
 import { MusicCategory } from "./MusicCategory";
+import { groupByCollection } from "../lib/groupByCollection";
 
 type StatusTab =
   | "ALL"
@@ -256,6 +258,13 @@ export function Category() {
     );
   }, [baseItems, isAnime, statusTab, genreTab, q]);
 
+  // Franchise/series grouping ("card stack") — groups sharing a collectionId
+  // (Phase 4) render as a CardStack; everything else renders as a normal MediaCard.
+  const groupedDisplayed = useMemo(
+    () => groupByCollection(displayed),
+    [displayed]
+  );
+
   return (
     <div className="min-h-screen px-4 md:px-10 py-6">
       <div className="flex items-center justify-between">
@@ -398,15 +407,25 @@ export function Category() {
               lg:[grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]
             "
           >
-            {displayed.map((it: any) => (
-              <MediaCard
-                key={it.id}
-                item={it}
-                onOpen={() => nav(`/media/${it.id}`)}
-                onDelete={(id) => del.mutate(id)}
-                variant="tile"
-              />
-            ))}
+            {groupedDisplayed.map((g) =>
+              g.stack.length > 1 ? (
+                <CardStack
+                  key={g.primary.collectionId}
+                  items={g.stack}
+                  collectionName={g.primary.collectionName}
+                  onOpenItem={(it) => nav(`/media/${it.id}`)}
+                  onDeleteItem={(id) => del.mutate(id)}
+                />
+              ) : (
+                <MediaCard
+                  key={g.primary.id}
+                  item={g.primary}
+                  onOpen={() => nav(`/media/${g.primary.id}`)}
+                  onDelete={(id) => del.mutate(id)}
+                  variant="tile"
+                />
+              )
+            )}
           </div>
         )}
       </div>
