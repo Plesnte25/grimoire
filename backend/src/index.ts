@@ -24,7 +24,21 @@ const app = express();
 // X-Forwarded-For so express-rate-limit can identify clients correctly.
 app.set("trust proxy", 1);
 
-app.use(helmet());
+// Posters/artwork come from several third-party CDNs (TMDB, Google Books,
+// iTunes/Apple, AniList) whose exact subdomains vary — allow any https image
+// rather than enumerating hosts. Only matters once Express itself serves the
+// page (production); Vite's dev server carries no CSP, so this never showed
+// up locally.
+app.use(
+    helmet({
+        contentSecurityPolicy: {
+            directives: {
+                ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+                "img-src": ["'self'", "data:", "https:"],
+            },
+        },
+    })
+);
 app.use(
     cors({
         origin: process.env.FRONTEND_ORIGIN
