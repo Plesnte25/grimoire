@@ -1,6 +1,9 @@
 import { createRequire } from "module";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Request, Response, NextFunction } from "express";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 const express = require("express");
 const cors = require("cors");
@@ -38,6 +41,14 @@ app.use("/api/providers", requireSession, providersRouter);
 app.use("/api/library", requireSession, libraryRouter);
 app.use("/api/lists", requireSession, listsRouter);
 app.use("/api/suggestions", requireSession, suggestionsRouter);
+
+// Serve the built frontend in production — makes the deployed app single-origin
+// (no CORS, no cross-origin cookie concerns) since one Node process serves both.
+const frontendDist = path.join(__dirname, "../../frontend/dist");
+app.use(express.static(frontendDist));
+app.get(/^(?!\/api|\/health).*/, (_req: Request, res: Response) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+});
 
 /**
  * ✅ Central error handler (prevents crashes from thrown errors in routes)
