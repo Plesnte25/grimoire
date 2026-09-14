@@ -20,6 +20,10 @@ import { requireSession } from "./middleware/requireSession.js";
 
 const app = express();
 
+// Behind Cloudflare Tunnel / a reverse proxy in production — trust its
+// X-Forwarded-For so express-rate-limit can identify clients correctly.
+app.set("trust proxy", 1);
+
 app.use(helmet());
 app.use(
     cors({
