@@ -20,3 +20,6 @@ dist-ssr/
 
 # vite
 .vite/
+
+# typescript
+*.tsbuildinfo

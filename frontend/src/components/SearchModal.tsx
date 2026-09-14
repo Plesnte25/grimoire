@@ -267,11 +267,11 @@ export function SearchModal({
                 {results.map((r) => (
                   <button
                     key={`${r.provider}:${r.providerId}`}
-                    className="w-full text-left rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition overflow-hidden"
+                    className="w-full text-left rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:shadow-lg hover:shadow-black/30 hover:-translate-y-0.5 transition-all overflow-hidden"
                     onClick={() => add(r)}
                   >
                     <div className="flex gap-4 p-3">
-                      <div className="w-14 h-20 rounded-xl overflow-hidden bg-white/5 flex-shrink-0">
+                      <div className="w-14 h-20 rounded-xl overflow-hidden bg-white/5 flex-shrink-0 shadow-md shadow-black/40">
                         {r.posterUrl ? (
                           <img
                             src={r.posterUrl}

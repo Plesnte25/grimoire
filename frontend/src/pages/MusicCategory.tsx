@@ -404,7 +404,7 @@ export function MusicCategory() {
 
       {/* Hero */}
       <div className="mt-5 rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 via-white/5 to-transparent p-5 md:p-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-3xl md:text-4xl font-semibold tracking-tight">
               MUSIC
@@ -413,7 +413,7 @@ export function MusicCategory() {
           </div>
 
           {/* Tabs */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {(["library", "playlists", "explore"] as Tab[]).map((t) => (
               <button
                 key={t}
@@ -548,7 +548,7 @@ export function MusicCategory() {
                     <div
                       key={s.id}
                       className={[
-                        "group flex items-center gap-3 px-4 py-3 transition",
+                        "group flex flex-wrap items-center gap-3 px-4 py-3 transition",
                         isCurrent ? "bg-white/10" : "hover:bg-white/7",
                       ].join(" ")}
                     >
@@ -591,7 +591,7 @@ export function MusicCategory() {
                       </div>
 
                       {/* row actions */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 w-full md:w-auto justify-end mt-2 md:mt-0">
                         <button
                           className="px-3 py-1.5 rounded-xl text-xs bg-white/10 hover:bg-white/15 border border-white/10 transition"
                           onClick={() => {
@@ -706,10 +706,17 @@ export function MusicCategory() {
       {/* Bottom player bar */}
       <div className="fixed bottom-0 left-0 right-0 z-40">
         <div className="mx-auto max-w-[1200px] px-4 md:px-10 pb-4">
-          <div className="rounded-3xl border border-white/10 bg-[#0b0b0f]/90 backdrop-blur-xl shadow-lg overflow-hidden">
+          <div className="relative rounded-3xl border border-white/10 bg-[#0b0b0f]/90 backdrop-blur-xl shadow-2xl shadow-black/50 overflow-hidden">
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-px opacity-60"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(139,92,246,0.8), rgba(56,189,248,0.6), transparent)",
+              }}
+            />
             <div className="p-3 md:p-4 flex items-center gap-3">
               {/* artwork */}
-              <div className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 overflow-hidden shrink-0">
+              <div className="h-12 w-12 rounded-2xl bg-white/5 border border-white/10 overflow-hidden shrink-0 shadow-lg shadow-black/40">
                 {playerMeta?.artwork ? (
                   <img
                     src={playerMeta.artwork}
@@ -778,7 +785,12 @@ export function MusicCategory() {
                 </button>
 
                 <button
-                  className="h-10 w-14 rounded-2xl bg-white/15 hover:bg-white/20 border border-white/10 transition flex items-center justify-center font-semibold"
+                  className={[
+                    "h-10 w-14 rounded-2xl border border-white/10 transition flex items-center justify-center font-semibold",
+                    isPlaying
+                      ? "bg-white/20 shadow-[0_0_16px_rgba(139,92,246,0.55)]"
+                      : "bg-white/15 hover:bg-white/20",
+                  ].join(" ")}
                   onClick={playPause}
                   title="Play / Pause"
                 >
