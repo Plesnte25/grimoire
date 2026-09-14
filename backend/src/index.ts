@@ -4,6 +4,7 @@ import type { Request, Response, NextFunction } from "express";
 const require = createRequire(import.meta.url);
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 
 import helmet from "helmet";
 
@@ -11,25 +12,32 @@ import { libraryRouter } from "./routes/library.js";
 import { listsRouter } from "./routes/lists.js";
 import { providersRouter } from "./routes/providers.js";
 import suggestionsRouter from "./routes/suggestions.js";
+import { authRouter } from "./routes/auth.js";
+import { requireSession } from "./middleware/requireSession.js";
 
 const app = express();
 
 app.use(helmet());
 app.use(
     cors({
-        origin: true,
+        origin: process.env.FRONTEND_ORIGIN
+            ? process.env.FRONTEND_ORIGIN.split(",")
+            : true,
         credentials: true,
     })
 );
 
 app.use(express.json({ limit: "2mb" }));
+app.use(cookieParser());
 
 app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 
-app.use("/api/providers", providersRouter);
-app.use("/api/library", libraryRouter);
-app.use("/api/lists", listsRouter);
-app.use("/api/suggestions", suggestionsRouter);
+app.use("/api/auth", authRouter);
+
+app.use("/api/providers", requireSession, providersRouter);
+app.use("/api/library", requireSession, libraryRouter);
+app.use("/api/lists", requireSession, listsRouter);
+app.use("/api/suggestions", requireSession, suggestionsRouter);
 
 /**
  * ✅ Central error handler (prevents crashes from thrown errors in routes)

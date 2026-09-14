@@ -7,7 +7,45 @@ const API_BASE =
 export const api = axios.create({
     baseURL: API_BASE,
     timeout: 20_000,
+    withCredentials: true,
 });
+
+// --- Auth ---
+
+export type AuthStatus = {
+    bootstrap: boolean;
+    deviceTrusted: boolean;
+    unlocked: boolean;
+};
+
+export async function authStatus(): Promise<AuthStatus> {
+    const res = await api.get("/api/auth/status");
+    return res.data;
+}
+
+export async function bootstrapAccount(email: string, pin: string) {
+    await api.post("/api/auth/bootstrap", { email, pin });
+}
+
+export async function requestOtp(email: string) {
+    await api.post("/api/auth/otp/request", { email });
+}
+
+export async function verifyOtp(code: string) {
+    await api.post("/api/auth/otp/verify", { code });
+}
+
+export async function unlockWithPin(pin: string) {
+    await api.post("/api/auth/unlock", { pin });
+}
+
+export async function lock() {
+    await api.post("/api/auth/lock");
+}
+
+export async function setAccountPin(currentPin: string, newPin: string) {
+    await api.post("/api/auth/pin", { currentPin, newPin });
+}
 
 // --- Providers ---
 

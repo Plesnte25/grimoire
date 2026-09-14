@@ -68,3 +68,40 @@ model ListItem {
 
   @@unique([listId, mediaId])
 }
+
+// --- Auth (single-account: PIN unlock on trusted devices, email OTP to trust a new device) ---
+
+model AccountConfig {
+  id                Int       @id @default(1)
+  email             String
+  pinSaltHex        String
+  pinHashHex        String
+  failedPinAttempts Int       @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model TrustedDevice {
+  id         String   @id @default(cuid()) // stored in long-lived httpOnly cookie `mv_device`
+  label      String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid()) // stored in httpOnly cookie `mv_session`
+  deviceId  String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model OtpCode {
+  id              String    @id @default(cuid())
+  codeHash        String
+  pendingDeviceId String    // stored in short-lived httpOnly cookie `mv_pending_device`
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  attempts        Int       @default(0)
+  createdAt       DateTime  @default(now())
+}
