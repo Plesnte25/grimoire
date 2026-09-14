@@ -52,31 +52,45 @@ function createClient(): AxiosInstance {
 const http = createClient();
 
 // --------- GENRE MAP CACHE ----------
+type GenreMapEntry = { at: number; nameToId: Record<string, number>; idToName: Record<number, string> };
 type GenreMapCache = {
-    movie?: { at: number; map: Record<string, number> };
-    tv?: { at: number; map: Record<string, number> };
+    movie?: GenreMapEntry;
+    tv?: GenreMapEntry;
 };
 
 const genreCache: GenreMapCache = {};
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-async function getGenreMap(kind: "movie" | "tv") {
+async function getGenreMapEntry(kind: "movie" | "tv"): Promise<GenreMapEntry> {
     const cached = genreCache[kind];
-    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.map;
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached;
 
-    if (!API_KEY) return {};
+    if (!API_KEY) return { at: Date.now(), nameToId: {}, idToName: {} };
 
     const res = await requestWithRetry(() =>
         http.get(`/genre/${kind}/list`, { params: { api_key: API_KEY } })
     );
 
-    const map: Record<string, number> = {};
+    const nameToId: Record<string, number> = {};
+    const idToName: Record<number, string> = {};
     for (const g of res.data?.genres ?? []) {
-        if (g?.name && g?.id) map[String(g.name).toLowerCase()] = Number(g.id);
+        if (g?.name && g?.id) {
+            nameToId[String(g.name).toLowerCase()] = Number(g.id);
+            idToName[Number(g.id)] = String(g.name);
+        }
     }
 
-    genreCache[kind] = { at: Date.now(), map };
-    return map;
+    const entry = { at: Date.now(), nameToId, idToName };
+    genreCache[kind] = entry;
+    return entry;
+}
+
+async function getGenreMap(kind: "movie" | "tv") {
+    return (await getGenreMapEntry(kind)).nameToId;
+}
+
+async function getGenreIdToName(kind: "movie" | "tv") {
+    return (await getGenreMapEntry(kind)).idToName;
 }
 
 function toPoster(url?: string | null) {
@@ -181,20 +195,20 @@ export async function tmdbDiscoverByGenres(params: {
         .filter(Boolean)
         .slice(0, 3);
 
-    // If mapping fails, return empty (caller can fallback to search)
-    if (ids.length === 0) return [];
+    // If genre-name mapping fails entirely, fall back to unfiltered popularity
+    // discover rather than returning nothing.
+    const queryParams: Record<string, any> = {
+        api_key: API_KEY,
+        sort_by: "popularity.desc",
+        include_adult: false,
+        page,
+    };
+    if (ids.length > 0) queryParams.with_genres = ids.join(",");
 
-    const res = await requestWithRetry(() =>
-        http.get(endpoint, {
-            params: {
-                api_key: API_KEY,
-                with_genres: ids.join(","),
-                sort_by: "popularity.desc",
-                include_adult: false,
-                page,
-            },
-        })
-    );
+    const res = await requestWithRetry(() => http.get(endpoint, { params: queryParams }));
+
+    // discover results only carry genre_ids, not names
+    const idToName = await getGenreIdToName(kind);
 
     return (res.data?.results ?? []).map((r: any) => ({
         provider: "tmdb",
@@ -211,5 +225,8 @@ export async function tmdbDiscoverByGenres(params: {
         globalRating: typeof r.vote_average === "number" ? r.vote_average : undefined,
         globalRatingText:
             typeof r.vote_count === "number" ? `TMDB (${r.vote_count} votes)` : undefined,
+        genres: Array.isArray(r.genre_ids)
+            ? r.genre_ids.map((gid: number) => idToName[gid]).filter(Boolean)
+            : [],
     }));
 }

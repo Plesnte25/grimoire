@@ -1,7 +1,7 @@
 import axios from "axios";
 
 export async function itunesSearch(q: string) {
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&limit=10`;
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=10`;
     const res = await axios.get(url);
     const items = res.data?.results ?? [];
 
@@ -17,6 +17,8 @@ export async function itunesSearch(q: string) {
         globalRating: undefined,
         globalRatingText: "iTunes",
         genres: t.primaryGenreName ? [t.primaryGenreName] : [],
+        collectionId: t.collectionId != null ? String(t.collectionId) : undefined,
+        collectionName: t.collectionName ?? undefined,
     }));
 }
 
@@ -38,6 +40,8 @@ export async function itunesLookupById(id: string) {
         globalRating: undefined,
         globalRatingText: "iTunes",
         genres: t.primaryGenreName ? [t.primaryGenreName] : [],
+        collectionId: t.collectionId != null ? String(t.collectionId) : undefined,
+        collectionName: t.collectionName ?? undefined,
     };
 }
 

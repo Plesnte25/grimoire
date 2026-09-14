@@ -6,8 +6,8 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 import { tmdbDiscoverByGenres } from "../services/providers/tmdb.js";
 import { anilistDiscoverByGenres } from "../services/providers/anilist.js";
-import { googleBooksDiscoverByIds } from "../services/providers/googleBooks.js";
-import { itunesDiscoverByIds } from "../services/providers/itunes.js";
+import { googleBooksSearch } from "../services/providers/googleBooks.js";
+import { itunesSearch } from "../services/providers/itunes.js";
 
 export const suggestionsRouter = Router();
 
@@ -81,11 +81,24 @@ function mulberry32(seed: number) {
     };
 }
 
+// Unbiased seeded shuffle (the old `.sort(() => rand() - 0.5)` pattern is not uniform).
+function seededShuffle<T>(arr: T[], rand: () => number): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
 suggestionsRouter.get("/", asyncHandler(async (req, res) => {
     const q = parseOrThrow(
         z.object({
             mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK", "MUSIC"]).optional(),
             cursor: z.string().optional(),
+            // Sent only on an explicit Refresh click — forces a live re-fetch instead of
+            // reusing the 2-minute cache bucket (see cacheKey below).
+            refresh: z.coerce.number().optional(),
             scope: z.preprocess((val) => {
                 if (typeof val !== "string") return val;
 
@@ -101,13 +114,18 @@ suggestionsRouter.get("/", asyncHandler(async (req, res) => {
     const scope = (q.scope ?? "SERIES") as "SERIES" | "MOVIES" | "HENTAI";
 
     /**
-     * Bucket seed changes every 2 minutes, so repeated refreshes
-     * don't hammer AniList/TMDB with completely new queries. 
+     * Bucket seed changes every 2 minutes, so organic page loads/navigation
+     * don't hammer AniList/TMDB with completely new queries. An explicit
+     * Refresh click sends `refresh` (its own timestamp), which seeds and
+     * keys the cache independently so it always live-fetches.
      */
+    const isExplicitRefresh = typeof q.refresh === "number";
     const bucket = Math.floor(Date.now() / SUG_TTL_MS);
     const cursor = q.cursor ?? String(bucket);
 
-    const seedNum = Number(String(cursor).replace(/\D/g, "").slice(-9)) || bucket;
+    const seedNum = isExplicitRefresh
+        ? q.refresh! >>> 0
+        : Number(String(cursor).replace(/\D/g, "").slice(-9)) || bucket;
     const rand = mulberry32(seedNum);
 
     // Pull from library to compute "because you like" seeds
@@ -140,12 +158,15 @@ suggestionsRouter.get("/", asyncHandler(async (req, res) => {
     const topGenres = pickTopGenres(library, 6);
 
     // Shuffle top genres deterministically
-    const shuffledTop = [...topGenres].sort(() => rand() - 0.5);
+    const shuffledTop = seededShuffle(topGenres, rand);
     const seedGenres = shuffledTop.slice(0, Math.max(1, Math.min(3, shuffledTop.length)));
 
-    // Cache key depends on mediaType + scope + genre seed + bucket
-    const cacheKey = `${bucket}:${mediaType ?? "ALL"}:${scope}:${seedGenres.join("|")}`;
-    const cachedBecause = sugGet(cacheKey);
+    // Cache key depends on mediaType + scope + genre seed + bucket (or the refresh
+    // seed on an explicit refresh, so it never collides with the organic-load bucket).
+    const cacheKey = isExplicitRefresh
+        ? `refresh:${seedNum}:${mediaType ?? "ALL"}:${scope}:${seedGenres.join("|")}`
+        : `${bucket}:${mediaType ?? "ALL"}:${scope}:${seedGenres.join("|")}`;
+    const cachedBecause = isExplicitRefresh ? null : sugGet(cacheKey);
 
     let becauseYouLike: any[] = [];
 
@@ -180,20 +201,19 @@ suggestionsRouter.get("/", asyncHandler(async (req, res) => {
 
             sugSet(cacheKey, becauseYouLike);
         } else if (mediaType === "BOOK") {
-            const base = 100000 + Math.floor(rand() * 500000);
-            const ids = Array.from({ length: 12 }, (_, i) => String(base + i * 13));
-
-            const results = await googleBooksDiscoverByIds(ids);
+            // Google Books categories are BISAC-style ("Fiction / Coming of Age") —
+            // `subject:` wants a single simple term, so use just the top-level segment.
+            const rawGenre = seedGenres[0] ?? "fiction";
+            const genre = rawGenre.split("/")[0].trim().toLowerCase() || "fiction";
+            const results = await googleBooksSearch(`subject:${genre}`);
             becauseYouLike = results
                 .filter((r: any) => !existing.has(`${r.provider}:${r.providerId}`))
                 .slice(0, 12);
 
             sugSet(cacheKey, becauseYouLike);
         } else if (mediaType === "MUSIC") {
-            const base = 100000000 + Math.floor(rand() * 50000000);
-            const ids = Array.from({ length: 12 }, (_, i) => String(base + i * 31));
-
-            const results = await itunesDiscoverByIds(ids);
+            const genre = seedGenres[0] ?? "pop";
+            const results = await itunesSearch(genre);
             becauseYouLike = results
                 .filter((r: any) => !existing.has(`${r.provider}:${r.providerId}`))
                 .slice(0, 12);

@@ -28,6 +28,18 @@ function asKey(x: SuggestionItem) {
   return `${x.provider}:${x.providerId}`;
 }
 
+function genreList(genres: SuggestionItem["genres"]): string[] {
+  if (!genres) return [];
+  if (Array.isArray(genres)) return genres.filter(Boolean).map(String);
+  if (typeof genres === "string") return [genres];
+  return [];
+}
+
+function ratingLabel(s: SuggestionItem): string | null {
+  if (typeof s.globalRating !== "number") return null;
+  return `★ ${s.globalRating.toFixed(1)}`;
+}
+
 export function SuggestionsCarousel({
   mediaType,
   existingProviderIds,
@@ -35,12 +47,14 @@ export function SuggestionsCarousel({
   subtitle,
 }: Props) {
   const qc = useQueryClient();
-  const [seed, setSeed] = useState<number>(() => Date.now());
+  // undefined = organic load (benefits from the backend's 2-minute cache bucket);
+  // set only by an explicit Refresh click, which always forces a live re-fetch.
+  const [refreshSeed, setRefreshSeed] = useState<number | undefined>(undefined);
   const [removed, setRemoved] = useState<Set<string>>(new Set());
 
   const { data, isLoading, isFetching, isError, error } = useQuery({
-    queryKey: ["suggestions", mediaType, seed, scope],
-    queryFn: () => fetchSuggestions(mediaType, seed, scope),
+    queryKey: ["suggestions", mediaType, scope, refreshSeed],
+    queryFn: () => fetchSuggestions(mediaType, scope, refreshSeed),
     staleTime: 0,
     refetchOnWindowFocus: false,
   });
@@ -153,7 +167,7 @@ export function SuggestionsCarousel({
             className="px-3 py-1 rounded-lg text-sm bg-white/10 hover:bg-white/15 transition"
             onClick={() => {
               setRemoved(new Set());
-              setSeed(Date.now());
+              setRefreshSeed(Date.now());
             }}
             disabled={isFetching}
             title="Refresh suggestions"
@@ -163,78 +177,114 @@ export function SuggestionsCarousel({
         </div>
       </div>
 
-      <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+      <div
+        className="mt-3 relative rounded-2xl border border-white/10 p-3 overflow-hidden"
+        style={{
+          background:
+            "radial-gradient(120% 160% at 0% 0%, rgba(139,92,246,0.10) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))",
+        }}
+      >
         {isLoading ? (
-          <div className="text-sm opacity-70">Analyzing…</div>
+          <div className="text-sm opacity-70 py-6 text-center">Analyzing…</div>
         ) : isError ? (
-          <div className="text-sm opacity-70">
+          <div className="text-sm opacity-70 py-6 text-center">
             Couldn’t load suggestions.{" "}
             <button
               className="underline hover:opacity-90"
               onClick={() => {
                 setRemoved(new Set());
-                setSeed(Date.now());
+                setRefreshSeed(Date.now());
               }}
             >
               Retry
             </button>
           </div>
         ) : displayed.length === 0 ? (
-          <div className="text-sm opacity-70">
+          <div className="text-sm opacity-70 py-6 text-center">
             No suggestions yet. Add a few items (with genres) and refresh.
           </div>
         ) : (
-          <div
-            id={scrollId}
-            className="
-      flex gap-3 overflow-x-auto pb-2
-      [scrollbar-width:none] [-ms-overflow-style:none]
-      [&::-webkit-scrollbar]:hidden
-    "
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
-            {displayed.map((s) => (
-              <div key={asKey(s)} className="group relative w-[160px] shrink-0">
-                <div
-                  className="h-[240px] rounded-2xl border border-white/10 overflow-hidden bg-black/30 cursor-pointer"
-                  title={s.title ?? ""}
-                >
-                  {s.posterUrl ? (
-                    <img
-                      src={s.posterUrl}
-                      alt={s.title ?? ""}
-                      className="h-full w-full object-cover group-hover:scale-[1.02] transition"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center text-xs opacity-60">
-                      No poster
-                    </div>
-                  )}
+          <div className="relative group/rail">
+            <button
+              className="hidden sm:flex absolute left-1 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/60 hover:bg-black/80 border border-white/15 backdrop-blur-sm items-center justify-center opacity-0 group-hover/rail:opacity-100 transition"
+              onClick={() => scrollBy(-1)}
+              aria-label="Scroll left"
+            >
+              ‹
+            </button>
+            <button
+              className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/60 hover:bg-black/80 border border-white/15 backdrop-blur-sm items-center justify-center opacity-0 group-hover/rail:opacity-100 transition"
+              onClick={() => scrollBy(1)}
+              aria-label="Scroll right"
+            >
+              ›
+            </button>
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+            <div
+              id={scrollId}
+              className="
+        flex gap-4 overflow-x-auto py-2 px-1
+        [scrollbar-width:none] [-ms-overflow-style:none]
+        [&::-webkit-scrollbar]:hidden
+      "
+              style={{ WebkitOverflowScrolling: "touch" }}
+            >
+              {displayed.map((s) => {
+                const genres = genreList(s.genres).slice(0, 2);
+                const rating = ratingLabel(s);
+                return (
+                  <div
+                    key={asKey(s)}
+                    className="group/card relative w-[180px] shrink-0 transform-gpu transition duration-200 hover:scale-[1.06] hover:z-10"
+                  >
+                    <div
+                      className="h-[270px] rounded-2xl border border-white/10 overflow-hidden bg-black/30 cursor-pointer shadow-lg shadow-black/30 group-hover/card:shadow-2xl group-hover/card:shadow-black/50 transition-shadow"
+                      title={s.title ?? ""}
+                    >
+                      {s.posterUrl ? (
+                        <img
+                          src={s.posterUrl}
+                          alt={s.title ?? ""}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-xs opacity-60">
+                          No poster
+                        </div>
+                      )}
 
-                  <div className="absolute bottom-2 left-2 right-2">
-                    <div className="text-sm font-semibold leading-tight line-clamp-2">
-                      {s.title}
-                    </div>
-                    <div className="text-xs opacity-70 mt-0.5">
-                      {s.year ?? ""}
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
+
+                      <div className="absolute bottom-2 left-2 right-2">
+                        <div className="text-sm font-semibold leading-tight line-clamp-2 drop-shadow">
+                          {s.title}
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] opacity-85 mt-1 drop-shadow">
+                          {s.year ? <span>{s.year}</span> : null}
+                          {rating ? <span>{rating}</span> : null}
+                        </div>
+                        {genres.length ? (
+                          <div className="text-[11px] opacity-70 mt-0.5 line-clamp-1 drop-shadow">
+                            {genres.join(" · ")}
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <button
+                        className="absolute top-2 right-2 px-2 py-1 rounded-lg text-xs bg-white/10 hover:bg-white/25 border border-white/10 backdrop-blur-sm transition"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleQuickAdd(s);
+                        }}
+                      >
+                        + Add
+                      </button>
                     </div>
                   </div>
-
-                  <button
-                    className="absolute top-2 right-2 px-2 py-1 rounded-lg text-xs bg-white/10 hover:bg-white/20 border border-white/10 transition"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleQuickAdd(s);
-                    }}
-                  >
-                    + Add
-                  </button>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
