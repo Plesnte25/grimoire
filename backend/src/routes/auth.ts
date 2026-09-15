@@ -105,10 +105,17 @@ authRouter.post(
             },
         });
 
-        // The device doing the bootstrap is trusted immediately — no chicken-and-egg
-        // email verification for the very first device.
-        const device = await prisma.trustedDevice.create({ data: { label: "First device" } });
-        setDeviceCookie(res, device.id);
+        // Registering now verifies the email via OTP first (see /otp/request,
+        // /otp/verify), which already trusts this device — reuse that instead
+        // of creating a duplicate. Only make a fresh one if somehow absent.
+        const existingDeviceId = req.cookies?.mv_device;
+        const existingDevice = existingDeviceId
+            ? await prisma.trustedDevice.findUnique({ where: { id: existingDeviceId } })
+            : null;
+        if (!existingDevice) {
+            const device = await prisma.trustedDevice.create({ data: { label: "First device" } });
+            setDeviceCookie(res, device.id);
+        }
 
         res.json({ ok: true });
     })
@@ -125,9 +132,13 @@ authRouter.post(
         if (!pendingDeviceId) pendingDeviceId = crypto.randomBytes(16).toString("hex");
         setPendingDeviceCookie(res, pendingDeviceId);
 
-        // Always respond 200 regardless of whether the email matches the account,
-        // so a caller can't use this endpoint to probe the account's real email.
-        if (account && data.email.toLowerCase().trim() === account.email) {
+        // No account yet -> this is a registration email, always send (there's
+        // nothing to enumerate). Account exists -> only send when the email
+        // matches it, and always respond 200 either way so this endpoint can't
+        // be used to probe the account's real email.
+        const targetEmail = data.email.toLowerCase().trim();
+        const shouldSend = account ? targetEmail === account.email : true;
+        if (shouldSend) {
             const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
             await prisma.otpCode.create({
                 data: {
@@ -137,7 +148,7 @@ authRouter.post(
                 },
             });
             await sendEmail(
-                account.email,
+                account ? account.email : targetEmail,
                 "MediaVault verification code",
                 `Your verification code is ${code}. It expires in 10 minutes.`
             );
