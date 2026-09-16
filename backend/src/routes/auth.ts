@@ -43,18 +43,18 @@ function baseCookieOpts() {
 }
 
 function setDeviceCookie(res: Response, deviceId: string) {
-    res.cookie("mv_device", deviceId, { ...baseCookieOpts(), maxAge: DEVICE_COOKIE_MAX_AGE_MS });
+    res.cookie("gr_device", deviceId, { ...baseCookieOpts(), maxAge: DEVICE_COOKIE_MAX_AGE_MS });
 }
 
 function setPendingDeviceCookie(res: Response, pendingDeviceId: string) {
-    res.cookie("mv_pending_device", pendingDeviceId, {
+    res.cookie("gr_pending_device", pendingDeviceId, {
         ...baseCookieOpts(),
         maxAge: PENDING_DEVICE_COOKIE_MAX_AGE_MS,
     });
 }
 
 function setSessionCookie(res: Response, sessionId: string) {
-    res.cookie("mv_session", sessionId, { ...baseCookieOpts(), maxAge: SESSION_TTL_MS });
+    res.cookie("gr_session", sessionId, { ...baseCookieOpts(), maxAge: SESSION_TTL_MS });
 }
 
 const otpRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 3 });
@@ -69,12 +69,12 @@ authRouter.get(
             return res.json({ bootstrap: true, deviceTrusted: false, unlocked: false });
         }
 
-        const deviceId = req.cookies?.mv_device;
+        const deviceId = req.cookies?.gr_device;
         const device = deviceId
             ? await prisma.trustedDevice.findUnique({ where: { id: deviceId } })
             : null;
 
-        const sessionId = req.cookies?.mv_session;
+        const sessionId = req.cookies?.gr_session;
         const session = sessionId
             ? await prisma.session.findUnique({ where: { id: sessionId } })
             : null;
@@ -108,7 +108,7 @@ authRouter.post(
         // Registering now verifies the email via OTP first (see /otp/request,
         // /otp/verify), which already trusts this device — reuse that instead
         // of creating a duplicate. Only make a fresh one if somehow absent.
-        const existingDeviceId = req.cookies?.mv_device;
+        const existingDeviceId = req.cookies?.gr_device;
         const existingDevice = existingDeviceId
             ? await prisma.trustedDevice.findUnique({ where: { id: existingDeviceId } })
             : null;
@@ -128,7 +128,7 @@ authRouter.post(
         const data = parseOrThrow(z.object({ email: z.string().email() }), req.body);
         const account = await prisma.accountConfig.findUnique({ where: { id: 1 } });
 
-        let pendingDeviceId: string = req.cookies?.mv_pending_device;
+        let pendingDeviceId: string = req.cookies?.gr_pending_device;
         if (!pendingDeviceId) pendingDeviceId = crypto.randomBytes(16).toString("hex");
         setPendingDeviceCookie(res, pendingDeviceId);
 
@@ -149,7 +149,7 @@ authRouter.post(
             });
             await sendEmail(
                 account ? account.email : targetEmail,
-                "MediaVault verification code",
+                "Grimoire verification code",
                 `Your verification code is ${code}. It expires in 10 minutes.`
             );
         }
@@ -164,7 +164,7 @@ authRouter.post(
     asyncHandler(async (req, res) => {
         const data = parseOrThrow(z.object({ code: z.string().regex(/^\d{6}$/) }), req.body);
 
-        const pendingDeviceId = req.cookies?.mv_pending_device;
+        const pendingDeviceId = req.cookies?.gr_pending_device;
         if (!pendingDeviceId) throw httpError(400, "NO_PENDING_OTP", "No pending verification");
 
         const otp = await prisma.otpCode.findFirst({
@@ -189,7 +189,7 @@ authRouter.post(
 
         const device = await prisma.trustedDevice.create({ data: {} });
         setDeviceCookie(res, device.id);
-        res.clearCookie("mv_pending_device", { path: "/" });
+        res.clearCookie("gr_pending_device", { path: "/" });
 
         res.json({ ok: true });
     })
@@ -201,7 +201,7 @@ authRouter.post(
     asyncHandler(async (req, res) => {
         const data = parseOrThrow(z.object({ pin: pinSchema }), req.body);
 
-        const deviceId = req.cookies?.mv_device;
+        const deviceId = req.cookies?.gr_device;
         const device = deviceId
             ? await prisma.trustedDevice.findUnique({ where: { id: deviceId } })
             : null;
@@ -244,9 +244,9 @@ authRouter.post(
 authRouter.post(
     "/lock",
     asyncHandler(async (req, res) => {
-        const sessionId = req.cookies?.mv_session;
+        const sessionId = req.cookies?.gr_session;
         if (sessionId) await prisma.session.deleteMany({ where: { id: sessionId } });
-        res.clearCookie("mv_session", { path: "/" });
+        res.clearCookie("gr_session", { path: "/" });
         res.json({ ok: true });
     })
 );

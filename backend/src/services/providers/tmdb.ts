@@ -44,7 +44,7 @@ function createClient(): AxiosInstance {
         timeout: 12_000,
         headers: {
             Accept: "application/json",
-            "User-Agent": "media-vault-backend",
+            "User-Agent": "grimoire-backend",
         },
     });
 }

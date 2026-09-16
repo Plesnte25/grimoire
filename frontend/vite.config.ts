@@ -23,8 +23,8 @@ export default defineConfig({
             registerType: "autoUpdate",
             includeAssets: ["favicon.svg"],
             manifest: {
-                name: "MediaVault",
-                short_name: "MediaVault",
+                name: "Grimoire",
+                short_name: "Grimoire",
                 theme_color: "#0b0b10",
                 background_color: "#0b0b10",
                 display: "standalone",

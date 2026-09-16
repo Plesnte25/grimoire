@@ -1,4 +1,4 @@
-# Media Vault
+# Grimoire
 
 A personal media tracker for anime, movies, TV, music, and more — track what you're watching/reading/listening to, rate it, organize custom lists, and pull in provider metadata (e.g. TMDB) for posters and info.
 
@@ -49,4 +49,5 @@ npm run dev
 
 ## Status
 
-Actively developed, single-user local app (SQLite). No auth yet — assumes a single local user.
+Actively developed, single-user app (SQLite). Real auth: shared PIN unlock
+across trusted devices, new devices verified via a 6-digit email code.

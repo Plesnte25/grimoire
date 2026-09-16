@@ -4,7 +4,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 
 export const requireSession = asyncHandler(
     async (req: Request, res: Response, next: NextFunction) => {
-        const sessionId = req.cookies?.mv_session;
+        const sessionId = req.cookies?.gr_session;
         if (!sessionId) {
             return res.status(401).json({ error: "Not authenticated", code: "UNAUTHENTICATED" });
         }

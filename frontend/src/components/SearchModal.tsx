@@ -215,7 +215,7 @@ export function SearchModal({
                 <div className="text-sm font-semibold opacity-90">
                   {mediaTypeFilter
                     ? `Add ${mediaTypeFilter}`
-                    : "Add to MediaVault"}
+                    : "Add to Grimoire"}
                 </div>
                 <div className="text-xs opacity-60 mt-0.5">
                   Type to search — click a result to add instantly
