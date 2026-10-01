@@ -52,6 +52,17 @@ commit once done. Issues are discussed and fixed one at a time.
     will clash with the regional categories (#37: Turkish Dizi, Pakistani Dramas, K-Drama). **Fix:** rename to "TV"
     when the regional categories land (or as part of the redesign).
 
+77. ✅ **Fixed** (`de565e8`) — **One failed AniList request broke every later one** (high). `postAniList` queued
+    calls with `chain = chain.then(task)`; after a rejection the chain stayed rejected, so all following AniList
+    requests failed until the server restarted. Now each task runs regardless of the previous result, with a
+    700 ms gap between requests.
+78. **Berserk 2 sits under "Berserk: The Golden Age Arc – Memorial Edition"** (low). AniList links the 2016 series'
+    prequel chain to the 2022 Memorial Edition TV rather than the 1997 series (an ALTERNATIVE). Correct per the
+    "follow AniList links" decision; a manual franchise override (detail page, like region "Move to…") would let
+    the user regroup it.
+79. **Co-productions can land in the wrong region** (low). *The Transporter* (English-language, French production
+    company) gets `origin_country: FR` → European. Covered by `regionOverride` ("Move to…", #37).
+
 ### Anime pipeline review (2026-10-01)
 
 Goal agreed with the user: one tile per franchise ("ONE PIECE") in Anime → Series, opening a franchise page that
@@ -60,21 +71,21 @@ Findings below are from the local DB (78 anime) and live AniList queries. Decisi
 **both** the Movies tab and the franchise page; the franchise page shows **unadded** entries with "+ Add"; grouping
 **follows AniList links** (Boruto joins Naruto via its SEQUEL link).
 
-9. **Movies/OVAs/specials never join their series** (high). `findMainlinePrequel` (`services/providers/anilist.ts`)
+9. ✅ **Fixed** (`de565e8`) — **Movies/OVAs/specials never join their series** (high). `findMainlinePrequel` (`services/providers/anilist.ts`)
    only follows `PREQUEL` edges between TV/TV_SHORT entries, but side entries hang off the series via `PARENT` (and
    sometimes `SIDE_STORY`/`PREQUEL` from a MOVIE). E.g. *One Piece: Heart of Gold* → `PARENT: ONE PIECE`; both Naruto
    movies → `PARENT: NARUTO`. All ungrouped.
-10. **Series with no sequel never get a collectionId** (high). Root self-reference only happens when a mainline
+10. ✅ **Fixed** (`de565e8`) — **Series with no sequel never get a collectionId** (high). Root self-reference only happens when a mainline
     `SEQUEL` exists, so ONE PIECE (no sequel) has no id and nothing can attach to it.
-11. **3-hop cap splits franchises** (medium). Demon Slayer is spread over 3 ids (101922 / 129874 / 142329); MHA S5
+11. ✅ **Fixed** (`de565e8`) — **3-hop cap splits franchises** (medium). Demon Slayer is spread over 3 ids (101922 / 129874 / 142329); MHA S5
     sits under 21856 instead of 21459.
-12. **Grouping data dropped on add** (high). `SearchModal.add` copies genres/poster/etc. from `providerDetails` but
+12. ✅ **Fixed** (`de565e8`) — **Grouping data dropped on add** (high). `SearchModal.add` copies genres/poster/etc. from `providerDetails` but
     not `collectionId`/`collectionName`; the suggestions add doesn't fetch details at all. Only the one-off
     backfill script ever set anime collections. `GET /library` enriches anime on the fly but never persists it.
-13. **~50 of 78 anime have no `format` stored** (medium) → wrong tab: *Mugen Train* (MOVIE) shows under Series.
+13. ✅ **Fixed** (`de565e8`) — **~50 of 78 anime have no `format` stored** (medium) → wrong tab: *Mugen Train* (MOVIE) shows under Series.
 14. **Ongoing series have no episode total** (medium). ONE PIECE has `episodes: null` (1181 aired), so progress
     initialises as `0/null`. AniList's `nextAiringEpisode` gives the aired count.
-15. **Donghua / Korean anime are mostly ONA** (medium). Grouping accepts only TV/TV_SHORT as mainline, so CN/KR
+15. ✅ **Fixed** (`de565e8`) — **Donghua / Korean anime are mostly ONA** (medium). Grouping accepts only TV/TV_SHORT as mainline, so CN/KR
     series (e.g. *Lord of Mysteries*, CN ONA) can't chain their seasons.
 16. **Dead `pages/Anime.tsx` + `/anime` route** (low). Nothing links to it; it never renders library items. The
     real anime page is `pages/Category.tsx`.
@@ -113,7 +124,7 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
 18. **No creator field** (medium). Books store no author, music packs the artist into the title/description, movies
     have no director. **Fix:** one `creator` column (author / artist / director) filled by every provider, shown on
     cards and searchable.
-19. **Library loads call providers per request** (medium, perf). `GET /library` re-fetches AniList details for
+19. ✅ **Fixed** (`de565e8`) — **Library loads call providers per request** (medium, perf). `GET /library` re-fetches AniList details for
     anime missing `format`, and TMDB details for every movie without a collection. The 39 movies that genuinely have
     no collection are re-fetched on **every** Movies page load because "no collection" is never stored.
     **Fix:** persist results plus a `metaCheckedAt` timestamp; enrichment moves to the add path + backfill
@@ -124,7 +135,7 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
 
 **Movies**
 
-20. **31 of 100 movies have no genres** (low) (*Interstellar*, *Se7en*, *Fast X*…), so they're missing from genre
+20. ✅ **Fixed** (`de565e8`) — **31 of 100 movies have no genres** (low) (*Interstellar*, *Se7en*, *Fast X*…), so they're missing from genre
     chips and suggestion seeding. **Fix:** covered by the shared backfill.
 21. **Collection stack has no "full collection" view** (polish). TMDB `/collection/{id}` lists every film. Reuse the
     anime franchise page (step F) for movie collections: owned films highlighted, the rest "+ Add", in release
@@ -132,7 +143,7 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
 
 **TV**
 
-22. **No seasons/episodes stored** (medium). `tmdbDetails` returns `seasons`/`episodes` but nothing saves them
+22. 🟡 **Data stored** (`de565e8`; season/episode picker in Phase 2) — **No seasons/episodes stored** (medium). `tmdbDetails` returns `seasons`/`episodes` but nothing saves them
     (`episodes` is null for all 9 shows). **Fix:** store them on add/backfill; a season → episode progress picker from
     TMDB `/tv/{id}/season/{n}`; for airing shows, show `next_episode_to_air` ("S3E5 airs Fri").
 23. TV spinoff grouping (*Young Sheldon* ↔ *Big Bang Theory*): **not planned.** TMDB has no relation data for TV;
@@ -140,7 +151,7 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
 
 **Books**
 
-24. **Edition data instead of the book** (medium). Google Books returns editions: *The Alchemist* shows 2015,
+24. 🟡 **Code done** (`de565e8`; blocked by Google's anonymous quota until `GOOGLE_BOOKS_API_KEY` is set, #26) — **Edition data instead of the book** (medium). Google Books returns editions: *The Alchemist* shows 2015,
     *The Kite Runner* 2020. No author or page count is stored. **Fix:** store `authors`, `pageCount`, ISBN; take the
     original year from Open Library (`/search.json?isbn=` → `first_publish_year`, free, no key).
 25. **Low-res `http://` covers** (low). All 3 covers are `http://books.google.com/...&zoom=1` thumbnails. **Fix:**
@@ -170,11 +181,11 @@ Digital), *Meray Paas Tum Ho*, *Dark* (DE), *Lupin* (FR), *La casa de papel* (ES
 *Meray Paas Tum Ho*), so it isn't worth adding as a second provider. What's missing is everything the app does
 *after* the search:
 
-31. **Origin/language is thrown away** (medium). TMDB returns `origin_country` and `original_language` for every
+31. 🟡 **Data stored** (`de565e8`; region categories/filters in Phase 3) — **Origin/language is thrown away** (medium). TMDB returns `origin_country` and `original_language` for every
     show; `tmdbSearch`/`tmdbDetails` drop both, so there's no way to filter Turkish vs Pakistani vs European.
     **Fix:** store `countryOfOrigin` (same column as anime #15/H) + `originalLanguage`; prefer country over
     language (the Urdu dub of Ertuğrul is `lang: ur` but `country: TR`).
-32. **Original title is thrown away** (low). `original_name` ("Diriliş: Ertuğrul", "La casa de papel") isn't mapped
+32. 🟡 **Data stored** (`de565e8`; bilingual title display in Phase 3) — **Original title is thrown away** (low). `original_name` ("Diriliş: Ertuğrul", "La casa de papel") isn't mapped
     to `nativeTitle`, and `withNativeTitle` in `Category.tsx` only runs for anime. **Fix:** map it for TMDB TV +
     movies; show "Resurrection: Ertugrul · Diriliş: Ertuğrul"; library search matches both.
 33. **Urdu romanization misses** (medium). TMDB search is spelling-exact: "Mere Paas Tum Ho" → **0 results**,
@@ -367,14 +378,16 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 Each step: one commit per item, verified against the real library, then deployed. Personalisation features
 #63–74 are all kept (decided 2026-10-01).
 
-**Phase 0: ship blockers + quick wins**
+**Phase 0: ship blockers + quick wins** ✅ deployed 2026-10-01 (`43943b6`; music export at
+`/opt/grimoire/backups/music-export-2026-10-01.json`, pre-deploy DB at `backups/pre-deploy-phase0-*.db`)
 0. Remove the auth bypass (#5); commit + deploy the bootstrap fix (#2), MediaDetail save fix (#3),
    providers/details handler (#4).
 1. Remove Music (#45), so later migrations and backfills don't carry MUSIC paths.
 2. Rating quick wins: separate personal vs online (#46), star control with Clear (#47), normalised scales (#48).
    Safe delete with confirm + undo (#55). Status labels per medium (#53).
 
-**Phase 1: data foundation (one migration, one backfill)**
+**Phase 1: data foundation (one migration, one backfill)** ✅ built + verified on a copy of the local data
+(`9252d3c`, `de565e8`), deploy pending
 3. **One schema migration** for the shared data: Franchise table + anime fields (A); `creator` (#18);
    `metaCheckedAt` (#19); TV `seasons`/`episodes` (#22); `countryOfOrigin`/`originalLanguage`/`nativeTitle`
    (#31–32); `region`/`regionOverride` (#37); airing snapshot (#39); **WatchLog** with started/finished dates,
@@ -425,7 +438,7 @@ Each step: one commit per item, verified against the real library, then deployed
    after installs, restarting the service. A `scripts/deploy.sh` run over SSH would make it one command.
 7. **No uptime monitoring**: `/health` exists (`backend/src/index.ts:54`) but nothing watches it. A free external
    check (e.g. UptimeRobot) would flag outages on the 1 GB VM.
-8. **Stale `mv_*` names in comments**: `backend/prisma/schema.prisma` still says `mv_device`, `mv_session` and
+8. ✅ **Fixed** (`9252d3c`) — **Stale `mv_*` names in comments**: `backend/prisma/schema.prisma` still says `mv_device`, `mv_session` and
    `mv_pending_device` after the cookie rename to `gr_*`.
 30. **Suggestions cache never short-circuits**: `routes/suggestions.ts` writes `SUG_CACHE` but only reads it as a
     fallback when a provider call fails, so every page load still hits TMDB/AniList/Google/iTunes. Return the cached
