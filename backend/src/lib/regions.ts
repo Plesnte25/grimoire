@@ -23,3 +23,9 @@ export function regionForItem(mediaType: string, country?: string | null): Regio
     if (mediaType !== "TV" && mediaType !== "MOVIE") return null;
     return regionForCountry(country);
 }
+
+/** The region an item is shown under: your "Move to…" choice, else its country's. */
+export function effectiveRegion(item: { region?: string | null; regionOverride?: string | null }): Region | null {
+    if (item.regionOverride === "NONE") return null;
+    return (item.regionOverride ?? item.region ?? null) as Region | null;
+}

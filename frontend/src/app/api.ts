@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
     MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
+    CatalogEntry,
 } from "../types";
 
 const API_BASE =
@@ -296,3 +297,46 @@ export async function fetchSuggestions(
 
 
 
+
+// --- Catalogue: franchise / collection / person pages ---
+
+export async function fetchFranchise(id: string): Promise<{
+    franchise: { id: string; title: string; nativeTitle?: string | null; posterUrl?: string | null; bannerUrl?: string | null; countryOfOrigin?: string | null; status?: string | null };
+    entries: CatalogEntry[];
+}> {
+    const res = await api.get(`/api/franchises/${id}`, { timeout: 120_000 });
+    return res.data;
+}
+
+export async function fetchCollection(id: string): Promise<{
+    id: string;
+    name: string;
+    overview?: string | null;
+    backdropUrl?: string | null;
+    parts: CatalogEntry[];
+}> {
+    const res = await api.get(`/api/collections/${id}`);
+    return res.data;
+}
+
+export async function fetchContributor(id: string): Promise<{
+    contributor: { id: string; name: string; kind: "PERSON" | "STUDIO"; imageUrl?: string | null };
+    bio?: string | null;
+    yours: (Pick<MediaItem, "id" | "title" | "mediaType" | "year" | "posterUrl" | "status" | "yourRating"> & { role: string; character?: string | null })[];
+    otherWork: CatalogEntry[];
+}> {
+    const res = await api.get(`/api/contributors/${encodeURIComponent(id)}`);
+    return res.data;
+}
+
+/** Adds a catalogue entry to the library (the server fills in the details). */
+export async function addCatalogEntry(e: CatalogEntry): Promise<MediaItem> {
+    return addToLibrary({
+        provider: e.provider,
+        providerId: e.providerId,
+        mediaType: e.mediaType,
+        title: e.title,
+        year: e.year ?? undefined,
+        posterUrl: e.posterUrl ?? undefined,
+    } as any);
+}

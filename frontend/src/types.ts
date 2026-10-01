@@ -73,6 +73,28 @@ export type MediaItem = {
     lastAiredSeason?: number | null;
     lastAiredEpisode?: number | null;
     tags?: { tag: Tag }[];
+    credits?: {
+        role: "DIRECTOR" | "CREATOR" | "AUTHOR" | "CAST" | "STUDIO";
+        character?: string | null;
+        contributor: { id: string; name: string; kind: "PERSON" | "STUDIO"; imageUrl?: string | null };
+    }[];
+};
+
+/** A provider entry shown on franchise / collection / person pages. */
+export type CatalogEntry = {
+    provider: "anilist" | "tmdb";
+    providerId: string;
+    mediaType: "ANIME" | "MOVIE" | "TV";
+    title: string;
+    format?: string | null;
+    role?: string | null;
+    year?: number | null;
+    date?: string | null;
+    status?: string | null;
+    posterUrl?: string | null;
+    libraryId?: string;
+    yourStatus?: MediaStatus;
+    yourRating?: number | null;
 };
 
 export type Tag = { id: string; name: string; kind: "TAG" | "MOOD"; color?: string | null; count?: number };

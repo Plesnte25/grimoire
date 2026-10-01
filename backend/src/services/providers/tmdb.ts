@@ -165,20 +165,32 @@ export async function tmdbDetails(providerId: string, type: "movie" | "tv") {
 }
 
 
-// --- existing search function (keep your exports if you already had them) ---
-export async function tmdbSearch(query: string, type: "movie" | "tv") {
-    if (!API_KEY) return [];
-    const endpoint = type === "movie" ? "/search/movie" : "/search/tv";
+// Main language per country, to spot dubbed re-uploads ("Ertugrul Ghazi Urdu" is
+// listed as country TR but language ur). Countries with several languages (IN,
+// CH, BE…) are left out rather than guessed.
+const COUNTRY_LANGUAGE: Record<string, string[]> = {
+    TR: ["tr"], PK: ["ur", "pa"], KR: ["ko"], JP: ["ja"], CN: ["zh", "cn"], TW: ["zh"], ES: ["es", "ca", "eu", "gl"],
+    MX: ["es"], DE: ["de"], AT: ["de"], FR: ["fr"], IT: ["it"], NO: ["no", "nb", "nn"], SE: ["sv"], DK: ["da"],
+    FI: ["fi"], PL: ["pl"], NL: ["nl"], PT: ["pt"], BR: ["pt"], US: ["en"], GB: ["en"], IE: ["en", "ga"],
+    AU: ["en"], CA: ["en", "fr"],
+};
 
-    const res = await requestWithRetry(() =>
-        http.get(endpoint, { params: { api_key: API_KEY, query } })
-    );
+function looksDubbed(r: any): boolean {
+    if (/\b(urdu|hindi|dubbed|dub|in hindi|in urdu)\b/i.test(r.name ?? r.title ?? "")) return true;
+    const country = r.origin_country?.[0];
+    const langs = country ? COUNTRY_LANGUAGE[country] : undefined;
+    return !!(langs && r.original_language && !langs.includes(r.original_language));
+}
 
-    return (res.data?.results ?? []).map((r: any) => ({
+function mapSearchResult(r: any, type: "movie" | "tv") {
+    const title = r.title ?? r.name ?? "";
+    const original = r.original_title ?? r.original_name ?? null;
+    return {
         provider: "tmdb",
         providerId: String(r.id),
         mediaType: type === "movie" ? "MOVIE" : "TV",
-        title: r.title ?? r.name ?? "",
+        title,
+        nativeTitle: original && original !== title ? original : undefined,
         year:
             type === "movie"
                 ? Number(String(r.release_date || "").slice(0, 4)) || undefined
@@ -189,7 +201,64 @@ export async function tmdbSearch(query: string, type: "movie" | "tv") {
         globalRating: typeof r.vote_average === "number" ? r.vote_average : undefined,
         globalRatingText:
             typeof r.vote_count === "number" ? `TMDB (${r.vote_count} votes)` : undefined,
-    }));
+        countryOfOrigin: r.origin_country?.[0] ?? undefined,
+        originalLanguage: r.original_language ?? undefined,
+        isDub: looksDubbed(r),
+        popularity: typeof r.popularity === "number" ? r.popularity : 0,
+    };
+}
+
+async function searchOnce(query: string, type: "movie" | "tv") {
+    const endpoint = type === "movie" ? "/search/movie" : "/search/tv";
+    const res = await requestWithRetry(() => http.get(endpoint, { params: { api_key: API_KEY, query } }));
+    return (res.data?.results ?? []).map((r: any) => mapSearchResult(r, type));
+}
+
+// Urdu titles have no fixed romanisation: "Mere Paas Tum Ho" is listed as
+// "Meray Paas Tum Ho". Each pair is tried in both directions.
+const ROMANISATION_PAIRS: [string, string][] = [
+    ["mere", "meray"], ["tere", "teray"], ["hai", "hay"], ["ki", "kee"], ["se", "say"],
+    ["mein", "main"], ["aur", "or"], ["ye", "yeh"], ["wo", "woh"], ["ishq", "ishk"], ["e", "ay"],
+];
+
+/** Spelling variants of a query (one swap at a time, then all swaps together). */
+export function romanisationVariants(query: string): string[] {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const swap = (w: string) => {
+        for (const [a, b] of ROMANISATION_PAIRS) {
+            if (w === a) return b;
+            if (w === b) return a;
+        }
+        return null;
+    };
+    const variants = new Set<string>();
+    const all = words.map((w) => swap(w) ?? w);
+    words.forEach((w, i) => {
+        const s = swap(w);
+        if (s) variants.add([...words.slice(0, i), s, ...words.slice(i + 1)].join(" "));
+    });
+    variants.add(all.join(" "));
+    variants.delete(words.join(" "));
+    return [...variants].slice(0, 4);
+}
+
+export async function tmdbSearch(query: string, type: "movie" | "tv") {
+    if (!API_KEY) return [];
+    const first = await searchOnce(query, type);
+    if (first.length >= 3) return first;
+
+    // Few hits: try spelling variants and merge (Pakistani titles especially).
+    const seen = new Set(first.map((r: any) => r.providerId));
+    const merged = [...first];
+    for (const v of romanisationVariants(query)) {
+        for (const r of await searchOnce(v, type).catch(() => [])) {
+            if (!seen.has(r.providerId)) {
+                seen.add(r.providerId);
+                merged.push(r);
+            }
+        }
+    }
+    return merged;
 }
 
 // --- NEW: Discover by genre ids ---

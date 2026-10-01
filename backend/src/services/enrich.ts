@@ -264,7 +264,7 @@ const ANIME_QUERY = `
 
 type AniDate = { year?: number | null; month?: number | null; day?: number | null } | null;
 
-async function fetchAnime(id: number): Promise<any | null> {
+export async function fetchAnime(id: number): Promise<any | null> {
     const data = await postAniList<any>(
         { query: ANIME_QUERY, variables: { id } },
         `enrich:${id}`,
@@ -273,17 +273,17 @@ async function fetchAnime(id: number): Promise<any | null> {
     return data?.data?.Media ?? null;
 }
 
-function aniTitle(t: any): string {
+export function aniTitle(t: any): string {
     return t?.english ?? t?.romaji ?? t?.native ?? "";
 }
 
-function aniDate(d: AniDate): Date | null {
+export function aniDate(d: AniDate): Date | null {
     if (!d?.year) return null;
     return new Date(Date.UTC(d.year, (d.month ?? 1) - 1, d.day ?? 1));
 }
 
 /** Sort key in airing order; unknown dates go last. */
-function aniOrder(d: AniDate): number {
+export function aniOrder(d: AniDate): number {
     if (!d?.year) return 99_999_999;
     return d.year * 10_000 + (d.month ?? 12) * 100 + (d.day ?? 28);
 }
@@ -298,9 +298,9 @@ const ANILIST_STATUS: Record<string, string> = {
     HIATUS: "HIATUS",
 };
 
-const TV_FORMATS = new Set(["TV", "TV_SHORT"]);
+export const TV_FORMATS = new Set(["TV", "TV_SHORT"]);
 
-function animeEdges(m: any, relation: string): any[] {
+export function animeEdges(m: any, relation: string): any[] {
     return (m?.relations?.edges ?? []).filter(
         (e: any) => e?.relationType === relation && e?.node?.type === "ANIME"
     );

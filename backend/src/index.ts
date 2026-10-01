@@ -16,6 +16,7 @@ import { listsRouter } from "./routes/lists.js";
 import { logsRouter } from "./routes/logs.js";
 import { tierListsRouter } from "./routes/tierLists.js";
 import { tagsRouter } from "./routes/tags.js";
+import { catalogRouter } from "./routes/catalog.js";
 import { providersRouter } from "./routes/providers.js";
 import suggestionsRouter from "./routes/suggestions.js";
 import { authRouter } from "./routes/auth.js";
@@ -65,6 +66,7 @@ app.use("/api/logs", requireSession, logsRouter);
 app.use("/api/tier-lists", requireSession, tierListsRouter);
 app.use("/api/tags", requireSession, tagsRouter);
 app.use("/api/suggestions", requireSession, suggestionsRouter);
+app.use("/api", requireSession, catalogRouter);
 
 // Serve the built frontend in production — makes the deployed app single-origin
 // (no CORS, no cross-origin cookie concerns) since one Node process serves both.

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { regionForCountry } from "../lib/regions.js";
 import { tmdbSearch, tmdbDetails } from "../services/providers/tmdb.js";
 import { anilistSearch, anilistDetails } from "../services/providers/anilist.js";
 import { googleBooksSearch, googleBooksDetails } from "../services/providers/googleBooks.js";
@@ -11,10 +12,12 @@ export const providersRouter = Router();
 providersRouter.get("/search", asyncHandler(async (req, res) => {
     const parsed = parseOrThrow(z.object({
         q: z.string().min(1),
-        mediaType: z.string().optional()
+        mediaType: z.string().optional(),
+        // From a regional category: shows + films, that region's titles first.
+        region: z.enum(["TR", "PK", "KR", "EU"]).optional(),
     }), req.query);
     const q = parsed.q;
-    const mediaType = parsed.mediaType;
+    const mediaType = parsed.region ? undefined : parsed.mediaType;
 
     const services: Promise<any>[] = [];
 
@@ -28,10 +31,10 @@ providersRouter.get("/search", asyncHandler(async (req, res) => {
         services.push(tmdbSearch(q, "tv"));
     }
 
-    if (!mediaType || mediaType === "ANIME") {
+    if (!parsed.region && (!mediaType || mediaType === "ANIME")) {
         services.push(anilistSearch(q));
     }
-    if (!mediaType || mediaType === "BOOK") {
+    if (!parsed.region && (!mediaType || mediaType === "BOOK")) {
         services.push(googleBooksSearch(q));
     }
 
@@ -43,6 +46,11 @@ providersRouter.get("/search", asyncHandler(async (req, res) => {
         } else if (s.status === "rejected") {
             console.error("Provider search failed:", s.reason);
         }
+    }
+
+    if (parsed.region) {
+        const inRegion = (r: any) => regionForCountry(r.countryOfOrigin) === parsed.region;
+        results.sort((a, b) => Number(inRegion(b)) - Number(inRegion(a)) || (b.popularity ?? 0) - (a.popularity ?? 0));
     }
 
     // Merge results. Frontend will show type badges.

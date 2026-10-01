@@ -105,6 +105,9 @@ export function MediaDetail() {
   const online = onlineRating(item);
   const genres = safeParseGenres(item.genres);
   const tags = (item.tags ?? []).map((t) => t.tag);
+  const credits = item.credits ?? [];
+  const creators = credits.filter((c) => c.role !== "CAST");
+  const cast = credits.filter((c) => c.role === "CAST");
   const facts = [
     TYPE_LABEL[item.mediaType],
     item.year ? String(item.year) : null,
@@ -135,7 +138,9 @@ export function MediaDetail() {
             </div>
             <div className="min-w-0">
               {item.franchise && item.franchiseRole && item.franchiseRole !== "MAIN" ? (
-                <div className="text-xs text-white/80">Part of {item.franchise.title}</div>
+                <button className="text-xs text-white/85 underline underline-offset-2" onClick={() => nav(`/franchise/${item.franchiseId}`)}>
+                  {item.franchise.title} ›
+                </button>
               ) : null}
               <h1 className="text-xl md:text-2xl font-semibold">{item.title}</h1>
               {item.nativeTitle && item.nativeTitle !== item.title ? (
@@ -159,11 +164,57 @@ export function MediaDetail() {
         </div>
 
         <div className="p-4 md:p-6 space-y-6">
-          {item.creator ? (
+          {creators.length ? (
+            <p className="text-sm">
+              <span className="text-white/75">{CREATOR_LABEL[item.mediaType]} </span>
+              {creators.map((c, i) => (
+                <span key={c.contributor.id}>
+                  {i > 0 ? ", " : ""}
+                  <button className="underline underline-offset-2 hover:text-white" onClick={() => nav(`/people/${encodeURIComponent(c.contributor.id)}`)}>
+                    {c.contributor.name}
+                  </button>
+                </span>
+              ))}
+            </p>
+          ) : item.creator ? (
             <p className="text-sm">
               <span className="text-white/75">{CREATOR_LABEL[item.mediaType]} </span>
               {item.creator}
             </p>
+          ) : null}
+
+          {item.franchiseId || item.collectionId ? (
+            <div className="flex flex-wrap gap-2">
+              {item.franchiseId ? (
+                <button className="min-h-11 rounded-xl bg-white/10 px-4 text-sm hover:bg-white/15" onClick={() => nav(`/franchise/${item.franchiseId}`)}>
+                  See the whole {item.franchise?.title ?? "franchise"} →
+                </button>
+              ) : null}
+              {item.collectionId && item.collectionSource === "tmdb" ? (
+                <button className="min-h-11 rounded-xl bg-white/10 px-4 text-sm hover:bg-white/15" onClick={() => nav(`/collection/${item.collectionId}`)}>
+                  Part of {item.collectionName ?? "a collection"} →
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {cast.length ? (
+            <section aria-labelledby="cast-heading">
+              <h2 id="cast-heading" className="text-sm font-semibold">Cast</h2>
+              <ul className="mt-2 flex gap-3 overflow-x-auto pb-2">
+                {cast.map((c) => (
+                  <li key={c.contributor.id} className="w-24 shrink-0">
+                    <button className="w-full text-left" onClick={() => nav(`/people/${encodeURIComponent(c.contributor.id)}`)}>
+                      <div className="h-24 w-24 overflow-hidden rounded-full bg-white/10">
+                        {c.contributor.imageUrl ? <img src={c.contributor.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" /> : null}
+                      </div>
+                      <div className="mt-1 line-clamp-2 text-xs font-semibold">{c.contributor.name}</div>
+                      {c.character ? <div className="line-clamp-1 text-xs text-white/75">{c.character}</div> : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
 
           {genres.length ? (

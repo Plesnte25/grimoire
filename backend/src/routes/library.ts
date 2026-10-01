@@ -7,6 +7,8 @@ import { enrichWithinBudget } from "../services/enrich.js";
 import { isFinished, progressTotal } from "../lib/progress.js";
 import { itemLogsRouter } from "./logs.js";
 import { setItemTags } from "./tags.js";
+import { effectiveRegion, regionForItem } from "../lib/regions.js";
+import { randomUUID } from "node:crypto";
 import { tmdbGet } from "../services/providers/tmdb.js";
 
 export const libraryRouter = Router();
@@ -101,11 +103,19 @@ const yearSchema = z
 libraryRouter.get(
     "/",
     asyncHandler(async (req, res) => {
-        const mediaType = req.query.mediaType as string | undefined;
-        const status = req.query.status as string | undefined;
+        const { mediaType, status, region } = parseOrThrow(
+            z.object({
+                mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK"]).optional(),
+                status: z.string().optional(),
+                // A regional category: its shows and films.
+                region: z.enum(["TR", "PK", "KR", "EU"]).optional(),
+            }),
+            req.query
+        );
 
         const where: any = {};
-        if (mediaType) where.mediaType = mediaType;
+        if (region) where.mediaType = { in: ["TV", "MOVIE"] };
+        else if (mediaType) where.mediaType = mediaType;
         if (status) where.status = status;
 
         // Library reads are DB-only: provider metadata is stored when an item is
@@ -116,7 +126,14 @@ libraryRouter.get(
             include: ITEM_INCLUDE,
         });
 
-        const out = items.map(withParsedGenres);
+        // Regional shows move out of TV into their region's category; regional
+        // films stay in Movies as well (decided 2026-10-01).
+        const visible = region
+            ? items.filter((it) => effectiveRegion(it) === region)
+            : mediaType === "TV"
+                ? items.filter((it) => !effectiveRegion(it))
+                : items;
+        const out = visible.map(withParsedGenres);
 
         res.json({ items: out });
     })
@@ -148,7 +165,13 @@ libraryRouter.get(
 libraryRouter.get(
     "/:id",
     asyncHandler(async (req, res) => {
-        const include = ITEM_INCLUDE;
+        const include = {
+            ...ITEM_INCLUDE,
+            credits: {
+                orderBy: [{ role: "asc" as const }, { order: "asc" as const }],
+                include: { contributor: { select: { id: true, name: true, kind: true, imageUrl: true } } },
+            },
+        };
         let item = await prisma.mediaItem.findUnique({ where: { id: req.params.id }, include });
         if (!item) return res.status(404).json({ error: "Not found" });
 
@@ -210,9 +233,14 @@ libraryRouter.post(
 
             collectionId: nonEmptyString,
             collectionName: nonEmptyString,
+            countryOfOrigin: z.string().length(2).toUpperCase().optional(),
+            originalLanguage: nonEmptyString,
         });
 
-        const data = parseOrThrow(schema, req.body);
+        const body = { ...req.body };
+        // Manual entries (not on any provider) get a generated id.
+        if (body.provider === "manual" && !body.providerId) body.providerId = `manual-${randomUUID()}`;
+        const data = parseOrThrow(schema, body);
 
         let mediaTypeNormalized = data.mediaType as any;
         const provider = (data.provider ?? "").toLowerCase();
@@ -224,6 +252,11 @@ libraryRouter.post(
         });
 
         const genreString = serializeGenres(data.genres ?? []);
+        const origin = {
+            countryOfOrigin: data.countryOfOrigin,
+            originalLanguage: data.originalLanguage,
+            region: data.countryOfOrigin ? regionForItem(mediaTypeNormalized, data.countryOfOrigin) : undefined,
+        };
         const collectionSource = data.collectionId ? provider : undefined;
 
         const item = await prisma.mediaItem.upsert({
@@ -246,6 +279,7 @@ libraryRouter.post(
                 collectionId: data.collectionId,
                 collectionName: data.collectionName,
                 collectionSource,
+                ...origin,
             },
             create: {
                 mediaType: mediaTypeNormalized,
@@ -267,6 +301,9 @@ libraryRouter.post(
                 collectionId: data.collectionId,
                 collectionName: data.collectionName,
                 collectionSource,
+                ...origin,
+                // Nothing to fetch for manual entries.
+                ...(provider === "manual" ? { metaCheckedAt: new Date() } : {}),
             },
         });
 
@@ -321,6 +358,12 @@ libraryRouter.patch(
             progressEpisode: clearableInt,
             progressTotalOverride: clearableInt,
             regionOverride: z.enum(["TR", "PK", "KR", "EU", "NONE"]).nullable().optional(),
+            // Editable on manual entries only (provider items are kept in sync).
+            title: z.string().trim().min(1).optional(),
+            year: z.number().int().min(1800).max(3000).nullable().optional(),
+            countryOfOrigin: z.string().length(2).toUpperCase().nullable().optional(),
+            episodes: z.number().int().min(1).nullable().optional(),
+            posterUrl: z.string().url().nullable().optional(),
             genres: z
                 .union([z.array(z.string()), z.string()])
                 .optional()
@@ -334,6 +377,16 @@ libraryRouter.patch(
         const updateData: any = { ...data };
         if (data.genres !== undefined) {
             updateData.genres = serializeGenres(data.genres);
+        }
+        const manualFields = ["title", "year", "countryOfOrigin", "episodes", "posterUrl"] as const;
+        if (current.provider !== "manual" && manualFields.some((f) => data[f] !== undefined)) {
+            const err: any = new Error("Only manually added items can have their details edited");
+            err.status = 400;
+            err.code = "NOT_MANUAL";
+            throw err;
+        }
+        if (data.countryOfOrigin !== undefined) {
+            updateData.region = regionForItem(current.mediaType, data.countryOfOrigin);
         }
 
         // Reaching the last unit of something that can't grow completes it.

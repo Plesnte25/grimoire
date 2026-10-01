@@ -4,7 +4,7 @@ import type { MediaType } from "../types";
 import { useQuery } from "@tanstack/react-query";
 import { fetchLibrary } from "../app/api";
 import { MediaCard, safeParseGenres } from "../components/MediaCard";
-import { CardStack } from "../components/ui/CardStack";
+import { GroupTile } from "../components/GroupTile";
 import { SearchModal } from "../components/SearchModal";
 import { SuggestionsCarousel } from "../components/SuggestionsCarousel";
 import { groupByCollection } from "../lib/groupByCollection";
@@ -138,7 +138,15 @@ export function Category() {
   // Base set = category items, narrowed by anime sub-tab if ANIME
   const baseItems = useMemo(() => {
     if (!isAnime) return items as any[];
-    return (animeBuckets?.[animeTab] ?? []) as any[];
+    const bucket = (animeBuckets?.[animeTab] ?? []) as any[];
+    if (animeTab !== "SERIES") return bucket;
+    // Series tab: one tile per franchise, so a franchise's movies fold into its
+    // tile here too (they also stay listed under Movies).
+    const withSeries = new Set(
+      bucket.filter((it) => it.franchiseId && it.franchiseRole === "MAIN").map((it) => it.franchiseId)
+    );
+    const folded = (animeBuckets?.MOVIES ?? []).filter((it: any) => withSeries.has(it.franchiseId));
+    return [...bucket, ...folded];
   }, [isAnime, items, animeBuckets, animeTab]);
 
   // Reset genre to ALL when switching anime tabs (prevents “stuck” genre)
@@ -251,7 +259,7 @@ export function Category() {
   }, [baseItems, isAnime, statusTab, genreTab, tagFilter, q]);
 
   // Franchise/series grouping ("card stack") — groups sharing a collectionId
-  // (Phase 4) render as a CardStack; everything else renders as a normal MediaCard.
+  // render as one tile linking to the franchise / collection page; the rest as cards.
   const groupedDisplayed = useMemo(
     () => groupByCollection(displayed),
     [displayed]
@@ -420,11 +428,11 @@ export function Category() {
           >
             {groupedDisplayed.map((g) =>
               g.stack.length > 1 ? (
-                <CardStack
+                <GroupTile
                   key={g.primary.franchiseId ?? g.primary.collectionId}
                   items={g.stack}
-                  collectionName={g.name}
-                  onOpenItem={(it) => nav(`/media/${it.id}`)}
+                  name={g.name}
+                  kind={g.primary.franchiseId ? "franchise" : "collection"}
                 />
               ) : (
                 <MediaCard
