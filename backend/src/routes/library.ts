@@ -198,7 +198,7 @@ libraryRouter.post(
     "/",
     asyncHandler(async (req, res) => {
         const schema = z.object({
-            mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK", "MUSIC"]),
+            mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK"]),
             provider: z.string(),
             providerId: z.string(),
             title: z.string().min(1),
@@ -247,7 +247,6 @@ libraryRouter.post(
         let mediaTypeNormalized = data.mediaType as any;
         const provider = (data.provider ?? "").toLowerCase();
         if (provider === "anilist") mediaTypeNormalized = "ANIME";
-        if (provider === "itunes") mediaTypeNormalized = "MUSIC";
         if (provider === "googlebooks") mediaTypeNormalized = "BOOK";
 
         const existed = await prisma.mediaItem.findUnique({

@@ -5,7 +5,6 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { tmdbSearch, tmdbDetails } from "../services/providers/tmdb.js";
 import { anilistSearch, anilistDetails } from "../services/providers/anilist.js";
 import { googleBooksSearch, googleBooksDetails } from "../services/providers/googleBooks.js";
-import { itunesSearch, itunesTrackMeta } from "../services/providers/itunes.js";
 
 export const providersRouter = Router();
 
@@ -35,9 +34,6 @@ providersRouter.get("/search", asyncHandler(async (req, res) => {
     if (!mediaType || mediaType === "BOOK") {
         services.push(googleBooksSearch(q));
     }
-    if (!mediaType || mediaType === "MUSIC") {
-        services.push(itunesSearch(q));
-    }
 
     const settled = await Promise.allSettled(services);
     const results: any[] = [];
@@ -57,7 +53,7 @@ providersRouter.get("/details", asyncHandler(async (req, res) => {
     const data = parseOrThrow(z.object({
         provider: z.string(),
         providerId: z.string(),
-        mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK", "MUSIC"])
+        mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK"])
     }), req.query);
 
     try {
@@ -68,8 +64,6 @@ providersRouter.get("/details", asyncHandler(async (req, res) => {
             details = await anilistDetails(data.providerId);
         } else if (data.provider === "googlebooks" && data.mediaType === "BOOK") {
             details = await googleBooksDetails(data.providerId);
-        } else if (data.provider === "itunes" && data.mediaType === "MUSIC") {
-            details = null; // iTunes search response already contains most info we need
         }
 
         res.json({ details });
@@ -77,13 +71,4 @@ providersRouter.get("/details", asyncHandler(async (req, res) => {
         console.error("Provider details error:", err);
         res.status(502).json({ error: "Failed to fetch provider details" });
     }
-}));
-
-providersRouter.get("/track-meta", asyncHandler(async (req, res) => {
-    const data = parseOrThrow(z.object({
-        providerId: z.string().min(1)
-    }), req.query);
-
-    const meta = await itunesTrackMeta(data.providerId);
-    res.json({ meta });
 }));

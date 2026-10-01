@@ -7,7 +7,6 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { tmdbDiscoverByGenres } from "../services/providers/tmdb.js";
 import { anilistDiscoverByGenres } from "../services/providers/anilist.js";
 import { googleBooksSearch } from "../services/providers/googleBooks.js";
-import { itunesSearch } from "../services/providers/itunes.js";
 
 export const suggestionsRouter = Router();
 
@@ -94,7 +93,7 @@ function seededShuffle<T>(arr: T[], rand: () => number): T[] {
 suggestionsRouter.get("/", asyncHandler(async (req, res) => {
     const q = parseOrThrow(
         z.object({
-            mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK", "MUSIC"]).optional(),
+            mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK"]).optional(),
             cursor: z.string().optional(),
             // Sent only on an explicit Refresh click — forces a live re-fetch instead of
             // reusing the 2-minute cache bucket (see cacheKey below).
@@ -206,14 +205,6 @@ suggestionsRouter.get("/", asyncHandler(async (req, res) => {
             const rawGenre = seedGenres[0] ?? "fiction";
             const genre = rawGenre.split("/")[0].trim().toLowerCase() || "fiction";
             const results = await googleBooksSearch(`subject:${genre}`);
-            becauseYouLike = results
-                .filter((r: any) => !existing.has(`${r.provider}:${r.providerId}`))
-                .slice(0, 12);
-
-            sugSet(cacheKey, becauseYouLike);
-        } else if (mediaType === "MUSIC") {
-            const genre = seedGenres[0] ?? "pop";
-            const results = await itunesSearch(genre);
             becauseYouLike = results
                 .filter((r: any) => !existing.has(`${r.provider}:${r.providerId}`))
                 .slice(0, 12);

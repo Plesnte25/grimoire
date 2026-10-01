@@ -1,4 +1,4 @@
-export type MediaType = "MOVIE" | "TV" | "ANIME" | "BOOK" | "MUSIC";
+export type MediaType = "MOVIE" | "TV" | "ANIME" | "BOOK";
 export type MediaStatus = "PLANNED" | "IN_PROGRESS" | "COMPLETED" | "ON_HOLD" | "DROPPED";
 
 export type ProviderSearchResult = {

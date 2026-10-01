@@ -59,23 +59,6 @@ export async function providerSearch(
     return res.data?.results ?? [];
 }
 
-export type TrackMeta = {
-    previewUrl?: string;
-    artistName?: string;
-    collectionName?: string;
-    trackTimeMillis?: number;
-    artworkUrl100?: string;
-    trackViewUrl?: string;
-    primaryGenreName?: string;
-} | null;
-
-export async function fetchTrackMeta(providerId: string): Promise<TrackMeta> {
-    const res = await api.get("/api/providers/track-meta", {
-        params: { providerId },
-    });
-    return res.data?.meta ?? null;
-}
-
 export async function providerDetails(
     provider: string,
     providerId: string,

@@ -1,7 +1,6 @@
 import { prisma } from "../db.js";
 import { tmdbDetails } from "../services/providers/tmdb.js";
 import { anilistDetails } from "../services/providers/anilist.js";
-import { itunesLookupById } from "../services/providers/itunes.js";
 
 function sleep(ms: number) {
     return new Promise((r) => setTimeout(r, ms));
@@ -39,15 +38,6 @@ async function main() {
                         collectionId: (d as any).collectionId,
                         collectionName: (d as any).collectionName,
                         collectionSource: "anilist",
-                    };
-                }
-            } else if (it.provider === "itunes") {
-                const d = await itunesLookupById(it.providerId);
-                if ((d as any)?.collectionId) {
-                    patch = {
-                        collectionId: (d as any).collectionId,
-                        collectionName: (d as any).collectionName,
-                        collectionSource: "itunes",
                     };
                 }
             }

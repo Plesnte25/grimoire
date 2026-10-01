@@ -85,13 +85,12 @@ export function SearchModal({
   }, [q, open]);
 
   const placeholder = useMemo(() => {
-    if (!mediaTypeFilter) return "Search movies, shows, anime, books, songs…";
+    if (!mediaTypeFilter) return "Search movies, shows, anime, books…";
     const m: Record<MediaType, string> = {
       MOVIE: "Search movies…",
       TV: "Search TV shows…",
       ANIME: "Search anime…",
       BOOK: "Search books…",
-      MUSIC: "Search songs…",
     };
     return m[mediaTypeFilter] ?? "Search…";
   }, [mediaTypeFilter]);
@@ -156,11 +155,8 @@ export function SearchModal({
         if (details.globalRatingText)
           payload.globalRatingText = details.globalRatingText;
 
-        // init progress for non-music
-        if (
-          (details.totalEpisodes || details.runtime) &&
-          item.mediaType !== "MUSIC"
-        ) {
+        // init progress
+        if (details.totalEpisodes || details.runtime) {
           const total = details.totalEpisodes ?? details.runtime;
           payload.progressText = `0/${total}`;
           payload.progressValue = 0;

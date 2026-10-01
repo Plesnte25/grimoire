@@ -9,7 +9,6 @@ const typeLabel: Record<MediaType, string> = {
   TV: "Dramas",
   ANIME: "Anime",
   BOOK: "Books",
-  MUSIC: "Music",
 };
 
 // Each type gets TWO color states (rest vs active) for the “background transitions from one color to different”
@@ -33,11 +32,6 @@ const typeTint: Record<MediaType, { rest: string; active: string }> = {
     rest: "radial-gradient(120% 140% at 20% 10%, rgba(245,158,11,0.30) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.65))",
     active:
       "radial-gradient(120% 140% at 80% 20%, rgba(234,179,8,0.30) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.75))",
-  },
-  MUSIC: {
-    rest: "radial-gradient(120% 140% at 20% 10%, rgba(139,92,246,0.30) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.65))",
-    active:
-      "radial-gradient(120% 140% at 80% 20%, rgba(56,189,248,0.25) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.75))",
   },
 };
 

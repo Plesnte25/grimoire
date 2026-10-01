@@ -7,7 +7,7 @@ import type { MediaType } from "../types";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
-const TYPES: MediaType[] = ["MOVIE", "TV", "ANIME", "BOOK", "MUSIC"];
+const TYPES: MediaType[] = ["MOVIE", "TV", "ANIME", "BOOK"];
 
 /** Minimal inline icons (no deps) */
 function IconPlus(props: React.SVGProps<SVGSVGElement>) {
@@ -72,7 +72,8 @@ export function Home() {
     const map = new Map<MediaType, { total: number; inProgress: number }>();
     for (const t of TYPES) map.set(t, { total: 0, inProgress: 0 });
     for (const it of all) {
-      const s = map.get(it.mediaType as MediaType)!;
+      const s = map.get(it.mediaType as MediaType);
+      if (!s) continue;
       s.total += 1;
       if (it.status === "IN_PROGRESS") s.inProgress += 1;
     }

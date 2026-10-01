@@ -7,7 +7,6 @@ import { MediaCard, safeParseGenres } from "../components/MediaCard";
 import { CardStack } from "../components/ui/CardStack";
 import { SearchModal } from "../components/SearchModal";
 import { SuggestionsCarousel } from "../components/SuggestionsCarousel";
-import { MusicCategory } from "./MusicCategory";
 import { groupByCollection } from "../lib/groupByCollection";
 
 type StatusTab =
@@ -85,9 +84,6 @@ const IMPORTANT_ANIME_GENRES = [
 export function Category() {
   const { type } = useParams();
   const mediaType = type as MediaType;
-  if (mediaType === "MUSIC") {
-    return <MusicCategory />;
-  }
   const isAnime = mediaType === "ANIME";
 
   const nav = useNavigate();

@@ -1,6 +1,6 @@
 # Grimoire
 
-A personal media tracker for anime, movies, TV, music, and more — track what you're watching/reading/listening to, rate it, organize custom lists, and pull in provider metadata (e.g. TMDB) for posters and info.
+A personal media tracker for anime, movies, TV and books — track what you're watching and reading, rate it, organize custom lists, and pull in provider metadata (e.g. TMDB) for posters and info.
 
 ## Stack
 
@@ -18,7 +18,7 @@ backend/
   prisma/         schema + migrations (SQLite)
 frontend/
   src/
-    pages/        Home, Category, Anime, MusicCategory, Lists, ListDetail, MediaDetail, Settings
+    pages/        Home, Category, Anime, Lists, ListDetail, MediaDetail, Settings
 ```
 
 ## Setup
