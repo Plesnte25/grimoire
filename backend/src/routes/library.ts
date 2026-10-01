@@ -3,8 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { anilistDetails } from "../services/providers/anilist.js";
-import { tmdbDetails } from "../services/providers/tmdb.js";
+import { enrichWithinBudget } from "../services/enrich.js";
 
 export const libraryRouter = Router();
 
@@ -99,57 +98,15 @@ libraryRouter.get(
         if (mediaType) where.mediaType = mediaType;
         if (status) where.status = status;
 
+        // Library reads are DB-only: provider metadata is stored when an item is
+        // added (or by scripts/enrichAll), never fetched per request.
         const items = await prisma.mediaItem.findMany({
             where,
             orderBy: [{ updatedAt: "desc" }],
+            include: { franchise: { select: { title: true, posterUrl: true, bannerUrl: true } } },
         });
 
-        let out = items.map(withParsedGenres);
-
-        if (mediaType === "ANIME") {
-            out = await Promise.all(
-                out.map(async (it: any) => {
-                    // Only enrich if the DB does NOT have format/isAdult stored yet
-                    if (it.format || typeof it.isAdult === "boolean" || it.nativeTitle) return it;
-                    if ((it.provider ?? "").toLowerCase() !== "anilist") return it;
-
-                    try {
-                        const details = await anilistDetails(String(it.providerId));
-                        return details ? { ...it, ...details } : it;
-                    } catch {
-                        return it;
-                    }
-                })
-            );
-        }
-
-        if (mediaType === "MOVIE") {
-            // Franchise grouping backfill for items added via search (which lacks
-            // belongs_to_collection — only the full details fetch has it).
-            out = await Promise.all(
-                out.map(async (it: any) => {
-                    if (it.collectionId) return it;
-                    if ((it.provider ?? "").toLowerCase() !== "tmdb") return it;
-
-                    try {
-                        const details = await tmdbDetails(String(it.providerId), "movie");
-                        if (!details?.collectionId) return it;
-                        const patched = await prisma.mediaItem.update({
-                            where: { id: it.id },
-                            data: {
-                                collectionId: details.collectionId,
-                                collectionName: details.collectionName,
-                                collectionSource: "tmdb",
-                            },
-                        });
-                        return withParsedGenres(patched);
-                    } catch {
-                        return it;
-                    }
-                })
-            );
-        }
-
+        const out = items.map(withParsedGenres);
 
         res.json({ items: out });
     })
@@ -158,38 +115,18 @@ libraryRouter.get(
 libraryRouter.get(
     "/:id",
     asyncHandler(async (req, res) => {
-        const item = await prisma.mediaItem.findUnique({ where: { id: req.params.id } });
+        const include = { franchise: { select: { title: true, posterUrl: true, bannerUrl: true } } };
+        let item = await prisma.mediaItem.findUnique({ where: { id: req.params.id }, include });
         if (!item) return res.status(404).json({ error: "Not found" });
 
-        let out: any = withParsedGenres(item);
-        if (out.mediaType === "ANIME" && String(out.provider ?? "").toLowerCase() === "anilist") {
-            try {
-                const details = await anilistDetails(String(out.providerId));
-                if (details) out = { ...out, ...details };
-            } catch { }
+        // Items added before Phase 1 (or whose enrichment failed) get it here. A short
+        // budget: opening a page shouldn't wait on a slow or rate-limited provider.
+        if (!item.metaCheckedAt && item.provider !== "manual") {
+            await enrichWithinBudget(item.id, 2500);
+            item = (await prisma.mediaItem.findUnique({ where: { id: item.id }, include })) ?? item;
         }
 
-        if (
-            out.mediaType === "MOVIE" &&
-            !out.collectionId &&
-            String(out.provider ?? "").toLowerCase() === "tmdb"
-        ) {
-            try {
-                const details = await tmdbDetails(String(out.providerId), "movie");
-                if (details?.collectionId) {
-                    const patched = await prisma.mediaItem.update({
-                        where: { id: out.id },
-                        data: {
-                            collectionId: details.collectionId,
-                            collectionName: details.collectionName,
-                            collectionSource: "tmdb",
-                        },
-                    });
-                    out = withParsedGenres(patched);
-                }
-            } catch { }
-        }
-
+        const out = withParsedGenres(item);
         res.json({ item: out });
     })
 );
@@ -300,7 +237,15 @@ libraryRouter.post(
             },
         });
 
-        res.json({ item: withParsedGenres(item), alreadyExisted: !!existed });
+        if (!item.metaCheckedAt && item.provider !== "manual") {
+            await enrichWithinBudget(item.id);
+        }
+        const fresh = await prisma.mediaItem.findUnique({
+            where: { id: item.id },
+            include: { franchise: { select: { title: true, posterUrl: true, bannerUrl: true } } },
+        });
+
+        res.json({ item: withParsedGenres(fresh ?? item), alreadyExisted: !!existed });
     })
 );
 

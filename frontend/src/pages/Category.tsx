@@ -387,9 +387,9 @@ export function Category() {
             {groupedDisplayed.map((g) =>
               g.stack.length > 1 ? (
                 <CardStack
-                  key={g.primary.collectionId}
+                  key={g.primary.franchiseId ?? g.primary.collectionId}
                   items={g.stack}
-                  collectionName={g.primary.collectionName}
+                  collectionName={g.name}
                   onOpenItem={(it) => nav(`/media/${it.id}`)}
                 />
               ) : (

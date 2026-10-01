@@ -51,6 +51,15 @@ function createClient(): AxiosInstance {
 
 const http = createClient();
 
+/** Raw TMDB GET with the shared retry policy (used by the enrichment service). */
+export async function tmdbGet<T = any>(path: string, params: Record<string, any> = {}): Promise<T | null> {
+    if (!API_KEY) return null;
+    const res = await requestWithRetry(() => http.get(path, { params: { api_key: API_KEY, ...params } }));
+    return res.data as T;
+}
+
+export const TMDB_IMAGE_BASE = TMDB_IMAGE;
+
 // --------- GENRE MAP CACHE ----------
 type GenreMapEntry = { at: number; nameToId: Record<string, number>; idToName: Record<number, string> };
 type GenreMapCache = {

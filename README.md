@@ -14,7 +14,7 @@ backend/
   src/
     routes/       library, lists, providers, suggestions
     services/     provider integrations (TMDB, etc.), suggestion logic
-    scripts/      one-off data scripts (e.g. backfillAnime)
+    scripts/      one-off data scripts (enrichAll: provider metadata backfill)
   prisma/         schema + migrations (SQLite)
 frontend/
   src/

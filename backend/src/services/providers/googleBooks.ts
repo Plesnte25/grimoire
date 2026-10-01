@@ -1,9 +1,36 @@
 import axios from "axios";
 
+const API_KEY = process.env.GOOGLE_BOOKS_API_KEY;
+const BASE = "https://www.googleapis.com/books/v1";
+
+function sleep(ms: number) {
+    return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * GET against the Books API. Without GOOGLE_BOOKS_API_KEY requests share
+ * Google's anonymous quota, which often answers 429, so back off and retry.
+ */
+export async function googleBooksGet<T = any>(path: string, params: Record<string, any> = {}): Promise<T> {
+    let wait = 2000;
+    for (let attempt = 0; ; attempt++) {
+        try {
+            const res = await axios.get(`${BASE}${path}`, {
+                params: { ...params, ...(API_KEY ? { key: API_KEY } : {}) },
+                timeout: 12_000,
+            });
+            return res.data as T;
+        } catch (err: any) {
+            if (err?.response?.status !== 429 || attempt >= 3) throw err;
+            await sleep(wait);
+            wait *= 2;
+        }
+    }
+}
+
 export async function googleBooksSearch(q: string) {
-    const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=10`;
-    const res = await axios.get(url);
-    const items = res.data?.items ?? [];
+    const data = await googleBooksGet("/volumes", { q, maxResults: 10 });
+    const items = data?.items ?? [];
 
     return items.map((b: any) => ({
         provider: "googlebooks",
@@ -28,9 +55,7 @@ export async function googleBooksSearch(q: string) {
 }
 
 export async function googleBooksDetails(providerId: string) {
-    const url = `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(providerId)}`;
-    const res = await axios.get(url);
-    const b = res.data;
+    const b = await googleBooksGet(`/volumes/${encodeURIComponent(providerId)}`);
     if (!b) return null;
 
     return {

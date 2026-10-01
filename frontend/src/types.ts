@@ -42,6 +42,30 @@ export type MediaItem = {
     collectionId?: string | null;
     collectionName?: string | null;
     collectionSource?: string | null;
+
+    // Phase 1 metadata (stored at add time / by the backfill).
+    franchiseId?: string | null;
+    franchiseRole?: "MAIN" | "MOVIE" | "OVA" | "ONA" | "SPECIAL" | null;
+    franchiseOrder?: number | null;
+    franchise?: { title: string; posterUrl?: string | null; bannerUrl?: string | null } | null;
+    nativeTitle?: string | null;
+    format?: string | null;
+    countryOfOrigin?: string | null;
+    originalLanguage?: string | null;
+    region?: "TR" | "PK" | "KR" | "EU" | null;
+    regionOverride?: string | null;
+    creator?: string | null;
+    seasons?: number | null;
+    episodes?: number | null;
+    duration?: number | null;
+    pageCount?: number | null;
+    airStatus?: string | null;
+    nextAirSeason?: number | null;
+    nextAirEpisode?: number | null;
+    nextAirDate?: string | null;
+    airedEpisodeCount?: number | null;
+    announcedNext?: string | null;
+    announcedNextDate?: string | null;
 };
 
 export type CustomList = {
