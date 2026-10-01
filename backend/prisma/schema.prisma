@@ -8,71 +8,198 @@ datasource db {
 }
 
 model MediaItem {
-  id               String      @id @default(cuid())
-  mediaType        String
-  format           String?
-  isAdult          Boolean?
-  episodes         Int?
-  duration         Int?      
-  provider         String
-  providerId       String
-  title            String
-  nativeTitle      String?
-  year             Int?
-  description      String?
-  posterUrl        String?
-  backdropUrl      String?
+  id          String   @id @default(cuid())
+  mediaType   String
+  format      String?
+  isAdult     Boolean?
+  episodes    Int?
+  duration    Int? // minutes (per episode for series)
+  provider    String // "tmdb" | "anilist" | "googlebooks" | "manual"
+  providerId  String
+  title       String
+  nativeTitle String? // original-language title ("Diriliş: Ertuğrul")
+  year        Int?
+  description String?
+  posterUrl   String?
+  backdropUrl String?
 
-  // global rating info (provider-based)
+  // global rating info (provider-based, always 0–10)
   globalRating     Float?
   globalRatingText String?
 
   // your tracking
-  status           String      @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, ON_HOLD, DROPPED
-  yourRating       Float?
-  yourNotes        String?
+  status     String  @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, ON_HOLD, DROPPED
+  yourRating Float?
+  yourNotes  String?
 
   // progress (generic + type-specific optional fields)
-  progressText     String?      // e.g. "S2E5", "Page 123", "Listened 10x"
-  progressValue    Int?         // numeric progress optional
+  progressText          String? // legacy free text, kept until typed progress replaces it in the UI
+  progressValue         Int? // episodes watched / pages read
+  progressSeason        Int? // TV: season you're in
+  progressEpisode       Int? // TV: episode within that season
+  progressTotalOverride Int? // user-set total (e.g. a dub with a different episode split)
+  completedSeasonCount  Int? // seasons that existed when you marked it COMPLETED (airing baseline)
 
-  genres           String?      // JSON string array
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  genres    String? // JSON string array
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Franchise/series grouping ("card stack") — best-effort, provider-sourced.
-  // Movies: TMDB belongs_to_collection. Anime: AniList prequel-chain root.
-  // Books/TV: left null, no reliable signal.
+  // Movies: TMDB belongs_to_collection. Books/TV: left null, no reliable signal.
+  // Anime uses franchiseId below instead.
   collectionId     String?
   collectionName   String?
-  collectionSource String?      // "tmdb" | "anilist"
+  collectionSource String? // "tmdb" | "anilist"
 
-  listItems        ListItem[]
+  // Anime franchise: the original series this entry belongs under.
+  franchiseId    String?
+  franchiseRole  String? // MAIN | MOVIE | OVA | ONA | SPECIAL
+  franchiseOrder Int? // position within the franchise (airing order)
+
+  // Origin + region (regional categories). region is derived from
+  // countryOfOrigin; regionOverride is the user's "Move to…" choice.
+  countryOfOrigin  String? // ISO 3166-1 alpha-2 ("TR", "PK", "JP")
+  originalLanguage String? // ISO 639-1 ("tr", "ur", "ja")
+  region           String? // TR | PK | KR | EU | null (= general TV/Movies)
+  regionOverride   String? // same values, or "NONE" to force general
+
+  creator     String? // display: director / creator / author(s)
+  seasons     Int? // TV: number of seasons
+  pageCount   Int? // books
+  isbn        String? // books (ISBN-13 when available)
+  releaseDate DateTime? // movies: theatrical; series: first air date
+
+  // Airing / release snapshot, refreshed by the daily job.
+  airStatus          String? // RETURNING | ENDED | CANCELED | AIRING | UPCOMING | IN_PRODUCTION
+  lastAiredSeason    Int?
+  lastAiredEpisode   Int?
+  lastAiredDate      DateTime?
+  nextAirSeason      Int?
+  nextAirEpisode     Int?
+  nextAirDate        DateTime?
+  airedEpisodeCount  Int? // episodes aired so far (ongoing series)
+  announcedNext      String? // "Season 5" / sequel title, when announced
+  announcedNextDate  DateTime?
+  digitalReleaseDate DateTime? // movies still in cinemas
+
+  // When provider metadata was last fetched (also set when it found nothing,
+  // so library loads never re-fetch).
+  metaCheckedAt DateTime?
+  airCheckedAt  DateTime?
+
+  franchise Franchise? @relation(fields: [franchiseId], references: [id])
+  listItems ListItem[]
+  watchLogs WatchLog[]
+  credits   Credit[]
+  tags      MediaTag[]
 
   @@unique([provider, providerId])
   @@index([collectionId])
+  @@index([franchiseId])
+  @@index([mediaType, region])
+}
+
+// One anime franchise, keyed by the AniList id of its original series. Holds
+// the OG series' artwork so the tile works even if only a movie is tracked.
+model Franchise {
+  id              String   @id // AniList media id of the root series
+  title           String
+  nativeTitle     String?
+  posterUrl       String?
+  bannerUrl       String?
+  countryOfOrigin String?
+  status          String? // AniList status of the root series
+  updatedAt       DateTime @updatedAt
+
+  items MediaItem[]
+}
+
+// One watch/read of an item: dates, rating at the time, review, how/where.
+model WatchLog {
+  id                String    @id @default(cuid())
+  mediaId           String
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  rating            Float? // your rating for this watch (0.5–10)
+  review            String?
+  reviewHasSpoilers Boolean   @default(false)
+  isRewatch         Boolean   @default(false)
+  watchedOn         String? // where: "Cinema", "Netflix", "YouTube"…
+  watchMode         String? // SUB | DUB | ORIGINAL
+  watchedWith       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  media MediaItem @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([mediaId])
+  @@index([finishedAt])
+}
+
+// A person or studio, keyed "<source>:<externalId>" ("tmdb:525", "anilist-studio:569").
+model Contributor {
+  id       String   @id
+  name     String
+  kind     String // PERSON | STUDIO
+  imageUrl String?
+  credits  Credit[]
+}
+
+model Credit {
+  id            String  @id @default(cuid())
+  mediaId       String
+  contributorId String
+  role          String // DIRECTOR | CREATOR | AUTHOR | CAST | STUDIO
+  character     String?
+  order         Int     @default(0)
+
+  media       MediaItem   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  contributor Contributor @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+
+  @@unique([mediaId, contributorId, role])
+  @@index([contributorId])
+}
+
+// Personal tags ("comfort watch") and moods.
+model Tag {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  kind      String     @default("TAG") // TAG | MOOD
+  color     String?
+  createdAt DateTime   @default(now())
+  items     MediaTag[]
+}
+
+model MediaTag {
+  mediaId String
+  tagId   String
+  media   MediaItem @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  tag     Tag       @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([mediaId, tagId])
+  @@index([tagId])
 }
 
 model CustomList {
-  id          String     @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   description String?
-  coverColor  String?    // hex or css token
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  coverColor  String? // hex or css token
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  items       ListItem[]
+  items ListItem[]
 }
 
 model ListItem {
-  id         String    @id @default(cuid())
-  listId     String
-  mediaId    String
-  order      Int       @default(0)
-  createdAt  DateTime  @default(now())
+  id        String   @id @default(cuid())
+  listId    String
+  mediaId   String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
 
-  list       CustomList @relation(fields: [listId], references: [id], onDelete: Cascade)
-  media      MediaItem  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  list  CustomList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  media MediaItem  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
 
   @@unique([listId, mediaId])
 }
@@ -91,15 +218,15 @@ model AccountConfig {
 }
 
 model TrustedDevice {
-  id            String   @id @default(cuid()) // stored in long-lived httpOnly cookie `mv_device`
+  id            String   @id @default(cuid()) // stored in long-lived httpOnly cookie `gr_device`
   label         String?
-  verifiedEmail String?  // email this device proved ownership of via OTP; required to bootstrap
+  verifiedEmail String? // email this device proved ownership of via OTP; required to bootstrap
   createdAt     DateTime @default(now())
   lastSeenAt    DateTime @updatedAt
 }
 
 model Session {
-  id        String   @id @default(cuid()) // stored in httpOnly cookie `mv_session`
+  id        String   @id @default(cuid()) // stored in httpOnly cookie `gr_session`
   deviceId  String
   createdAt DateTime @default(now())
   expiresAt DateTime
@@ -108,8 +235,8 @@ model Session {
 model OtpCode {
   id              String    @id @default(cuid())
   codeHash        String
-  email           String    // the email this code was actually sent to; binds /otp/verify's result
-  pendingDeviceId String    // stored in short-lived httpOnly cookie `mv_pending_device`
+  email           String // the email this code was actually sent to; binds /otp/verify's result
+  pendingDeviceId String // stored in short-lived httpOnly cookie `gr_pending_device`
   expiresAt       DateTime
   consumedAt      DateTime?
   attempts        Int       @default(0)
