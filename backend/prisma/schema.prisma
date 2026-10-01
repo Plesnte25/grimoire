@@ -91,10 +91,11 @@ model AccountConfig {
 }
 
 model TrustedDevice {
-  id         String   @id @default(cuid()) // stored in long-lived httpOnly cookie `mv_device`
-  label      String?
-  createdAt  DateTime @default(now())
-  lastSeenAt DateTime @updatedAt
+  id            String   @id @default(cuid()) // stored in long-lived httpOnly cookie `mv_device`
+  label         String?
+  verifiedEmail String?  // email this device proved ownership of via OTP; required to bootstrap
+  createdAt     DateTime @default(now())
+  lastSeenAt    DateTime @updatedAt
 }
 
 model Session {
@@ -107,6 +108,7 @@ model Session {
 model OtpCode {
   id              String    @id @default(cuid())
   codeHash        String
+  email           String    // the email this code was actually sent to; binds /otp/verify's result
   pendingDeviceId String    // stored in short-lived httpOnly cookie `mv_pending_device`
   expiresAt       DateTime
   consumedAt      DateTime?

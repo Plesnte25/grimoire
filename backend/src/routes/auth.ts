@@ -94,28 +94,33 @@ authRouter.post(
             z.object({ email: z.string().email(), pin: pinSchema }),
             req.body
         );
+        const email = data.email.toLowerCase().trim();
+
+        // Only the device that just completed OTP verification for this
+        // exact email may bootstrap the account — otherwise anyone who
+        // verifies an OTP for *any* inbox could set up the account with a
+        // different (unverified) email address.
+        const deviceId = req.cookies?.gr_device;
+        const device = deviceId
+            ? await prisma.trustedDevice.findUnique({ where: { id: deviceId } })
+            : null;
+        if (!device || !device.verifiedEmail || device.verifiedEmail !== email) {
+            throw httpError(
+                403,
+                "EMAIL_NOT_VERIFIED",
+                "This device hasn't verified that email via OTP"
+            );
+        }
 
         const { saltHex, hashHex } = hashWithSalt(data.pin);
         await prisma.accountConfig.create({
             data: {
                 id: 1,
-                email: data.email.toLowerCase().trim(),
+                email,
                 pinSaltHex: saltHex,
                 pinHashHex: hashHex,
             },
         });
-
-        // Registering now verifies the email via OTP first (see /otp/request,
-        // /otp/verify), which already trusts this device — reuse that instead
-        // of creating a duplicate. Only make a fresh one if somehow absent.
-        const existingDeviceId = req.cookies?.gr_device;
-        const existingDevice = existingDeviceId
-            ? await prisma.trustedDevice.findUnique({ where: { id: existingDeviceId } })
-            : null;
-        if (!existingDevice) {
-            const device = await prisma.trustedDevice.create({ data: { label: "First device" } });
-            setDeviceCookie(res, device.id);
-        }
 
         res.json({ ok: true });
     })
@@ -143,6 +148,7 @@ authRouter.post(
             await prisma.otpCode.create({
                 data: {
                     codeHash: packSaltedHash(code),
+                    email: account ? account.email : targetEmail,
                     pendingDeviceId,
                     expiresAt: new Date(Date.now() + OTP_TTL_MS),
                 },
@@ -187,7 +193,23 @@ authRouter.post(
 
         await prisma.otpCode.update({ where: { id: otp.id }, data: { consumedAt: new Date() } });
 
-        const device = await prisma.trustedDevice.create({ data: {} });
+        // Bind the device to the email that was actually verified (stored on
+        // the OTP record at /otp/request time), not anything client-supplied,
+        // so /bootstrap can't be hijacked with a different address.
+        const verifiedEmail = otp.email;
+
+        const existingDeviceId = req.cookies?.gr_device;
+        const existingDevice = existingDeviceId
+            ? await prisma.trustedDevice.findUnique({ where: { id: existingDeviceId } })
+            : null;
+
+        const device = existingDevice
+            ? await prisma.trustedDevice.update({
+                  where: { id: existingDevice.id },
+                  data: { verifiedEmail },
+              })
+            : await prisma.trustedDevice.create({ data: { verifiedEmail } });
+
         setDeviceCookie(res, device.id);
         res.clearCookie("gr_pending_device", { path: "/" });
 
