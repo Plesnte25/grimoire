@@ -403,8 +403,7 @@ Each step: one commit per item, verified against the real library, then deployed
 4. **Server-side enrichment on add** for every provider (C, #19) + **one backfill script** for all types
    (D, #20, #22, #24, credits #52, countries #31).
 
-**Phase 2: tracking core** ✅ built + verified end-to-end on a copy of the live data (`daa95b0`, `4be2080`),
-deploy pending
+**Phase 2: tracking core** ✅ deployed 2026-10-01 (`5bf7f33`; backup `backups/pre-deploy-phase2-*.db`)
 5. Typed progress (#17) + TV season picker (#22) + progress-total override (#35).
 6. Diary and logging UI: watch history on the detail page, finish-date prompt, reviews (#50, #51, #70);
    **Diary heatmap (#64)**.
