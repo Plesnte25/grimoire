@@ -41,6 +41,27 @@ commit once done. Issues are discussed and fixed one at a time.
    token in the URL leaks into server logs and browser history.
    **Fix:** remove all three pieces before committing #2–4; confirm `BYPASS_AUTH_TOKEN` isn't set on the VM.
 
+### Found while locking the app to a private Tailscale network (2026-10-01)
+
+6. ✅ **Fixed** (`b6cc66b`) — **Helmet's `upgrade-insecure-requests` CSP directive broke plain-HTTP-only access** (medium). The VM was
+   joined to a private Tailscale network so the app could be reached without a public DNS record, serving plain HTTP
+   on an internal address/port (no TLS cert there). Helmet's default CSP sends `upgrade-insecure-requests`, so the
+   browser's first request succeeded (200) but every following request was silently retried over HTTPS on the same
+   port, which isn't TLS and answered `400 Bad Request` — making the whole site look unreachable. Confirmed via
+   `tcpdump` on the VM: the TCP handshake and first HTTP exchange were fine; only the auto-upgraded requests failed.
+   **Fix:** set `"upgrade-insecure-requests": null` in the CSP directives (`backend/src/index.ts`). Harmless on the
+   public domain, which is already HTTPS end-to-end via Caddy.
+
+7. ✅ **Fixed** (`2c63309`) — **Helmet's HSTS header would have permanently broken the same private address** (medium-high — not yet
+   triggered, caught before a device loaded the page over the bad config). Same setup as #6: Helmet sends
+   `Strict-Transport-Security` unconditionally. Unlike CSP's `upgrade-insecure-requests` (a per-request, server-side
+   behavior), HSTS is cached by the browser for the full `max-age` (180 days) per hostname — so the first plain-HTTP
+   load of the Tailscale MagicDNS hostname would have made the browser force HTTPS on that hostname for months,
+   immune to any later server-side fix.
+   **Fix:** `hsts: false` in the Helmet config, then a small middleware that sets `Strict-Transport-Security`
+   manually, only when `req.secure` is true (`backend/src/index.ts`). Relies on `trust proxy` + Caddy's
+   `X-Forwarded-Proto` already being correct for the public HTTPS path.
+
 ### Found while shipping Phase 0 (2026-10-01)
 
 75. ✅ **Done** (`daa95b0`, `4be2080`) — **Notes and progress can't be cleared** (low). `PATCH /library/:id` validates `yourNotes`/`progressText` with
