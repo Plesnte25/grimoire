@@ -526,7 +526,8 @@ Each step: one commit per item, verified against the real library, then deployed
 8. Personal tags & moods: filters everywhere (#66).
 
 **Phase 3: catalogue structure** ✅ deployed 2026-10-01 (`f1c5209`; OMDb key on the VM; re-enrichment run
-for scores in `backups/enrich-phase3.log`)
+for scores: 193/193 ok; IMDb 112, RT 98, Metacritic 100, MAL ids 77 but MAL scores only 3 because
+Jikan was down, see #82)
 9. Anime franchise tile + page (E–I), then reuse for movie collections (#21); cast/crew/studio pages (#52).
 10. International: regional categories + flags (#37), manual add (#38), romanization retry (#33), vote
     threshold (#34), dub badges (#35).
