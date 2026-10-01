@@ -487,10 +487,10 @@ Diary, Stats / Wrapped, Tonight, Settings, Shared list, Unlock. These are built 
 
 **Open questions for the user**
 
-106. **"Remind me"** on the airing banner: email is declined (#44). Options: a web-push notification (needs the
+106. ✅ **Decided:** pin it to the top of Coming soon (no push, no email) — **"Remind me"** on the airing banner: email is declined (#44). Options: a web-push notification (needs the
      PWA + permission), or just pin it to the top of Coming soon.
-107. **Where to watch** is per country in TMDB. Which country's streaming catalogue should it show?
-108. The **undesigned screens** (#95): build them from the kit, or run a second Claude Design round first
+107. ✅ **Decided:** changeable in Settings; no default assumed, Settings asks once (pre-selected from the browser region) — **Where to watch** is per country in TMDB. Which country's streaming catalogue should it show?
+108. ✅ **Decided:** build them from the design kit; the user reviews screenshots — The **undesigned screens** (#95): build them from the kit, or run a second Claude Design round first
      (Search & add, Stats / Wrapped and Tonight are the most visual)?
 
 ### Build order (agreed 2026-10-01)
@@ -543,7 +543,8 @@ for scores in `backups/enrich-phase3.log`)
 16. Data: `yourRatingAt` (#96), log episode range/label (#97), settings record (#102), AniList % + count (#100),
     anime ↔ TMDB/IMDb link (#99).
 17. Category (#92), Detail (#93, without the Episodes tab), Log sheet (#94).
-18. Restyle Franchise, Collection, Person, Lists, Tier list, Diary, Search & add, Settings, Unlock (#95).
+18. Restyle Franchise, Collection, Person, Lists, Tier list, Diary, Search & add, Settings, Unlock from the kit
+    (#95, #108); screenshots for review.
 19. Episodes tab + spoiler shield (#98, #71).
 
 **Phase 6: Up next**
@@ -551,7 +552,7 @@ for scores in `backups/enrich-phase3.log`)
     "N new" counts (#103) (#39–43).
 21. Home "Up next" (#91): Ready to watch, Coming soon, Continue, Favourites shelf.
 22. Goals (#69), "What should I watch tonight?" (#65), rewatch nudges (#72): all three sit on Home.
-23. Where to watch + trailers (#73; needs the answer to #107), "Remind me" (#106).
+23. Where to watch + trailers (#73; country from Settings, #107), "Remind me" = pin to Coming soon (#106).
 
 **Phase 7: reflection, sharing, app**
 24. Taste-based suggestions (#68), rating-weighted (#57), region-aware (#36); suggestion caching (#30).
