@@ -13,6 +13,10 @@ export type ProviderSearchResult = {
     genres?: string[];
     globalRating?: number;
     globalRatingText?: string;
+    nativeTitle?: string;
+    countryOfOrigin?: string;
+    originalLanguage?: string;
+    isDub?: boolean;
 };
 
 export type MediaItem = {

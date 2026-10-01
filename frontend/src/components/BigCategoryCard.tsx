@@ -2,17 +2,18 @@ import React from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { fetchLibrary } from "../app/api";
-import type { MediaType } from "../types";
+import { REGION_LABEL, type CategoryKey } from "../lib/regions";
 
-const typeLabel: Record<MediaType, string> = {
+const typeLabel: Record<CategoryKey, string> = {
   MOVIE: "Movies",
-  TV: "Dramas",
+  TV: "TV",
   ANIME: "Anime",
   BOOK: "Books",
+  ...REGION_LABEL,
 };
 
 // Each type gets TWO color states (rest vs active) for the “background transitions from one color to different”
-const typeTint: Record<MediaType, { rest: string; active: string }> = {
+const typeTint: Record<CategoryKey, { rest: string; active: string }> = {
   MOVIE: {
     rest: "radial-gradient(120% 140% at 20% 10%, rgba(99,102,241,0.35) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.65))",
     active:
@@ -33,17 +34,37 @@ const typeTint: Record<MediaType, { rest: string; active: string }> = {
     active:
       "radial-gradient(120% 140% at 80% 20%, rgba(234,179,8,0.30) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.75))",
   },
+  TR: {
+    rest: "radial-gradient(120% 140% at 20% 10%, rgba(220,38,38,0.32) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.65))",
+    active:
+      "radial-gradient(120% 140% at 80% 20%, rgba(248,113,113,0.28) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.75))",
+  },
+  PK: {
+    rest: "radial-gradient(120% 140% at 20% 10%, rgba(22,163,74,0.32) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.65))",
+    active:
+      "radial-gradient(120% 140% at 80% 20%, rgba(74,222,128,0.26) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.75))",
+  },
+  KR: {
+    rest: "radial-gradient(120% 140% at 20% 10%, rgba(59,130,246,0.32) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.65))",
+    active:
+      "radial-gradient(120% 140% at 80% 20%, rgba(244,63,94,0.26) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.75))",
+  },
+  EU: {
+    rest: "radial-gradient(120% 140% at 20% 10%, rgba(37,99,235,0.32) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.25), rgba(0,0,0,0.65))",
+    active:
+      "radial-gradient(120% 140% at 80% 20%, rgba(250,204,21,0.24) 0%, rgba(0,0,0,0) 55%), linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.75))",
+  },
 };
 
 export function BigCategoryCard({
-  mediaType,
+  category,
   stats,
   onOpen,
   isActive,
   anyActive,
   expandOrigin,
 }: {
-  mediaType: MediaType;
+  category: CategoryKey;
   stats: { total: number; inProgress: number };
   onOpen: () => void;
   isActive: boolean;
@@ -51,8 +72,8 @@ export function BigCategoryCard({
   expandOrigin: "left" | "center" | "right";
 }) {
   const { data: items = [] } = useQuery({
-    queryKey: ["library", mediaType],
-    queryFn: () => fetchLibrary(mediaType),
+    queryKey: ["library", category],
+    queryFn: () => fetchLibrary(category),
     staleTime: 1000 * 60 * 2,
   });
 
@@ -153,13 +174,13 @@ export function BigCategoryCard({
         {/* Per-card color tint background transition (rest <-> active) */}
         <motion.div
           className="absolute inset-0"
-          style={{ background: typeTint[mediaType].rest }}
+          style={{ background: typeTint[category].rest }}
           animate={{ opacity: isActive ? 0 : 1 }}
           transition={{ duration: 0.22, ease: EASE }}
         />
         <motion.div
           className="absolute inset-0"
-          style={{ background: typeTint[mediaType].active }}
+          style={{ background: typeTint[category].active }}
           animate={{ opacity: isActive ? 1 : 0 }}
           transition={{ duration: 0.22, ease: EASE }}
         />
@@ -192,7 +213,7 @@ export function BigCategoryCard({
         text-base md:text-lg
       "
             >
-              {typeLabel[mediaType]}
+              {typeLabel[category]}
             </div>
 
             <div
@@ -235,7 +256,7 @@ export function BigCategoryCard({
             }}
             className="text-2xl md:text-3xl font-semibold tracking-tight"
           >
-            {typeLabel[mediaType]}
+            {typeLabel[category]}
           </motion.div>
 
           <motion.div

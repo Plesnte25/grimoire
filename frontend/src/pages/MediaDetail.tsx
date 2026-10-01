@@ -27,6 +27,8 @@ import { STATUSES, statusLabel } from "../lib/status";
 import { deleteWithUndo } from "../lib/deleteWithUndo";
 import { showToast } from "../lib/toast";
 import { plainText } from "../lib/text";
+import { REGIONS, REGION_LABEL, countryFlag, countryName } from "../lib/regions";
+import { ManualDetailsEditor } from "../components/ManualDetailsEditor";
 
 const TYPE_LABEL = { MOVIE: "Movie", TV: "TV", ANIME: "Anime", BOOK: "Book" } as const;
 const CREATOR_LABEL = { MOVIE: "Directed by", TV: "Created by", ANIME: "Studio", BOOK: "By" } as const;
@@ -111,7 +113,7 @@ export function MediaDetail() {
   const facts = [
     TYPE_LABEL[item.mediaType],
     item.year ? String(item.year) : null,
-    item.countryOfOrigin,
+    item.countryOfOrigin ? `${countryFlag(item.countryOfOrigin)} ${countryName(item.countryOfOrigin)}` : null,
     item.seasons ? `${item.seasons} season${item.seasons === 1 ? "" : "s"}` : null,
     item.mediaType !== "MOVIE" && item.episodes ? `${item.episodes} episodes` : null,
     item.mediaType === "BOOK" && item.pageCount ? `${item.pageCount} pages` : null,
@@ -293,6 +295,33 @@ export function MediaDetail() {
               Save notes
             </button>
           </section>
+
+          {item.mediaType === "TV" || item.mediaType === "MOVIE" ? (
+            <section aria-labelledby="category-heading" className="space-y-2">
+              <h2 id="category-heading" className="text-sm font-semibold">Category</h2>
+              <label className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-white/80">Show this under</span>
+                <select
+                  className="min-h-11 rounded-xl bg-black/30 border border-white/15 px-3"
+                  value={item.regionOverride ?? "AUTO"}
+                  onChange={(e) =>
+                    mut.mutate({ regionOverride: e.target.value === "AUTO" ? null : (e.target.value as any) })
+                  }
+                >
+                  <option value="AUTO">
+                    Automatic ({item.region ? REGION_LABEL[item.region] : item.mediaType === "TV" ? "TV" : "Movies"})
+                  </option>
+                  <option value="NONE">{item.mediaType === "TV" ? "TV" : "Movies"} only</option>
+                  {REGIONS.map((r) => (
+                    <option key={r} value={r}>{REGION_LABEL[r]}</option>
+                  ))}
+                </select>
+              </label>
+              <p className="text-xs text-white/70">For co-productions and dubs that land in the wrong place.</p>
+            </section>
+          ) : null}
+
+          {item.provider === "manual" ? <ManualDetailsEditor item={item} onPatch={(p) => mut.mutate(p as any)} /> : null}
 
           <div className="border-t border-white/10 pt-4">
             <button

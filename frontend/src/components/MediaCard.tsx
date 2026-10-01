@@ -2,6 +2,7 @@ import type { MediaItem } from "../types";
 import { formatScore, onlineRating, personalRating } from "../lib/ratings";
 import { statusLabel } from "../lib/status";
 import { plainText } from "../lib/text";
+import { countryFlag, countryName } from "../lib/regions";
 
 type Variant = "tile" | "row";
 
@@ -48,7 +49,7 @@ function ratingText(item: MediaItem) {
   const online = onlineRating(item);
   const parts: string[] = [];
   if (mine != null) parts.push(`You ${formatScore(mine)}`);
-  if (online) parts.push(`${online.source} ${formatScore(online.value)}`);
+  if (online && !online.lowConfidence) parts.push(`${online.source} ${formatScore(online.value)}`);
   return parts.length ? parts.join(" · ") : null;
 }
 
@@ -152,6 +153,17 @@ export function MediaCard({
 
             {/* subtle dark gradient */}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-60" />
+
+            {item.countryOfOrigin ? (
+              <span
+                className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-sm leading-none"
+                role="img"
+                aria-label={countryName(item.countryOfOrigin)}
+                title={countryName(item.countryOfOrigin)}
+              >
+                {countryFlag(item.countryOfOrigin)}
+              </span>
+            ) : null}
           </div>
 
           {/* Hover info panel */}

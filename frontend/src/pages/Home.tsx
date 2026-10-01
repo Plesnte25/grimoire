@@ -1,13 +1,19 @@
 import { useMemo, useState } from "react";
 import { BigCategoryCard } from "../components/BigCategoryCard";
+import { REGIONS, effectiveRegion, isRegion, type CategoryKey } from "../lib/regions";
 import { SearchModal } from "../components/SearchModal";
 import { useQuery } from "@tanstack/react-query";
 import { fetchLibrary } from "../app/api";
-import type { MediaType } from "../types";
+import type { MediaItem, MediaType } from "../types";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
 const TYPES: MediaType[] = ["MOVIE", "TV", "ANIME", "BOOK"];
+const CATEGORIES: CategoryKey[] = [...TYPES, ...REGIONS];
+
+function categoryHref(c: CategoryKey) {
+  return isRegion(c) ? `/region/${c}` : `/category/${c}`;
+}
 
 /** Minimal inline icons (no deps) */
 function IconPlus(props: React.SVGProps<SVGSVGElement>) {
@@ -77,20 +83,27 @@ export function Home() {
     queryFn: () => fetchLibrary(),
   });
 
+  // Same rules as the server: regional shows leave TV, regional films stay in
+  // Movies as well as their region.
   const stats = useMemo(() => {
-    const map = new Map<MediaType, { total: number; inProgress: number }>();
-    for (const t of TYPES) map.set(t, { total: 0, inProgress: 0 });
-    for (const it of all) {
-      const s = map.get(it.mediaType as MediaType);
-      if (!s) continue;
+    const map = new Map<CategoryKey, { total: number; inProgress: number }>();
+    for (const c of CATEGORIES) map.set(c, { total: 0, inProgress: 0 });
+    const bump = (c: CategoryKey, it: MediaItem) => {
+      const s = map.get(c);
+      if (!s) return;
       s.total += 1;
       if (it.status === "IN_PROGRESS") s.inProgress += 1;
+    };
+    for (const it of all) {
+      const region = it.mediaType === "TV" || it.mediaType === "MOVIE" ? effectiveRegion(it) : null;
+      if (region) bump(region, it);
+      if (!(region && it.mediaType === "TV")) bump(it.mediaType as MediaType, it);
     }
     return map;
   }, [all]);
 
   const EASE = [0.22, 1, 0.36, 1] as const;
-  const n = TYPES.length;
+  const n = CATEGORIES.length;
 
   // Accordion feel knobs (desktop)
   const SLIVER_PX = 60; // thin closed state
@@ -157,18 +170,18 @@ export function Home() {
               [&::-webkit-scrollbar]:hidden
             "
           >
-            {TYPES.map((t, i) => (
+            {CATEGORIES.map((t, i) => (
               <div
                 key={t}
                 className="flex-shrink-0 w-[78vw] max-w-[340px] h-[62vh] min-h-[520px]"
               >
                 <BigCategoryCard
-                  mediaType={t}
+                  category={t}
                   stats={stats.get(t)!}
                   isActive={true} // always expanded on mobile
                   anyActive={false}
                   expandOrigin="center"
-                  onOpen={() => nav(`/category/${t}`)}
+                  onOpen={() => nav(categoryHref(t))}
                 />
               </div>
             ))}
@@ -180,7 +193,7 @@ export function Home() {
             style={{ height: HEIGHT, minHeight: MIN_H, maxHeight: MAX_H }}
             onMouseLeave={() => setActiveIndex(null)}
           >
-            {TYPES.map((t, i) => {
+            {CATEGORIES.map((t, i) => {
               const isActive = activeIndex === i;
               const anyActive = activeIndex !== null;
 
@@ -208,14 +221,14 @@ export function Home() {
                   }}
                 >
                   <BigCategoryCard
-                    mediaType={t}
+                    category={t}
                     stats={stats.get(t)!}
                     isActive={isActive}
                     anyActive={anyActive}
                     expandOrigin={
                       i === 0 ? "left" : i === n - 1 ? "right" : "center"
                     }
-                    onOpen={() => nav(`/category/${t}`)}
+                    onOpen={() => nav(categoryHref(t))}
                   />
                 </motion.div>
               );

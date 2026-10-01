@@ -9,6 +9,7 @@ import { SearchModal } from "../components/SearchModal";
 import { SuggestionsCarousel } from "../components/SuggestionsCarousel";
 import { groupByCollection } from "../lib/groupByCollection";
 import { STATUSES, statusLabel } from "../lib/status";
+import { REGION_LABEL, isRegion } from "../lib/regions";
 
 type StatusTab =
   | "ALL"
@@ -36,6 +37,8 @@ function classifyAnime(it: any): "SERIES" | "MOVIES" | "HENTAI" {
   if (String(it.format || "").toUpperCase() === "MOVIE") return "MOVIES";
   return "SERIES";
 }
+
+const PAGE_TITLE: Record<MediaType, string> = { MOVIE: "Movies", TV: "TV", ANIME: "Anime", BOOK: "Books" };
 
 function withNativeTitle(it: any) {
   const native =
@@ -83,9 +86,12 @@ const IMPORTANT_ANIME_GENRES = [
 ];
 
 export function Category() {
-  const { type } = useParams();
-  const mediaType = type as MediaType;
+  const { type, key } = useParams();
+  // /region/:key is a regional category (its shows + films); /category/:type a media type.
+  const region = isRegion(key) ? key : null;
+  const mediaType = (region ? "TV" : type) as MediaType;
   const isAnime = mediaType === "ANIME";
+  const [regionTab, setRegionTab] = useState<"SERIES" | "MOVIES">("SERIES");
 
   const nav = useNavigate();
 
@@ -98,8 +104,8 @@ export function Category() {
   const [animeTab, setAnimeTab] = useState<AnimeTab>("SERIES");
 
   const { data: items = [] } = useQuery({
-    queryKey: ["library", mediaType],
-    queryFn: () => fetchLibrary(mediaType),
+    queryKey: ["library", region ?? mediaType],
+    queryFn: () => fetchLibrary(region ?? mediaType),
   });
 
   const existingProviderIds = useMemo(() => {
@@ -137,6 +143,7 @@ export function Category() {
 
   // Base set = category items, narrowed by anime sub-tab if ANIME
   const baseItems = useMemo(() => {
+    if (region) return (items as any[]).filter((it) => it.mediaType === (regionTab === "SERIES" ? "TV" : "MOVIE"));
     if (!isAnime) return items as any[];
     const bucket = (animeBuckets?.[animeTab] ?? []) as any[];
     if (animeTab !== "SERIES") return bucket;
@@ -147,7 +154,7 @@ export function Category() {
     );
     const folded = (animeBuckets?.MOVIES ?? []).filter((it: any) => withSeries.has(it.franchiseId));
     return [...bucket, ...folded];
-  }, [isAnime, items, animeBuckets, animeTab]);
+  }, [isAnime, items, animeBuckets, animeTab, region, regionTab]);
 
   // Reset genre to ALL when switching anime tabs (prevents “stuck” genre)
   useEffect(() => {
@@ -195,6 +202,8 @@ export function Category() {
     return ["ALL", ...(hasUnknown ? ["Unknown", ...list] : list)];
   }, [baseItems, isAnime]);
 
+  const pageTitle = region ? REGION_LABEL[region] : PAGE_TITLE[mediaType];
+
   // Personal tags/moods used in this category (filter chips; hidden when none).
   const presentTags = useMemo(() => {
     const m = new Map<string, { name: string; kind: string }>();
@@ -206,9 +215,8 @@ export function Category() {
 
   // Main displayed list
   const displayed = useMemo(() => {
-    const decorated = isAnime
-      ? (baseItems as any[]).map(withNativeTitle)
-      : (baseItems as any[]);
+    // English title + original ("Resurrection: Ertugrul · Diriliş: Ertuğrul") everywhere.
+    const decorated = (baseItems as any[]).map(withNativeTitle);
 
     // 1) status filter (GLOBAL RULE)
     const filteredByStatus =
@@ -288,9 +296,9 @@ export function Category() {
       {/* Header + Search */}
       <div className="mt-4 flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <div className="text-2xl font-semibold tracking-tight">
-            {mediaType}
-          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {pageTitle}
+          </h1>
 
           {/* Total excludes planned */}
           <div className="text-sm opacity-70 mt-1">
@@ -308,11 +316,36 @@ export function Category() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={`Search in ${mediaType.toLowerCase()}…`}
+            placeholder={`Search in ${pageTitle}…`}
             className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-white/20"
           />
         </div>
       </div>
+
+      {/* Region: Series / Movies */}
+      {region ? (
+        <div className="mt-4 flex gap-2 flex-wrap" role="group" aria-label="Shows or films">
+          {(["SERIES", "MOVIES"] as const).map((t) => {
+            const count = (items as any[]).filter(
+              (it) => it.mediaType === (t === "SERIES" ? "TV" : "MOVIE") && it.status !== "PLANNED"
+            ).length;
+            return (
+              <button
+                key={t}
+                aria-pressed={regionTab === t}
+                onClick={() => setRegionTab(t)}
+                className={[
+                  "min-h-9 px-3 py-1 rounded-lg text-sm border transition flex items-center gap-2",
+                  regionTab === t ? "border-white/30 bg-white/10" : "border-white/10 text-white/70 hover:text-white",
+                ].join(" ")}
+              >
+                <span>{t === "SERIES" ? "Series" : "Movies"}</span>
+                <span className="text-xs text-white/70">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* Anime: sub-tabs */}
       {isAnime ? (
@@ -449,7 +482,7 @@ export function Category() {
 
       {/* Suggestions */}
       <div className="mt-6">
-        {isAnime ? (
+        {region ? null : isAnime ? (
           <SuggestionsCarousel
             mediaType="ANIME"
             scope={animeTab} // "SERIES" | "MOVIES" | "HENTAI"
@@ -473,7 +506,8 @@ export function Category() {
       <SearchModal
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
-        mediaTypeFilter={mediaType}
+        mediaTypeFilter={region ? undefined : mediaType}
+        region={region ?? undefined}
       />
     </div>
   );

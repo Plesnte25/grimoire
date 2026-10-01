@@ -4,6 +4,8 @@ import { fetchFranchise } from "../app/api";
 import type { CatalogEntry } from "../types";
 import { CatalogCard, catalogGrid } from "../components/CatalogCard";
 
+const ANIME_LANG: Record<string, string> = { JP: "ja", CN: "zh", TW: "zh", KR: "ko" };
+
 const SECTIONS: { title: string; roles: string[] }[] = [
   { title: "Seasons", roles: ["MAIN"] },
   { title: "Movies", roles: ["MOVIE"] },
@@ -45,7 +47,11 @@ export function FranchisePage() {
           {franchise.posterUrl ? <img src={franchise.posterUrl} alt="" className="h-28 w-20 rounded-xl object-cover" /> : null}
           <div>
             <h1 className="text-2xl font-semibold">{franchise.title}</h1>
-            {franchise.nativeTitle ? <div className="text-sm text-white/80" lang="ja">{franchise.nativeTitle}</div> : null}
+            {franchise.nativeTitle && franchise.nativeTitle.toLowerCase() !== franchise.title.toLowerCase() ? (
+              <div className="text-sm text-white/80" lang={ANIME_LANG[franchise.countryOfOrigin ?? ""] ?? undefined}>
+                {franchise.nativeTitle}
+              </div>
+            ) : null}
             <p className="mt-1 text-sm text-white/85">
               {seasons.length ? `${seenSeasons} of ${seasons.length} season${seasons.length === 1 ? "" : "s"} completed · ` : ""}
               {tracked} of {entries.length} entries in your library

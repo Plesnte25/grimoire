@@ -54,10 +54,11 @@ export async function setAccountPin(currentPin: string, newPin: string) {
 
 export async function providerSearch(
     q: string,
-    mediaType?: MediaType
+    mediaType?: MediaType,
+    region?: "TR" | "PK" | "KR" | "EU"
 ): Promise<ProviderSearchResult[]> {
     const res = await api.get("/api/providers/search", {
-        params: { q, mediaType },
+        params: { q, mediaType, region },
     });
     return res.data?.results ?? [];
 }
@@ -93,8 +94,10 @@ export async function updateLibrary(id: string, patch: Record<string, any>): Pro
     return res.data.item;
 }
 
-export async function fetchLibrary(mediaType?: MediaType): Promise<MediaItem[]> {
-    const res = await api.get("/api/library", { params: { mediaType } });
+/** A media type's library, or a regional category's shows and films. */
+export async function fetchLibrary(category?: MediaType | "TR" | "PK" | "KR" | "EU"): Promise<MediaItem[]> {
+    const region = category && ["TR", "PK", "KR", "EU"].includes(category) ? category : undefined;
+    const res = await api.get("/api/library", { params: region ? { region } : { mediaType: category } });
     return res.data?.items ?? [];
 }
 
@@ -115,6 +118,11 @@ export type ItemPatch = Partial<
         | "progressEpisode"
         | "progressTotalOverride"
         | "regionOverride"
+        | "title"
+        | "year"
+        | "countryOfOrigin"
+        | "episodes"
+        | "posterUrl"
     >
 >;
 

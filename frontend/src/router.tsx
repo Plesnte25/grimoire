@@ -14,6 +14,7 @@ import { ContributorPage } from "./pages/ContributorPage";
 export const router = createBrowserRouter([
   { path: "/", element: <Home /> },
   { path: "/category/:type", element: <Category /> },
+  { path: "/region/:key", element: <Category /> },
   { path: "/media/:id", element: <MediaDetail /> },
   { path: "/lists", element: <Lists /> },
   { path: "/lists/:id", element: <ListDetail /> },

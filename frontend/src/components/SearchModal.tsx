@@ -2,6 +2,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { MediaType } from "../types";
+import { REGION_LABEL, countryFlag, countryName, type Region } from "../lib/regions";
+import { onlineRating, onlineRatingText } from "../lib/ratings";
+import { ManualAddForm } from "./ManualAddForm";
+
+const TYPE_LABEL: Record<string, string> = { MOVIE: "Movie", TV: "TV show", ANIME: "Anime", BOOK: "Book" };
 import {
   addToLibrary,
   providerDetails,
@@ -14,6 +19,10 @@ type ProviderSearchResult = {
   providerId: string;
   mediaType: MediaType;
   title: string;
+  nativeTitle?: string;
+  countryOfOrigin?: string;
+  originalLanguage?: string;
+  isDub?: boolean;
   year?: string;
   posterUrl?: string;
   backdropUrl?: string;
@@ -58,16 +67,19 @@ export function SearchModal({
   open,
   onClose,
   mediaTypeFilter, // undefined on landing page, defined inside category page
+  region, // set on a regional category page: shows + films, that region first
 }: {
   open: boolean;
   onClose: () => void;
   mediaTypeFilter?: MediaType;
+  region?: Region;
 }) {
   const nav = useNavigate();
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [rawResults, setRawResults] = useState<ProviderSearchResult[]>([]);
   const [debounced, setDebounced] = useState("");
+  const [manualOpen, setManualOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -75,6 +87,7 @@ export function SearchModal({
     setDebounced("");
     setRawResults([]);
     setLoading(false);
+    setManualOpen(false);
   }, [open]);
 
   // debounce typing
@@ -85,6 +98,7 @@ export function SearchModal({
   }, [q, open]);
 
   const placeholder = useMemo(() => {
+    if (region) return `Search ${REGION_LABEL[region]} shows and films…`;
     if (!mediaTypeFilter) return "Search movies, shows, anime, books…";
     const m: Record<MediaType, string> = {
       MOVIE: "Search movies…",
@@ -110,7 +124,7 @@ export function SearchModal({
     (async () => {
       setLoading(true);
       try {
-        const res = await providerSearch(debounced);
+        const res = await providerSearch(debounced, undefined, region);
         if (cancelled) return;
         setRawResults((res ?? []) as ProviderSearchResult[]);
       } catch (e) {
@@ -271,7 +285,7 @@ export function SearchModal({
                         {r.posterUrl ? (
                           <img
                             src={r.posterUrl}
-                            alt={r.title}
+                            alt=""
                             className="w-full h-full object-cover"
                           />
                         ) : null}
@@ -279,12 +293,26 @@ export function SearchModal({
 
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold truncate">{r.title}</div>
-                        <div className="text-xs opacity-70 mt-1">
-                          {r.mediaType}
-                          {r.year ? ` · ${r.year}` : ""}
-                          {typeof r.globalRating === "number"
-                            ? ` · ⭐ ${r.globalRating}`
-                            : ""}
+                        {r.nativeTitle ? (
+                          <div className="text-sm text-white/80 truncate" lang={r.originalLanguage}>{r.nativeTitle}</div>
+                        ) : null}
+                        <div className="text-xs text-white/80 mt-1 flex flex-wrap items-center gap-x-1.5">
+                          <span>{TYPE_LABEL[r.mediaType] ?? r.mediaType}</span>
+                          {r.year ? <span>· {r.year}</span> : null}
+                          {r.countryOfOrigin ? (
+                            <span>
+                              · <span aria-hidden="true">{countryFlag(r.countryOfOrigin)}</span> {countryName(r.countryOfOrigin)}
+                            </span>
+                          ) : null}
+                          {(() => {
+                            const online = onlineRating(r as any);
+                            return online && !online.lowConfidence ? <span>· {onlineRatingText(online)}</span> : null;
+                          })()}
+                          {r.isDub ? (
+                            <span className="ml-1 rounded-full border border-amber-300/60 px-2 py-0.5 text-[11px] text-amber-200">
+                              Dub
+                            </span>
+                          ) : null}
                         </div>
                         {r.description ? (
                           <div className="text-xs opacity-60 mt-2 line-clamp-2">
@@ -301,6 +329,29 @@ export function SearchModal({
                     </div>
                   </button>
                 ))}
+              </div>
+
+              <div className="mt-4 border-t border-white/10 pt-4">
+                {manualOpen ? (
+                  <ManualAddForm
+                    defaultType={mediaTypeFilter ?? (region ? "TV" : "TV")}
+                    defaultCountry={region && region !== "EU" ? region : ""}
+                    defaultTitle={q.trim()}
+                    onCancel={() => setManualOpen(false)}
+                    onAdded={(id) => {
+                      onClose();
+                      nav(`/media/${id}`);
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="min-h-11 text-sm underline underline-offset-2 text-white/85 hover:text-white"
+                    onClick={() => setManualOpen(true)}
+                  >
+                    Can't find it? Add it manually
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>

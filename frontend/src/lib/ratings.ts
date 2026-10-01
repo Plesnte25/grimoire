@@ -9,7 +9,10 @@ const SOURCE_LABEL: Record<string, string> = {
   googlebooks: "Google Books",
 };
 
-export type OnlineRating = { value: number; source: string; votes?: number };
+// Below this many votes an average says little (Pakistani dramas often have 2–8).
+export const MIN_VOTES = 20;
+
+export type OnlineRating = { value: number; source: string; votes?: number; lowConfidence: boolean };
 
 type RatingFields = Pick<MediaItem, "provider" | "globalRating" | "globalRatingText">;
 
@@ -21,7 +24,8 @@ export function onlineRating(item: RatingFields): OnlineRating | null {
   // AniList's parenthesised number is its own score, not a vote count.
   const m =
     provider === "anilist" ? null : /\((\d+)(?:\s+\w+)?\)/.exec(item.globalRatingText ?? "");
-  return { value: item.globalRating, source, votes: m ? Number(m[1]) : undefined };
+  const votes = m ? Number(m[1]) : undefined;
+  return { value: item.globalRating, source, votes, lowConfidence: votes != null && votes < MIN_VOTES };
 }
 
 export function personalRating(item: Pick<MediaItem, "yourRating">): number | null {
@@ -42,6 +46,7 @@ export function formatVotes(n: number): string {
 }
 
 export function onlineRatingText(r: OnlineRating): string {
+  if (r.lowConfidence) return `${r.source}: not enough ratings (${r.votes})`;
   const votes = r.votes != null ? ` · ${formatVotes(r.votes)} votes` : "";
   return `${r.source} ${formatScore(r.value)}${votes}`;
 }
