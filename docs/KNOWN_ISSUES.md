@@ -48,7 +48,7 @@ commit once done. Issues are discussed and fixed one at a time.
     leaves the old text. **Fix:** accept `""`/`null` on PATCH to clear (keep `nonEmptyString` for POST). Folded into
     Phase 2 with typed progress (#17) and reviews/notes (#51).
 
-76. **Home's TV tile is labelled "Dramas"** (low). `typeLabel.TV` in `BigCategoryCard.tsx` is "Dramas", which
+76. ✅ **Fixed** (`96b07a0`) — **Home's TV tile is labelled "Dramas"** (low). `typeLabel.TV` in `BigCategoryCard.tsx` is "Dramas", which
     will clash with the regional categories (#37: Turkish Dizi, Pakistani Dramas, K-Drama). **Fix:** rename to "TV"
     when the regional categories land (or as part of the redesign).
 
@@ -60,7 +60,7 @@ commit once done. Issues are discussed and fixed one at a time.
     prequel chain to the 2022 Memorial Edition TV rather than the 1997 series (an ALTERNATIVE). Correct per the
     "follow AniList links" decision; a manual franchise override (detail page, like region "Move to…") would let
     the user regroup it.
-79. **Co-productions can land in the wrong region** (low). *The Transporter* (English-language, French production
+79. ✅ **Covered** (`96b07a0`: "Show this under") — **Co-productions can land in the wrong region** (low). *The Transporter* (English-language, French production
     company) gets `origin_country: FR` → European. Covered by `regionOverride` ("Move to…", #37).
 
 80. ✅ **Fixed** (`daa95b0`, `4be2080`) — **AniList descriptions show raw `<br>` tags** (medium). AniList's
@@ -68,6 +68,10 @@ commit once done. Issues are discussed and fixed one at a time.
     Stripped at display (`lib/text.ts`) and at enrichment (stored text cleaned on the next enrich).
 81. ✅ **Fixed** (`4be2080`) — **Genre chips never showed on the detail page** (low). The page ran `JSON.parse` on
     `genres`, which the API already returns as an array, so it always fell back to none.
+
+82. **Jikan (MyAnimeList) is intermittently down** (low). Jikan often answers 504 "failed to connect to
+    MyAnimeList"; scores for those anime stay unset (`scoresCheckedAt` null). Retries are in place; the Phase 4
+    daily job should also retry items with a MAL id but no score.
 
 ### Anime pipeline review (2026-10-01)
 
@@ -107,13 +111,13 @@ Findings below are from the local DB (78 anime) and live AniList queries. Decisi
 - **C. Write path:** `POST /library` resolves franchise + format server-side for `anilist` items, so every add path
   (search, suggestions) is covered; `GET` stops doing per-request enrichment.
 - **D. Backfill:** rewrite `scripts/backfillCollections.ts` for anime — all 78 rows, ~1 req/s for AniList limits.
-- **E. Series tab:** one tile per franchise (OG poster even if only a movie is tracked), badge like
+- ✅ (`109c6dd`) **E. Series tab:** one tile per franchise (OG poster even if only a movie is tracked), badge like
   "3 movies · 1 special"; replaces `CardStack` for anime. Movies tab keeps listing every anime movie.
-- **F. Franchise page** `/franchise/:id`: banner, then Seasons (in order), Movies, OVAs & ONAs, Specials; tracked
+- ✅ (`109c6dd`) **F. Franchise page** `/franchise/:id`: banner, then Seasons (in order), Movies, OVAs & ONAs, Specials; tracked
   entries highlighted, untracked ones greyed with "+ Add" (from AniList). Detail pages get a "ONE PIECE ›" breadcrumb.
 - **G. Ongoing progress:** "Ep 1100 / 1181 aired" via `nextAiringEpisode`, refreshed with the franchise record.
 - **H. Origin filter:** JP / CN / KR chips from `countryOfOrigin`.
-- **I.** Delete `pages/Anime.tsx` and the `/anime` route.
+- ✅ (`4be2080`) **I.** Delete `pages/Anime.tsx` and the `/anime` route.
 
 ### Other pipelines review (2026-10-01)
 
@@ -143,7 +147,7 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
 
 20. ✅ **Fixed** (`de565e8`) — **31 of 100 movies have no genres** (low) (*Interstellar*, *Se7en*, *Fast X*…), so they're missing from genre
     chips and suggestion seeding. **Fix:** covered by the shared backfill.
-21. **Collection stack has no "full collection" view** (polish). TMDB `/collection/{id}` lists every film. Reuse the
+21. ✅ **Done** (`109c6dd`) — **Collection stack has no "full collection" view** (polish). TMDB `/collection/{id}` lists every film. Reuse the
     anime franchise page (step F) for movie collections: owned films highlighted, the rest "+ Add", in release
     order (*John Wick* 2–4 owned → 1 shown as missing).
 
@@ -187,21 +191,21 @@ Digital), *Meray Paas Tum Ho*, *Dark* (DE), *Lupin* (FR), *La casa de papel* (ES
 *Meray Paas Tum Ho*), so it isn't worth adding as a second provider. What's missing is everything the app does
 *after* the search:
 
-31. 🟡 **Data stored** (`de565e8`; region categories/filters in Phase 3) — **Origin/language is thrown away** (medium). TMDB returns `origin_country` and `original_language` for every
+31. ✅ **Done** (`de565e8`, `96b07a0`) — **Origin/language is thrown away** (medium). TMDB returns `origin_country` and `original_language` for every
     show; `tmdbSearch`/`tmdbDetails` drop both, so there's no way to filter Turkish vs Pakistani vs European.
     **Fix:** store `countryOfOrigin` (same column as anime #15/H) + `originalLanguage`; prefer country over
     language (the Urdu dub of Ertuğrul is `lang: ur` but `country: TR`).
-32. 🟡 **Data stored** (`de565e8`; bilingual title display in Phase 3) — **Original title is thrown away** (low). `original_name` ("Diriliş: Ertuğrul", "La casa de papel") isn't mapped
+32. ✅ **Done** (`de565e8`, `96b07a0`) — **Original title is thrown away** (low). `original_name` ("Diriliş: Ertuğrul", "La casa de papel") isn't mapped
     to `nativeTitle`, and `withNativeTitle` in `Category.tsx` only runs for anime. **Fix:** map it for TMDB TV +
     movies; show "Resurrection: Ertugrul · Diriliş: Ertuğrul"; library search matches both.
-33. **Urdu romanization misses** (medium). TMDB search is spelling-exact: "Mere Paas Tum Ho" → **0 results**,
+33. ✅ **Done** (`109c6dd`) — **Urdu romanization misses** (medium). TMDB search is spelling-exact: "Mere Paas Tum Ho" → **0 results**,
     "Meray Paas Tum Ho" → found. Pakistani titles have no fixed romanization (mere/meray, tere/teray, hai/hay,
     ki/kee). **Fix:** when a TV/movie search returns < 3 results, retry server-side with generated variants and merge
     (small rule table in `tmdb.ts`), and also try `/search/multi`. Free-text title entry stays as a last resort.
-34. **Ratings from a handful of votes** (low). Pakistani dramas have 2–8 TMDB votes (*Meray Paas Tum Ho*: 2), so
+34. ✅ **Done** (`96b07a0`) — **Ratings from a handful of votes** (low). Pakistani dramas have 2–8 TMDB votes (*Meray Paas Tum Ho*: 2), so
     `globalRating` can be a misleading 10.0 or 4.0. **Fix:** show the TMDB rating only at ≥ 20 votes; otherwise
     "Not enough ratings".
-35. 🟡 **Progress-total override done** (`4be2080`; dub badges in search come with Phase 3) — **Dubs are separate entries with different episode counts** (low). "Ertugrul Ghazi Urdu" (TMDB 207645) is
+35. ✅ **Done** (`4be2080` override, `109c6dd`/`96b07a0` dub badges) — **Dubs are separate entries with different episode counts** (low). "Ertugrul Ghazi Urdu" (TMDB 207645) is
     separate from the Turkish original (66017), and the Urdu dub's episode split doesn't match 150. **Fix:** mark
     dub entries in search results ("Urdu dub" badge when `original_language` ≠ the country's language or the
     title says "Urdu/Dubbed"), and let the progress total be overridden per item (#17).
@@ -209,7 +213,7 @@ Digital), *Meray Paas Tum Ho*, *Dark* (DE), *Lupin* (FR), *La casa de papel* (ES
     `sort_by=popularity.desc`, so it never suggests Turkish/Pakistani shows even if half the library is. **Fix:**
     weight suggestions by the library's top origin countries (`with_origin_country=TR|PK…`), mixed with the
     genre seed.
-37. **Regional categories** (feature, decided 2026-10-01). Home gets four new tiles next to TV:
+37. ✅ **Done** (`109c6dd`, `96b07a0`) — **Regional categories** (feature, decided 2026-10-01). Home gets four new tiles next to TV:
     **Turkish Dizi** (TR) · **Pakistani Dramas** (PK) · **K-Drama** (KR) · **European** (NO, DE, FR, ES, IT, SE, DK,
     NL, BE, PL, PT, IS, FI, AT, CH…; UK/IE stay in TV as English-language). Everything else stays in **TV**.
     Decisions: covers **shows and movies** (each regional page has Series / Movies tabs; regional films also stay in
@@ -221,7 +225,7 @@ Digital), *Meray Paas Tum Ho*, *Dark* (DE), *Lupin* (FR), *La casa de papel* (ES
     a regional page, "+ Add" searches TMDB TV+movies with that country boosted; suggestions use
     `with_origin_country`. A flag on each card everywhere. The country → region map lives in one shared file so
     adding a region later (e.g. 🇮🇳, 🇨🇳 C-Drama) is one line.
-38. **No manual add** (medium). If TMDB doesn't have a show (obscure Pakistani/regional dramas), there's no way to
+38. ✅ **Done** (`109c6dd`, `96b07a0`) — **No manual add** (medium). If TMDB doesn't have a show (obscure Pakistani/regional dramas), there's no way to
     track it: `SearchModal` only adds provider results. **Fix:** "Add manually" in the search modal: title, type
     (show/movie), country (→ region), episode total, optional poster URL; stored with `provider: "manual"` and a
     generated `providerId`. Detail page allows editing those fields for manual items only.
@@ -314,7 +318,7 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 48. ✅ **Fixed** (`53f1e99`) — **Online scores use different scales** (medium). TMDB 0–10, AniList stored /10, Google Books raw 0–5, all shown
     side by side. **Fix:** normalise to /10 for display, always show source + vote count, hide below a vote
     threshold (#34).
-49. **No critic vs audience split** (medium). Only one source per medium. **Fix:** OMDb (free key, 1,000/day,
+49. 🟡 **Built** (`0515907`): MAL live via Jikan; IMDb/RT/Metacritic switch on with `OMDB_API_KEY` — **No critic vs audience split** (medium). Only one source per medium. **Fix:** OMDb (free key, 1,000/day,
     joined via TMDB `external_ids` → IMDb id) adds **IMDb** (audience), **Rotten Tomatoes** and **Metacritic**
     (critics) for movies/TV; Jikan (free, no key) adds the **MyAnimeList** score next to AniList for anime.
 50. ✅ **Done** (`daa95b0`, `4be2080`) — **No dates, no rewatches** (high). The schema has only `createdAt`/`updatedAt`, so there's no "started",
@@ -323,7 +327,7 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
     date (defaults to today).
 51. ✅ **Done** (`daa95b0`, `4be2080`) — **Review and notes are the same field** (medium). **Fix:** a written **review** (with spoiler flag) per watch,
     kept apart from private **notes**.
-52. **No cast/crew/studio** (medium). You can't see or browse "everything by Denis Villeneuve" or "all MAPPA
+52. ✅ **Done** (`de565e8` data, `109c6dd` person/studio pages) — **No cast/crew/studio** (medium). You can't see or browse "everything by Denis Villeneuve" or "all MAPPA
     anime". **Fix:** store director/creator + top cast (TMDB credits), studio (AniList `studios`), author (#18);
     each is a link to a person/studio page listing what you've logged plus their other work.
 53. ✅ **Fixed** (`53f1e99`) — **Status wording is inconsistent and medium-blind** (low). Raw enums on the detail page ("IN_PROGRESS"),
@@ -411,7 +415,8 @@ Each step: one commit per item, verified against the real library, then deployed
    migration for tiers).
 8. Personal tags & moods: filters everywhere (#66).
 
-**Phase 3: catalogue structure**
+**Phase 3: catalogue structure** ✅ built + verified on a copy of the live data (`109c6dd`…`477ddf4`), deploy
+pending; OMDb key pending for IMDb/RT/Metacritic
 9. Anime franchise tile + page (E–I), then reuse for movie collections (#21); cast/crew/studio pages (#52).
 10. International: regional categories + flags (#37), manual add (#38), romanization retry (#33), vote
     threshold (#34), dub badges (#35).
