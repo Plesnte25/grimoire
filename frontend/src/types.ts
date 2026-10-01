@@ -66,6 +66,48 @@ export type MediaItem = {
     airedEpisodeCount?: number | null;
     announcedNext?: string | null;
     announcedNextDate?: string | null;
+    progressSeason?: number | null;
+    progressEpisode?: number | null;
+    progressTotalOverride?: number | null;
+    completedSeasonCount?: number | null;
+    lastAiredSeason?: number | null;
+    lastAiredEpisode?: number | null;
+    tags?: { tag: Tag }[];
+};
+
+export type Tag = { id: string; name: string; kind: "TAG" | "MOOD"; color?: string | null; count?: number };
+
+export type WatchMode = "SUB" | "DUB" | "ORIGINAL";
+
+export type WatchLog = {
+    id: string;
+    mediaId: string;
+    startedAt?: string | null;
+    finishedAt?: string | null;
+    rating?: number | null;
+    review?: string | null;
+    reviewHasSpoilers: boolean;
+    isRewatch: boolean;
+    watchedOn?: string | null;
+    watchMode?: WatchMode | null;
+    watchedWith?: string | null;
+    createdAt: string;
+};
+
+export type DiaryLog = WatchLog & {
+    media: Pick<MediaItem, "id" | "title" | "mediaType" | "posterUrl" | "year">;
+};
+
+export type Season = { season: number; name: string; episodes: number; airDate: string | null };
+
+export type Tier = "S" | "A" | "B" | "C" | "D";
+
+export type TierList = {
+    id: string;
+    name: string;
+    description?: string | null;
+    updatedAt: string;
+    entries: { id: string; mediaId: string; tier: Tier; order: number; media: MediaItem }[];
 };
 
 export type CustomList = {
@@ -73,5 +115,9 @@ export type CustomList = {
     name: string;
     description?: string | null;
     coverColor?: string | null;
-    items: { id: string; order: number; media: MediaItem }[];
+    kind: "LIST" | "TOP10";
+    mediaType?: MediaType | null;
+    isRanked: boolean;
+    contains?: boolean;
+    items: { id: string; order: number; note?: string | null; mediaId: string; media: MediaItem }[];
 };

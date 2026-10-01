@@ -1,5 +1,7 @@
 import axios from "axios";
-import type { MediaItem, ProviderSearchResult, MediaType, CustomList } from "../types";
+import type {
+    MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
+} from "../types";
 
 const API_BASE =
     (import.meta.env.VITE_API_BASE && String(import.meta.env.VITE_API_BASE).trim()) || "";
@@ -100,12 +102,22 @@ export async function fetchItem(id: string): Promise<MediaItem> {
     return res.data.item;
 }
 
-export async function updateItem(
-    id: string,
-    patch: Partial<
-        Pick<MediaItem, "status" | "yourRating" | "yourNotes" | "progressText" | "progressValue">
+export type ItemPatch = Partial<
+    Pick<
+        MediaItem,
+        | "status"
+        | "yourRating"
+        | "yourNotes"
+        | "progressText"
+        | "progressValue"
+        | "progressSeason"
+        | "progressEpisode"
+        | "progressTotalOverride"
+        | "regionOverride"
     >
-): Promise<MediaItem> {
+>;
+
+export async function updateItem(id: string, patch: ItemPatch): Promise<MediaItem> {
     const res = await api.patch(`/api/library/${id}`, patch);
     return res.data.item;
 }
@@ -136,9 +148,136 @@ export async function fetchList(id: string): Promise<CustomList> {
     return res.data.list;
 }
 
+export async function fetchListsContaining(mediaId: string): Promise<CustomList[]> {
+    const res = await api.get("/api/lists", { params: { containing: mediaId } });
+    return res.data?.lists ?? [];
+}
+
+export async function fetchTop10(mediaType: MediaType): Promise<CustomList> {
+    const res = await api.get(`/api/lists/top10/${mediaType}`);
+    return res.data.list;
+}
+
 export async function addItemToList(listId: string, mediaId: string) {
     const res = await api.post(`/api/lists/${listId}/items`, { mediaId });
     return res.data.item;
+}
+
+export async function updateList(
+    id: string,
+    patch: { name?: string; description?: string | null; isRanked?: boolean }
+): Promise<CustomList> {
+    const res = await api.patch(`/api/lists/${id}`, patch);
+    return res.data.list;
+}
+
+export async function deleteList(id: string) {
+    await api.delete(`/api/lists/${id}`);
+}
+
+export async function removeListItem(listId: string, itemId: string) {
+    await api.delete(`/api/lists/${listId}/items/${itemId}`);
+}
+
+export async function setListItemNote(listId: string, itemId: string, note: string | null) {
+    await api.patch(`/api/lists/${listId}/items/${itemId}`, { note });
+}
+
+export async function reorderList(listId: string, itemIds: string[]): Promise<CustomList> {
+    const res = await api.put(`/api/lists/${listId}/order`, { itemIds });
+    return res.data.list;
+}
+
+// --- Watch log / diary ---
+
+export type LogInput = Partial<
+    Pick<
+        WatchLog,
+        | "startedAt"
+        | "finishedAt"
+        | "rating"
+        | "review"
+        | "reviewHasSpoilers"
+        | "isRewatch"
+        | "watchedOn"
+        | "watchMode"
+        | "watchedWith"
+    >
+>;
+
+export async function fetchItemLogs(mediaId: string): Promise<WatchLog[]> {
+    const res = await api.get(`/api/library/${mediaId}/logs`);
+    return res.data.logs;
+}
+
+export async function createLog(mediaId: string, input: LogInput): Promise<WatchLog> {
+    const res = await api.post(`/api/library/${mediaId}/logs`, input);
+    return res.data.log;
+}
+
+export async function updateLog(logId: string, input: LogInput): Promise<WatchLog> {
+    const res = await api.patch(`/api/logs/${logId}`, input);
+    return res.data.log;
+}
+
+export async function deleteLog(logId: string) {
+    await api.delete(`/api/logs/${logId}`);
+}
+
+export async function fetchDiary(year: number): Promise<DiaryLog[]> {
+    const res = await api.get("/api/logs", { params: { year } });
+    return res.data.logs;
+}
+
+export async function fetchSeasons(mediaId: string): Promise<Season[]> {
+    const res = await api.get(`/api/library/${mediaId}/seasons`);
+    return res.data.seasons;
+}
+
+// --- Tags ---
+
+export async function fetchTags(): Promise<Tag[]> {
+    const res = await api.get("/api/tags");
+    return res.data.tags;
+}
+
+export async function setItemTags(mediaId: string, names: string[], kind: Tag["kind"]): Promise<Tag[]> {
+    const res = await api.put(`/api/library/${mediaId}/tags`, { names, kind });
+    return res.data.tags;
+}
+
+// --- Tier lists ---
+
+export async function fetchTierLists(): Promise<TierList[]> {
+    const res = await api.get("/api/tier-lists");
+    return res.data.tierLists;
+}
+
+export async function fetchTierList(id: string): Promise<TierList> {
+    const res = await api.get(`/api/tier-lists/${id}`);
+    return res.data.tierList;
+}
+
+export async function createTierList(name: string): Promise<TierList> {
+    const res = await api.post("/api/tier-lists", { name });
+    return res.data.tierList;
+}
+
+export async function updateTierList(id: string, patch: { name?: string }): Promise<TierList> {
+    const res = await api.patch(`/api/tier-lists/${id}`, patch);
+    return res.data.tierList;
+}
+
+export async function deleteTierList(id: string) {
+    await api.delete(`/api/tier-lists/${id}`);
+}
+
+export async function saveTierEntries(
+    id: string,
+    entries: { mediaId: string; tier: Tier }[]
+): Promise<TierList> {
+    const res = await api.put(`/api/tier-lists/${id}/entries`, { entries });
+    return res.data.tierList;
 }
 
 // --- Suggestions ---

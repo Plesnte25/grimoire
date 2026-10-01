@@ -93,6 +93,7 @@ export function Category() {
 
   const [statusTab, setStatusTab] = useState<StatusTab>("ALL");
   const [genreTab, setGenreTab] = useState<string>("ALL");
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [animeTab, setAnimeTab] = useState<AnimeTab>("SERIES");
 
@@ -186,6 +187,15 @@ export function Category() {
     return ["ALL", ...(hasUnknown ? ["Unknown", ...list] : list)];
   }, [baseItems, isAnime]);
 
+  // Personal tags/moods used in this category (filter chips; hidden when none).
+  const presentTags = useMemo(() => {
+    const m = new Map<string, { name: string; kind: string }>();
+    for (const it of baseItems as any[]) {
+      for (const t of it.tags ?? []) m.set(t.tag.id, { name: t.tag.name, kind: t.tag.kind });
+    }
+    return [...m.entries()].sort((a, b) => a[1].kind.localeCompare(b[1].kind) || a[1].name.localeCompare(b[1].name));
+  }, [baseItems]);
+
   // Main displayed list
   const displayed = useMemo(() => {
     const decorated = isAnime
@@ -208,11 +218,16 @@ export function Category() {
             return gs.includes(genreTab);
           });
 
+    // 2b) personal tag / mood filter
+    const filteredByTag = !tagFilter
+      ? filteredByGenre
+      : filteredByGenre.filter((x: any) => (x.tags ?? []).some((t: any) => t.tag.id === tagFilter));
+
     // 3) search filter (English + native + description)
     const qq = q.trim().toLowerCase();
     const filteredByQuery = !qq
-      ? filteredByGenre
-      : filteredByGenre.filter((x: any) => {
+      ? filteredByTag
+      : filteredByTag.filter((x: any) => {
           const t = String(x.title ?? "").toLowerCase();
           const d = String(x.description ?? "").toLowerCase();
           const native = String(
@@ -233,7 +248,7 @@ export function Category() {
         sensitivity: "base",
       })
     );
-  }, [baseItems, isAnime, statusTab, genreTab, q]);
+  }, [baseItems, isAnime, statusTab, genreTab, tagFilter, q]);
 
   // Franchise/series grouping ("card stack") — groups sharing a collectionId
   // (Phase 4) render as a CardStack; everything else renders as a normal MediaCard.
@@ -363,6 +378,25 @@ export function Category() {
           </button>
         ))}
       </div>
+
+      {/* Personal tags / moods */}
+      {presentTags.length ? (
+        <div className="mt-3 flex items-center gap-2 flex-wrap" role="group" aria-label="Filter by your tags">
+          {presentTags.map(([tagId, t]) => (
+            <button
+              key={tagId}
+              aria-pressed={tagFilter === tagId}
+              onClick={() => setTagFilter(tagFilter === tagId ? null : tagId)}
+              className={[
+                "min-h-9 px-3 rounded-full text-sm border border-dashed transition",
+                tagFilter === tagId ? "border-white/60 bg-white/15" : "border-white/25 text-white/80 hover:text-white",
+              ].join(" ")}
+            >
+              {t.kind === "MOOD" ? `Mood: ${t.name}` : `#${t.name}`}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {/* Grid */}
       <div className="mt-6" style={{ minHeight: "60vh" }}>

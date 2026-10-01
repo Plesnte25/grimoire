@@ -1,6 +1,7 @@
 import type { MediaItem } from "../types";
 import { formatScore, onlineRating, personalRating } from "../lib/ratings";
 import { statusLabel } from "../lib/status";
+import { plainText } from "../lib/text";
 
 type Variant = "tile" | "row";
 
@@ -233,7 +234,7 @@ export function MediaCard({
 
         {item.description ? (
           <div className="text-sm opacity-80 mt-2 line-clamp-2">
-            {item.description}
+            {plainText(item.description)}
           </div>
         ) : null}
 
