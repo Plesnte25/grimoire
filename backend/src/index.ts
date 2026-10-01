@@ -48,8 +48,23 @@ app.use(
                 "upgrade-insecure-requests": null,
             },
         },
+        // Same reasoning as above, but worse: a browser caches this header
+        // for `max-age` (180 days here) per-hostname and then forces HTTPS
+        // on every future visit to that host, on any port, even after the
+        // server stops sending the header. This app is reachable both over
+        // public HTTPS (via Caddy) and over a plain-HTTP-only private
+        // Tailscale address — sending HSTS unconditionally would permanently
+        // break the private address the first time it's loaded. Send it only
+        // when the request actually arrived over HTTPS.
+        hsts: false,
     })
 );
+app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.secure) {
+        res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
+    }
+    next();
+});
 app.use(
     cors({
         origin: process.env.FRONTEND_ORIGIN
