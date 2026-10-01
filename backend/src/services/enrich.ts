@@ -63,6 +63,19 @@ function tmdbImage(path: string | null | undefined, size: "w185" | "w500" | "w78
     return path ? `${TMDB_IMAGE_BASE}/${size}${path}` : null;
 }
 
+/** AniList's "plain" descriptions still contain <br>/<i> tags and entities. */
+function cleanDescription(s?: string | null): string | null {
+    if (!s) return null;
+    const text = s
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+        .replace(/[ \t]*\n[ \t]*/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    return text || null;
+}
+
 function slug(s: string) {
     return s
         .toLowerCase()
@@ -419,7 +432,10 @@ async function enrichAnilist(item: MediaItem): Promise<Enrichment | null> {
     return {
         data: {
             year: fill(item.year, m.startDate?.year ?? null),
-            description: fill(item.description, m.description || null),
+            // Replaces the stored text when it still carries AniList's markup.
+            description: /<[a-z][^>]*>/i.test(item.description ?? "")
+                ? cleanDescription(item.description)
+                : fill(item.description, cleanDescription(m.description)),
             posterUrl: fill(item.posterUrl, m.coverImage?.extraLarge ?? m.coverImage?.large ?? null),
             backdropUrl: fill(item.backdropUrl, m.bannerImage ?? null),
             genres: fill(item.genres, genresJson(m.genres)),

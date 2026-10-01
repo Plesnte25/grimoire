@@ -87,11 +87,12 @@ model MediaItem {
   metaCheckedAt DateTime?
   airCheckedAt  DateTime?
 
-  franchise Franchise? @relation(fields: [franchiseId], references: [id])
+  franchise Franchise?  @relation(fields: [franchiseId], references: [id])
   listItems ListItem[]
   watchLogs WatchLog[]
   credits   Credit[]
   tags      MediaTag[]
+  TierEntry TierEntry[]
 
   @@unique([provider, providerId])
   @@index([collectionId])
@@ -185,10 +186,15 @@ model CustomList {
   name        String
   description String?
   coverColor  String? // hex or css token
+  kind        String   @default("LIST") // LIST | TOP10 (one Top 10 per media type)
+  mediaType   String? // set for TOP10 lists
+  isRanked    Boolean  @default(false) // numbered order matters (TOP10 is always ranked)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   items ListItem[]
+
+  @@index([kind, mediaType])
 }
 
 model ListItem {
@@ -196,12 +202,36 @@ model ListItem {
   listId    String
   mediaId   String
   order     Int      @default(0)
+  note      String? // why it's on the list / why it ranks here
   createdAt DateTime @default(now())
 
   list  CustomList @relation(fields: [listId], references: [id], onDelete: Cascade)
   media MediaItem  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
 
   @@unique([listId, mediaId])
+}
+
+// Tier lists: drag items into S / A / B / C / D rows (KNOWN_ISSUES #67).
+model TierList {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  entries     TierEntry[]
+}
+
+model TierEntry {
+  id         String @id @default(cuid())
+  tierListId String
+  mediaId    String
+  tier       String // S | A | B | C | D
+  order      Int    @default(0)
+
+  tierList TierList  @relation(fields: [tierListId], references: [id], onDelete: Cascade)
+  media    MediaItem @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([tierListId, mediaId])
 }
 
 // --- Auth (single-account: PIN unlock on trusted devices, email OTP to trust a new device) ---

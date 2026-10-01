@@ -1,6 +1,6 @@
-import type { ZodTypeAny } from "zod";
+import type { z, ZodTypeAny } from "zod";
 
-export function parseOrThrow<T extends ZodTypeAny>(schema: T, data: unknown) {
+export function parseOrThrow<T extends ZodTypeAny>(schema: T, data: unknown): z.output<T> {
     const parsed = schema.safeParse(data);
     if (!parsed.success) {
         const msg = parsed.error.issues.map((i) => i.message).join(", ");
@@ -9,5 +9,5 @@ export function parseOrThrow<T extends ZodTypeAny>(schema: T, data: unknown) {
         err.code = "VALIDATION_ERROR";
         throw err;
     }
-    return parsed.data as any;
+    return parsed.data;
 }

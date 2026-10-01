@@ -13,6 +13,9 @@ import helmet from "helmet";
 
 import { libraryRouter } from "./routes/library.js";
 import { listsRouter } from "./routes/lists.js";
+import { logsRouter } from "./routes/logs.js";
+import { tierListsRouter } from "./routes/tierLists.js";
+import { tagsRouter } from "./routes/tags.js";
 import { providersRouter } from "./routes/providers.js";
 import suggestionsRouter from "./routes/suggestions.js";
 import { authRouter } from "./routes/auth.js";
@@ -58,6 +61,9 @@ app.use("/api/auth", authRouter);
 app.use("/api/providers", requireSession, providersRouter);
 app.use("/api/library", requireSession, libraryRouter);
 app.use("/api/lists", requireSession, listsRouter);
+app.use("/api/logs", requireSession, logsRouter);
+app.use("/api/tier-lists", requireSession, tierListsRouter);
+app.use("/api/tags", requireSession, tagsRouter);
 app.use("/api/suggestions", requireSession, suggestionsRouter);
 
 // Serve the built frontend in production — makes the deployed app single-origin

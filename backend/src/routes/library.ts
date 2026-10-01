@@ -4,8 +4,18 @@ import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { enrichWithinBudget } from "../services/enrich.js";
+import { isFinished, progressTotal } from "../lib/progress.js";
+import { itemLogsRouter } from "./logs.js";
+import { setItemTags } from "./tags.js";
+import { tmdbGet } from "../services/providers/tmdb.js";
 
 export const libraryRouter = Router();
+
+// Shared shape of library items: the franchise card data and tag names.
+const ITEM_INCLUDE = {
+    franchise: { select: { title: true, posterUrl: true, bannerUrl: true } },
+    tags: { select: { tag: { select: { id: true, name: true, kind: true, color: true } } } },
+} as const;
 
 function normalizeGenresInput(input: unknown): string[] {
     if (!input) return [];
@@ -103,7 +113,7 @@ libraryRouter.get(
         const items = await prisma.mediaItem.findMany({
             where,
             orderBy: [{ updatedAt: "desc" }],
-            include: { franchise: { select: { title: true, posterUrl: true, bannerUrl: true } } },
+            include: ITEM_INCLUDE,
         });
 
         const out = items.map(withParsedGenres);
@@ -112,10 +122,33 @@ libraryRouter.get(
     })
 );
 
+libraryRouter.use("/:id/logs", itemLogsRouter);
+libraryRouter.put("/:id/tags", setItemTags);
+
+// Seasons of a TMDB show, for the season → episode progress picker.
+libraryRouter.get(
+    "/:id/seasons",
+    asyncHandler(async (req, res) => {
+        const item = await prisma.mediaItem.findUnique({ where: { id: req.params.id } });
+        if (!item) return res.status(404).json({ error: "Not found" });
+        if (item.provider !== "tmdb" || item.mediaType !== "TV") return res.json({ seasons: [] });
+        const show = await tmdbGet(`/tv/${item.providerId}`);
+        const seasons = (show?.seasons ?? [])
+            .filter((s: any) => s.season_number >= 1)
+            .map((s: any) => ({
+                season: s.season_number,
+                name: s.name,
+                episodes: s.episode_count ?? 0,
+                airDate: s.air_date ?? null,
+            }));
+        res.json({ seasons });
+    })
+);
+
 libraryRouter.get(
     "/:id",
     asyncHandler(async (req, res) => {
-        const include = { franchise: { select: { title: true, posterUrl: true, bannerUrl: true } } };
+        const include = ITEM_INCLUDE;
         let item = await prisma.mediaItem.findUnique({ where: { id: req.params.id }, include });
         if (!item) return res.status(404).json({ error: "Not found" });
 
@@ -242,12 +275,27 @@ libraryRouter.post(
         }
         const fresh = await prisma.mediaItem.findUnique({
             where: { id: item.id },
-            include: { franchise: { select: { title: true, posterUrl: true, bannerUrl: true } } },
+            include: ITEM_INCLUDE,
         });
 
         res.json({ item: withParsedGenres(fresh ?? item), alreadyExisted: !!existed });
     })
 );
+
+// PATCH fields that can be cleared: "" or null → null, missing → unchanged.
+const clearableText = z
+    .union([z.string(), z.null()])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === null || v.trim() === "" ? null : v.trim()));
+
+const clearableInt = z
+    .union([z.number().int().min(0), z.string(), z.null()])
+    .optional()
+    .transform((v) => {
+        if (v === undefined || v === null) return v;
+        const n = typeof v === "number" ? v : Number(String(v));
+        return Number.isInteger(n) && n >= 0 ? n : undefined;
+    });
 
 libraryRouter.patch(
     "/:id",
@@ -266,16 +314,13 @@ libraryRouter.patch(
                 .refine((v) => v == null || (v >= 0.5 && v <= 10 && Number.isInteger(v * 2)), {
                     message: "Rating must be 0.5–10 in half steps",
                 }),
-            yourNotes: nonEmptyString,
-            progressText: nonEmptyString,
-            progressValue: z
-                .union([z.number().int(), z.string()])
-                .optional()
-                .transform((v) => {
-                    if (v === undefined) return undefined;
-                    const n = typeof v === "number" ? v : Number(String(v));
-                    return Number.isFinite(n) ? n : undefined;
-                }),
+            yourNotes: clearableText,
+            progressText: clearableText,
+            progressValue: clearableInt,
+            progressSeason: clearableInt,
+            progressEpisode: clearableInt,
+            progressTotalOverride: clearableInt,
+            regionOverride: z.enum(["TR", "PK", "KR", "EU", "NONE"]).nullable().optional(),
             genres: z
                 .union([z.array(z.string()), z.string()])
                 .optional()
@@ -283,17 +328,71 @@ libraryRouter.patch(
         });
 
         const data = parseOrThrow(schema, req.body);
-        const updateData: any = { ...data };
+        const current = await prisma.mediaItem.findUnique({ where: { id: req.params.id } });
+        if (!current) return res.status(404).json({ error: "Not found" });
 
+        const updateData: any = { ...data };
         if (data.genres !== undefined) {
             updateData.genres = serializeGenres(data.genres);
         }
 
-        const item = await prisma.mediaItem.update({
-            where: { id: req.params.id },
-            data: updateData,
-        });
+        // Reaching the last unit of something that can't grow completes it.
+        const merged = { ...current, ...updateData };
+        const total = progressTotal(merged);
+        if (
+            data.status === undefined &&
+            data.progressValue != null &&
+            total != null &&
+            data.progressValue >= total &&
+            current.status !== "COMPLETED" &&
+            isFinished(merged)
+        ) {
+            updateData.status = "COMPLETED";
+        }
 
+        const statusChange =
+            updateData.status !== undefined && updateData.status !== current.status ? updateData.status : null;
+
+        if (statusChange === "COMPLETED") {
+            if (total != null && data.progressValue === undefined) updateData.progressValue = total;
+            if (current.mediaType === "TV") {
+                updateData.completedSeasonCount = current.seasons ?? current.lastAiredSeason ?? null;
+                if (data.progressSeason === undefined && current.lastAiredSeason != null) {
+                    updateData.progressSeason = current.lastAiredSeason;
+                    updateData.progressEpisode = current.lastAiredEpisode;
+                }
+            }
+        }
+
+        const ops: any[] = [prisma.mediaItem.update({ where: { id: current.id }, data: updateData })];
+
+        // Keep the watch log in step with status: Watching opens an entry,
+        // Completed closes it (or records one if you never marked it Watching).
+        const openLog = await prisma.watchLog.findFirst({
+            where: { mediaId: current.id, finishedAt: null },
+            orderBy: { createdAt: "desc" },
+        });
+        const now = new Date();
+        if (statusChange === "IN_PROGRESS" && !openLog) {
+            const finishedBefore = await prisma.watchLog.count({
+                where: { mediaId: current.id, finishedAt: { not: null } },
+            });
+            ops.push(
+                prisma.watchLog.create({
+                    data: { mediaId: current.id, startedAt: now, isRewatch: finishedBefore > 0 },
+                })
+            );
+        }
+        if (statusChange === "COMPLETED") {
+            const rating = updateData.yourRating ?? current.yourRating ?? null;
+            ops.push(
+                openLog
+                    ? prisma.watchLog.update({ where: { id: openLog.id }, data: { finishedAt: now, rating } })
+                    : prisma.watchLog.create({ data: { mediaId: current.id, finishedAt: now, rating } })
+            );
+        }
+
+        const [item] = await prisma.$transaction(ops);
         res.json({ item: withParsedGenres(item) });
     })
 );
