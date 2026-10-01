@@ -17,7 +17,7 @@ commit once done. Issues are discussed and fixed one at a time.
    **Fix:** point the laptop (NetworkManager connection) or the router at a public resolver such as `1.1.1.1` /
    `9.9.9.9`, then confirm `dig grimoire-app.duckdns.org AAAA` returns instantly and a plain `curl` is ~1 s.
 
-2. **Account bootstrap can be hijacked with an unverified email** (high, security). `POST /auth/bootstrap` only
+2. ✅ **Fixed** (`5696301`) — **Account bootstrap can be hijacked with an unverified email** (high, security). `POST /auth/bootstrap` only
    checks that *some* OTP was verified, not for which address: verify an OTP for any inbox, then create the account
    under a different email.
    **Fix (written 2026-09-24, uncommitted):** `OtpCode.email` stores the address the code was sent to;
@@ -26,16 +26,16 @@ commit once done. Issues are discussed and fixed one at a time.
    `20260924070308_add_otp_email_and_device_verified_email`). Deploy note: the migration adds a NOT NULL `email` to
    `OtpCode`, so delete stale OTP rows on the VM before `prisma migrate deploy`.
 
-3. **Saving an item without editing wipes notes/progress** (medium). `MediaDetail.tsx` keeps local state starting
+3. ✅ **Fixed** (`3cc751c`) — **Saving an item without editing wipes notes/progress** (medium). `MediaDetail.tsx` keeps local state starting
    at `""` while the inputs use `defaultValue`, so Save sends empty strings over the real values.
    **Fix (written 2026-09-24, uncommitted):** sync local state from the loaded item in a `useEffect`
    (`frontend/src/pages/MediaDetail.tsx`).
 
-4. **`/providers/details` errors escape the error handler** (low). The route isn't wrapped in `asyncHandler`, so a
+4. ✅ **Fixed** (`3cc751c`) — **`/providers/details` errors escape the error handler** (low). The route isn't wrapped in `asyncHandler`, so a
    zod validation error becomes an unhandled rejection instead of a 400.
    **Fix (written 2026-09-24, uncommitted):** wrap it in `asyncHandler` (`backend/src/routes/providers.ts`).
 
-5. **Temporary auth bypass in the working tree** (high if shipped). `BYPASS_AUTH_TOKEN`, sent as the
+5. ✅ **Removed** (never committed, reverted before `5696301`) — **Temporary auth bypass in the working tree** (high if shipped). `BYPASS_AUTH_TOKEN`, sent as the
    `x-bypass-token` header or `?bypassToken=`, skips the session check (`backend/src/middleware/requireSession.ts`,
    `frontend/src/app/api.ts`, `frontend/src/components/PasscodeGate.tsx`). Added for an external analysis tool. A
    token in the URL leaks into server logs and browser history.
@@ -47,6 +47,10 @@ commit once done. Issues are discussed and fixed one at a time.
     `nonEmptyString` (`routes/library.ts`), which turns `""` into `undefined`, so emptying the field and saving
     leaves the old text. **Fix:** accept `""`/`null` on PATCH to clear (keep `nonEmptyString` for POST). Folded into
     Phase 2 with typed progress (#17) and reviews/notes (#51).
+
+76. **Home's TV tile is labelled "Dramas"** (low). `typeLabel.TV` in `BigCategoryCard.tsx` is "Dramas", which
+    will clash with the regional categories (#37: Turkish Dizi, Pakistani Dramas, K-Drama). **Fix:** rename to "TV"
+    when the regional categories land (or as part of the redesign).
 
 ### Anime pipeline review (2026-10-01)
 
@@ -114,6 +118,9 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
     no collection are re-fetched on **every** Movies page load because "no collection" is never stored.
     **Fix:** persist results plus a `metaCheckedAt` timestamp; enrichment moves to the add path + backfill
     (same as anime step C).
+    Measured 2026-10-01 against a copy of the local DB: `GET /library?mediaType=MOVIE` 2.8 s warm (minutes on a
+    flaky connection), `mediaType=ANIME` over 2 minutes (≈50 serial AniList calls), `mediaType=TV` 3 ms. The Home
+    Anime tile stays blank until that request finishes.
 
 **Movies**
 
@@ -261,7 +268,7 @@ GCP's free tier is ~1 GB egress/month) and declined under that rule. Playback th
 Premium Family via the official IFrame Player + Data API v3 was also considered (full-length, but the player must
 stay visible, there's no background play on phones, and it depends on YouTube) and declined: Music is dropped.
 
-45. **Remove the Music category** (decided). Scope:
+45. ✅ **Fixed** (`8be2453`) — **Remove the Music category** (decided). Scope:
     - Frontend: delete `pages/MusicCategory.tsx`; drop `MUSIC` from `TYPES` (`pages/Home.tsx`), `MediaType`
       (`types.ts`), `BigCategoryCard.tsx`, `SearchModal.tsx`, `Category.tsx`.
     - Backend: delete `services/providers/itunes.ts` and the `/providers/track-meta` route; drop `MUSIC` from the
@@ -281,13 +288,13 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 
 **Must-haves that are broken or missing**
 
-46. **Personal and online ratings are blended** (high). `MediaDetail.tsx` renders `⭐ {yourRating ?? globalRating}`:
+46. ✅ **Fixed** (`53f1e99`) — **Personal and online ratings are blended** (high). `MediaDetail.tsx` renders `⭐ {yourRating ?? globalRating}`:
     an unrated item shows the *online* score in the *personal* slot. `MediaCard` shows a single number that is yours
     if set, otherwise global, labelled "TMDB" even for AniList/Google items. **Fix:** always two separate, labelled
     values ("You 8.5" / "TMDB 7.9 · 12k votes"); "Not rated" when you haven't rated it.
-47. **"Unrated" and "0" are the same; the slider spams saves** (medium). The 0–10 range input starts at 0 when unrated
+47. ✅ **Fixed** (`53f1e99`) — **"Unrated" and "0" are the same; the slider spams saves** (medium). The 0–10 range input starts at 0 when unrated
     and fires a PATCH on every drag step. **Fix:** a 10-point (half-step) star control with "Clear", saving on release.
-48. **Online scores use different scales** (medium). TMDB 0–10, AniList stored /10, Google Books raw 0–5, all shown
+48. ✅ **Fixed** (`53f1e99`) — **Online scores use different scales** (medium). TMDB 0–10, AniList stored /10, Google Books raw 0–5, all shown
     side by side. **Fix:** normalise to /10 for display, always show source + vote count, hide below a vote
     threshold (#34).
 49. **No critic vs audience split** (medium). Only one source per medium. **Fix:** OMDb (free key, 1,000/day,
@@ -302,12 +309,12 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 52. **No cast/crew/studio** (medium). You can't see or browse "everything by Denis Villeneuve" or "all MAPPA
     anime". **Fix:** store director/creator + top cast (TMDB credits), studio (AniList `studios`), author (#18);
     each is a link to a person/studio page listing what you've logged plus their other work.
-53. **Status wording is inconsistent and medium-blind** (low). Raw enums on the detail page ("IN_PROGRESS"),
+53. ✅ **Fixed** (`53f1e99`) — **Status wording is inconsistent and medium-blind** (low). Raw enums on the detail page ("IN_PROGRESS"),
     "Ongoing" on cards, "Watching" on Category; `MediaCard.prettyStatus` checks `"PLANNING"`, which never exists.
     Books should say Reading / Want to read. **Fix:** one label map per media type.
 54. **Lists are create-only** (medium). No rename, delete, reorder, remove item, or "already in this list"
     state; "+ Add to …" gives no feedback. **Fix:** full list management, ranked lists with per-item notes.
-55. **Delete has no confirmation or undo and is hover-only** (high). The card's delete button is `opacity-0`
+55. ✅ **Fixed** (`53f1e99`) — **Delete has no confirmation or undo and is hover-only** (high). The card's delete button is `opacity-0`
     until hover: invisible on phones and to the keyboard, and one click removes the item with its rating/notes.
     **Fix:** move delete into the detail page / a menu, confirm, 10-second undo toast.
 56. **No export or import** (high). Everything lives in one SQLite file on a free VM; there's no way to get your
