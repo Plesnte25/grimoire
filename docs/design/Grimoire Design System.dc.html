@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..500&amp;family=Noto+Sans+JP:wght@400;500&amp;family=Noto+Sans+SC:wght@400;500&amp;family=Noto+Sans+KR:wght@400;500&amp;family=Noto+Nastaliq+Urdu:wght@400;600&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0..1,0&amp;display=block">
+<style>
+body{margin:0;background:#0b0b10;font-family:'Hanken Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#ab9ef2}a:hover{color:#e3defe}
+.th-dark{--bg:#0b0b10;--s1:#14121c;--s2:#1f1a33;--s3:#2a2445;--line:rgba(227,222,254,.11);--line2:rgba(227,222,254,.22);--tx:#f4f1ff;--tx2:#c3bde0;--tx3:#9d96c2;--acc:#ab9ef2;--accbg:#5a4ca0;--onacc:#ffffff;--you:#f0a8dd;--youbg:rgba(240,168,221,.13);--ok:#86dbb0;--warn:#f2c46d;--err:#ff9a9a;--scrim:rgba(5,4,10,.72)}
+.th-light{--bg:#f6f4fb;--s1:#ffffff;--s2:#ece8f8;--s3:#ddd7f1;--line:rgba(28,23,48,.12);--line2:rgba(28,23,48,.24);--tx:#0b0b10;--tx2:#433d5e;--tx3:#5e5880;--acc:#4d4189;--accbg:#453a7a;--onacc:#ffffff;--you:#a3327b;--youbg:#fbe6f3;--ok:#1d7349;--warn:#875700;--err:#b3261e;--scrim:rgba(11,11,16,.5)}
+.ms{font-family:'Material Symbols Rounded';font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;font-feature-settings:'liga';font-size:22px;display:inline-block}
+@keyframes shimmer{0%{opacity:.55}50%{opacity:1}100%{opacity:.55}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</helmet>
+
+<div class="th-dark" style="background:var(--bg);color:var(--tx);padding:56px 64px 80px;display:flex;flex-direction:column;gap:64px;width:1440px;box-sizing:border-box">
+
+<header style="display:flex;justify-content:space-between;align-items:flex-end;gap:40px;border-bottom:1px solid var(--line);padding-bottom:32px">
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:860px">
+    <div style="display:flex;align-items:center;gap:10px"><span style="color:var(--acc);font-size:22px">✦</span><span style="font:600 28px/1 'Newsreader',serif">Grimoire</span><span style="font:600 12px/1 ui-monospace,Menlo,monospace;color:var(--tx3);margin-left:8px">DESIGN SYSTEM · v1</span></div>
+    <div style="font:500 52px/1.02 'Newsreader',serif;letter-spacing:-.015em">The chrome stays quiet. Posters carry the colour.</div>
+    <div style="font:400 16px/1.55 'Hanken Grotesk';color:var(--tx2);text-wrap:pretty">Rules: one lavender accent for actions and focus. <span style="color:var(--you);font-weight:600">Petal pink and the ✦ sigil are reserved for you</span>: your rating, your favourites and your history. Crowd scores are plain numbers with vote counts and never take a colour. Surfaces step up in lightness instead of using glass. No blur, except to hide spoilers.</div>
+  </div>
+  <a href="Grimoire Key Screens.dc.html" style="font:600 14px 'Hanken Grotesk';white-space:nowrap">Key screens →</a>
+</header>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font:500 13px ui-monospace,Menlo,monospace;color:var(--tx3)">01</span><span style="font:500 30px/1 'Newsreader',serif">Colour</span><span style="font:400 14px 'Hanken Grotesk';color:var(--tx3)">Contrast is measured against the page background. Every text token passes AA.</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <sc-for list="{{themes}}" as="th" hint-placeholder-count="2">
+    <div class="{{th.cls}}" style="background:var(--bg);color:var(--tx);border:1px solid var(--line2);border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:6px">
+      <div style="font:600 16px 'Hanken Grotesk';margin-bottom:10px">{{th.label}}</div>
+      <sc-for list="{{th.sw}}" as="s" hint-placeholder-count="10">
+      <div style="display:grid;grid-template-columns:44px 120px 90px 1fr 70px;gap:14px;align-items:center;min-height:44px;border-top:1px solid var(--line)">
+        <span style="width:36px;height:28px;border-radius:7px;background:{{s.v}};box-shadow:inset 0 0 0 1px var(--line2)"></span>
+        <span style="font:600 13px ui-monospace,Menlo,monospace">{{s.k}}</span>
+        <span style="font:500 12px ui-monospace,Menlo,monospace;color:var(--tx2)">{{s.hex}}</span>
+        <span style="font:400 13px 'Hanken Grotesk';color:var(--tx2)">{{s.use}}</span>
+        <span style="font:600 12px 'Hanken Grotesk';color:var(--tx);text-align:right;font-variant-numeric:tabular-nums">{{s.cr}}</span>
+      </div>
+      </sc-for>
+    </div>
+    </sc-for>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;font:400 13px 'Hanken Grotesk';color:var(--tx2)"><span style="font:600 13px 'Hanken Grotesk';color:var(--tx)">Logo palette</span><sc-for list="{{brand}}" as="b" hint-placeholder-count="7"><span style="display:flex;align-items:center;gap:6px"><span style="width:22px;height:22px;border-radius:6px;background:{{b.v}};box-shadow:inset 0 0 0 1px var(--line2)"></span>{{b.k}}</span></sc-for><span style="margin-left:8px">Lavender is lifted to #ab9ef2 for text on dark. Pink is deepened to #a3327b in light so it reaches 4.5:1.</span></div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font:500 13px ui-monospace,Menlo,monospace;color:var(--tx3)">02</span><span style="font:500 30px/1 'Newsreader',serif">Type</span><span style="font:400 14px 'Hanken Grotesk';color:var(--tx3)">Newsreader for titles and section heads · Hanken Grotesk for interface text · Noto for CJK and Nastaliq</span></div>
+  <div style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:24px">
+    <div style="border:1px solid var(--line);border-radius:20px;padding:8px 24px">
+      <sc-for list="{{scale}}" as="t" hint-placeholder-count="8">
+      <div style="display:grid;grid-template-columns:140px 1fr;gap:16px;align-items:baseline;padding:14px 0;border-top:{{t.bt}}">
+        <div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 13px 'Hanken Grotesk'">{{t.k}}</span><span style="font:500 11px ui-monospace,Menlo,monospace;color:var(--tx3)">{{t.spec}}</span></div>
+        <span style="font:{{t.font}};letter-spacing:{{t.ls}};text-transform:{{t.tt}}">{{t.sample}}</span>
+      </div>
+      </sc-for>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:20px;padding:24px;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 15px 'Hanken Grotesk'">Bilingual title block</span><span style="font:400 13px/1.45 'Hanken Grotesk';color:var(--tx2)">The English title comes first. The original title sits underneath in its own script at 0.55× size, in tx2, with a <code style="font:12px ui-monospace,Menlo,monospace">lang</code> attribute. Urdu is set right-to-left in its own box, with line-height 2.1 because Nastaliq needs the room.</span></div>
+      <sc-for list="{{bi}}" as="b" hint-placeholder-count="5">
+      <div style="display:grid;grid-template-columns:56px 1fr;gap:14px;align-items:center;padding-top:14px;border-top:1px solid var(--line)">
+        <span style="font:600 11px ui-monospace,Menlo,monospace;color:var(--tx3)">{{b.code}}</span>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <span style="font:600 26px/1.1 'Newsreader',serif">{{b.en}}</span>
+          <span lang="{{b.lang}}" dir="{{b.dir}}" style="font:{{b.font}};color:var(--tx2);text-align:{{b.align}}">{{b.orig}}</span>
+        </div>
+      </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font:500 13px ui-monospace,Menlo,monospace;color:var(--tx3)">03</span><span style="font:500 30px/1 'Newsreader',serif">Space, shape, depth, motion</span></div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px">
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:10px"><span style="font:600 14px 'Hanken Grotesk'">Spacing · 4 pt base</span><sc-for list="{{space}}" as="s" hint-placeholder-count="8"><div style="display:flex;align-items:center;gap:12px"><span style="width:28px;font:500 12px ui-monospace,Menlo,monospace;color:var(--tx3)">{{s}}</span><span style="height:10px;width:{{s}}px;background:var(--acc);border-radius:2px"></span></div></sc-for></div>
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px"><span style="font:600 14px 'Hanken Grotesk'">Radius</span><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"><sc-for list="{{radii}}" as="r" hint-placeholder-count="6"><div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start"><span style="width:56px;height:56px;border-radius:{{r.v}}px;background:var(--s2);border:1px solid var(--line2)"></span><span style="font:500 11px/1.3 'Hanken Grotesk';color:var(--tx2)">{{r.v}} · {{r.k}}</span></div></sc-for></div></div>
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:10px"><span style="font:600 14px 'Hanken Grotesk'">Elevation</span><span style="font:400 13px/1.45 'Hanken Grotesk';color:var(--tx2)">In dark mode, depth comes from lighter surfaces, not shadows. Shadows are only for posters and overlays.</span>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="height:36px;border-radius:10px;background:var(--bg);border:1px solid var(--line);display:flex;align-items:center;padding:0 12px;font:500 12px 'Hanken Grotesk'">bg · page</span><span style="height:36px;border-radius:10px;background:var(--s1);display:flex;align-items:center;padding:0 12px;font:500 12px 'Hanken Grotesk'">s1 · cards, sidebar, sheet</span><span style="height:36px;border-radius:10px;background:var(--s2);display:flex;align-items:center;padding:0 12px;font:500 12px 'Hanken Grotesk'">s2 · callouts, active nav</span><span style="height:36px;border-radius:10px;background:var(--s3);display:flex;align-items:center;padding:0 12px;font:500 12px 'Hanken Grotesk';box-shadow:0 20px 40px rgba(0,0,0,.5)">s3 + shadow · dialogs</span></div></div>
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:8px"><span style="font:600 14px 'Hanken Grotesk'">Motion</span>
+      <sc-for list="{{motion}}" as="m" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px solid var(--line)"><span style="font:600 13px 'Hanken Grotesk'">{{m.k}} <span style="font:500 11px ui-monospace,Menlo,monospace;color:var(--tx3)">{{m.spec}}</span></span><span style="font:400 12px/1.4 'Hanken Grotesk';color:var(--tx2)">Reduced: {{m.rm}}</span></div></sc-for></div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font:500 13px ui-monospace,Menlo,monospace;color:var(--tx3)">04</span><span style="font:500 30px/1 'Newsreader',serif">Components</span></div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:start">
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px"><span style="font:600 14px 'Hanken Grotesk'">Buttons · 44 px min</span>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <button style="height:44px;padding:0 18px;border-radius:12px;border:0;background:var(--accbg);color:var(--onacc);font:600 14px 'Hanken Grotesk'">Primary</button>
+        <button style="height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--line2);background:transparent;color:var(--tx);font:600 14px 'Hanken Grotesk'">Secondary</button>
+        <button style="height:44px;padding:0 14px;border-radius:12px;border:0;background:transparent;color:var(--acc);font:600 14px 'Hanken Grotesk'">Ghost</button>
+        <button style="height:44px;padding:0 18px;border-radius:12px;border:1px solid var(--err);background:transparent;color:var(--err);font:600 14px 'Hanken Grotesk'">Delete</button>
+        <button style="height:44px;padding:0 18px;border-radius:12px;border:0;background:var(--accbg);color:var(--onacc);font:600 14px 'Hanken Grotesk';outline:2px solid var(--acc);outline-offset:3px">Focused</button>
+        <button aria-label="More" style="width:44px;height:44px;border-radius:22px;border:1px solid var(--line2);background:transparent;color:var(--tx)"><span class="ms">more_horiz</span></button>
+      </div>
+      <span style="font:400 12px 'Hanken Grotesk';color:var(--tx3)">Focus ring: 2 px lavender with a 2–3 px offset on every control.</span>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px"><span style="font:600 14px 'Hanken Grotesk'">Badges · placed on posters</span>
+      <div style="padding:14px;border-radius:12px;background:{{posterBg}};display:flex;flex-wrap:wrap;gap:8px">
+        <span style="font:700 11px/1 'Hanken Grotesk';letter-spacing:.04em;padding:6px 8px;border-radius:6px;background:#f4f1ff;color:#0b0b10">NEW S4</span>
+        <span style="font:700 11px/1 'Hanken Grotesk';padding:6px 8px;border-radius:6px;background:#8b7ae0;color:#0b0b10">Ep 1182 · Sun</span>
+        <span style="font:700 11px/1 'Hanken Grotesk';padding:6px 8px;border-radius:6px;background:rgba(11,11,16,.86);color:#f4f1ff">Ended</span>
+        <span style="font:700 11px/1 'Hanken Grotesk';padding:6px 8px;border-radius:6px;background:rgba(11,11,16,.86);color:#f4f1ff">Caught up</span>
+        <span style="font:700 10px/1 'Hanken Grotesk';padding:5px 6px;border-radius:5px;background:rgba(11,11,16,.86);color:#f4f1ff;border:1px solid rgba(244,241,255,.4)">DUB</span>
+        <span style="font:700 10px/1 'Hanken Grotesk';padding:5px 6px;border-radius:5px;background:#ffb4b4;color:#0b0b10">18+</span>
+        <span style="font:700 12px/1 'Hanken Grotesk';padding:5px 7px;border-radius:6px;background:rgba(11,11,16,.86);color:#f0a8dd">✦ 9.5</span>
+      </div>
+      <span style="font:400 12px 'Hanken Grotesk';color:var(--tx3)">Badges are solid, never translucent, so they stay readable on any poster.</span>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px"><span style="font:600 14px 'Hanken Grotesk'">Country flag chip · filter chips</span>
+      <div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{flags}}" as="f" hint-placeholder-count="8"><span style="height:36px;padding:0 11px;border-radius:999px;display:flex;align-items:center;gap:7px;font:600 13px 'Hanken Grotesk';background:{{f.bg}};border:1px solid {{f.bd}};color:{{f.fg}}"><img src="{{f.src}}" alt="" style="width:18px;height:12px;border-radius:2px;object-fit:cover">{{f.c}}</span></sc-for></div>
+      <div style="display:flex;gap:8px"><span style="height:36px;padding:0 14px;border-radius:999px;background:var(--tx);color:var(--bg);display:flex;align-items:center;font:600 13px 'Hanken Grotesk'">Watching 6</span><span style="height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--line2);color:var(--tx2);display:flex;align-items:center;font:600 13px 'Hanken Grotesk'">Planned 51</span><span style="height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line2);color:var(--tx2);display:flex;align-items:center;gap:4px;font:600 13px 'Hanken Grotesk'">Genre<span class="ms" style="font-size:18px">expand_more</span></span></div>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px;grid-row:span 2"><span style="font:600 14px 'Hanken Grotesk'">Rating pair · You vs Online</span>
+      <div style="padding:16px;border-radius:16px;background:var(--youbg);display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between"><span style="font:700 11px/1 'Hanken Grotesk';letter-spacing:.1em;color:var(--you)">✦ YOU</span><span style="font:600 12px 'Hanken Grotesk';color:var(--acc)">Clear</span></div>
+        <div style="display:flex;align-items:baseline;gap:4px"><span style="font:600 40px/1 'Newsreader',serif;color:var(--you)">8.5</span><span style="font:500 15px 'Hanken Grotesk';color:var(--tx2)">/ 10</span></div>
+        <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px"><sc-for list="{{pips}}" as="p" hint-placeholder-count="10"><div style="height:28px;border-radius:5px;background:{{p.bg}}"></div></sc-for></div>
+        <span style="font:400 12px 'Hanken Grotesk';color:var(--tx2)">Screen readers hear “Your rating, 8.5 out of 10”. Arrow keys change it by 0.5 and Delete clears it.</span>
+      </div>
+      <div style="padding:16px;border-radius:16px;border:1px solid var(--line);display:flex;flex-direction:column;gap:10px">
+        <span style="font:700 11px/1 'Hanken Grotesk';letter-spacing:.1em;color:var(--tx3)">ONLINE · AUDIENCE</span>
+        <div style="display:flex;justify-content:space-between;font:500 14px 'Hanken Grotesk'"><span style="color:var(--tx2)">TMDB</span><span><b>8.1</b> <span style="color:var(--tx3);font-size:12px">12.4k</span></span></div>
+        <div style="display:flex;justify-content:space-between;font:500 14px 'Hanken Grotesk'"><span style="color:var(--tx2)">IMDb</span><span><b>8.4</b> <span style="color:var(--tx3);font-size:12px">318k</span></span></div>
+        <span style="font:700 11px/1 'Hanken Grotesk';letter-spacing:.1em;color:var(--tx3);margin-top:4px">ONLINE · CRITICS</span>
+        <div style="display:flex;justify-content:space-between;font:500 14px 'Hanken Grotesk'"><span style="color:var(--tx2)">Rotten Tomatoes</span><span><b>98%</b> <span style="color:var(--tx3);font-size:12px">142 reviews</span></span></div>
+        <div style="display:flex;justify-content:space-between;font:500 14px 'Hanken Grotesk'"><span style="color:var(--tx2)">Metacritic</span><span style="color:var(--tx3);font-size:13px">Not enough ratings</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px"><span style="font:600 13px 'Hanken Grotesk';color:var(--tx2)">Compact pair (rows, cards)</span><div style="display:flex;gap:8px;align-items:center"><span style="font:700 13px/1 'Hanken Grotesk';padding:7px 9px;border-radius:7px;background:var(--youbg);color:var(--you)">✦ 8.5</span><span style="font:600 13px/1 'Hanken Grotesk';padding:7px 9px;border-radius:7px;border:1px solid var(--line2);color:var(--tx2)">IMDb 8.4</span><span style="font:600 13px/1 'Hanken Grotesk';padding:7px 9px;border-radius:7px;border:1px solid var(--line2);color:var(--tx2)">RT 98%</span><span style="font:600 13px/1 'Hanken Grotesk';padding:7px 9px;border-radius:7px;border:1px dashed var(--line2);color:var(--tx3)">Not rated</span></div></div>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px"><span style="font:600 14px 'Hanken Grotesk'">Status selector · wording per medium</span>
+      <div style="border-radius:14px;background:var(--s1);border:1px solid var(--line2);padding:6px;display:flex;flex-direction:column;box-shadow:0 16px 40px rgba(0,0,0,.4)">
+        <sc-for list="{{statuses}}" as="s" hint-placeholder-count="5"><div style="height:44px;padding:0 12px;border-radius:9px;display:flex;align-items:center;gap:10px;background:{{s.bg}};font:500 14px 'Hanken Grotesk'"><span style="width:8px;height:8px;border-radius:4px;background:{{s.dot}}"></span><span style="flex:1">{{s.l}}</span><span style="font:400 12px 'Hanken Grotesk';color:var(--tx3)">{{s.book}}</span><span class="ms" style="font-size:18px;color:var(--acc);opacity:{{s.on}}">check</span></div></sc-for>
+      </div>
+      <span style="font:400 12px 'Hanken Grotesk';color:var(--tx3)">The right-hand column shows the book wording. Each status also has its own dot colour.</span>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px"><span style="font:600 14px 'Hanken Grotesk'">Progress stepper · season → episode picker</span>
+      <div style="display:flex;align-items:center;gap:8px"><button aria-label="Minus one" style="width:44px;height:44px;border-radius:12px;border:1px solid var(--line2);background:transparent;color:var(--tx)"><span class="ms">remove</span></button><div style="flex:1;height:44px;border-radius:12px;background:var(--s1);display:flex;align-items:center;justify-content:center;font:600 15px 'Hanken Grotesk'">S3 · Ep 41 <span style="color:var(--tx3);font-weight:500;margin-left:6px">/ 76</span></div><button aria-label="Plus one" style="width:44px;height:44px;border-radius:12px;border:1px solid var(--line2);background:transparent;color:var(--tx)"><span class="ms">add</span></button></div>
+      <div style="display:flex;gap:6px"><sc-for list="{{seasons}}" as="s" hint-placeholder-count="5"><span style="flex:1;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font:600 13px 'Hanken Grotesk';background:{{s.bg}};color:{{s.fg}};border:1px solid {{s.bd}}">{{s.l}}</span></sc-for></div>
+      <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px"><sc-for list="{{epGrid}}" as="e" hint-placeholder-count="20"><span style="height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center;font:600 10px 'Hanken Grotesk';background:{{e.bg}};color:{{e.fg}};outline:{{e.ol}}">{{e.n}}</span></sc-for></div>
+      <span style="font:400 12px 'Hanken Grotesk';color:var(--tx3)">Diriliş: Ertuğrul, season 3. Ep 41 is current. Tapping a later episode marks everything up to it as watched.</span>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px"><span style="font:600 14px 'Hanken Grotesk'">Poster card · grid / shelf / compact row</span>
+      <div style="display:flex;gap:14px;align-items:flex-end">
+        <div style="width:110px;display:flex;flex-direction:column;gap:6px"><div style="aspect-ratio:2/3;border-radius:9px;background:{{p1}};position:relative"><img src="https://flagcdn.com/w40/de.png" alt="Germany" style="position:absolute;top:7px;right:7px;width:16px;height:11px;border-radius:2px"><span style="position:absolute;bottom:6px;left:6px;font:700 11px/1 'Hanken Grotesk';padding:5px 6px;border-radius:5px;background:rgba(11,11,16,.86);color:#f0a8dd">✦ 10</span></div><span style="font:600 13px 'Hanken Grotesk'">Dark</span><span style="font:400 11px 'Hanken Grotesk';color:var(--tx3);margin-top:-4px">2017 · 3 seasons</span></div>
+        <div style="width:76px;display:flex;flex-direction:column;gap:5px"><div style="aspect-ratio:2/3;border-radius:7px;background:{{p2}}"></div><span style="font:500 11px 'Hanken Grotesk';color:var(--tx2)">Lupin</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:8px;border-radius:12px;background:var(--s1)"><div style="width:36px;height:54px;border-radius:5px;background:{{p3}}"></div><div style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font:600 14px 'Hanken Grotesk'">Squid Game <span lang="ko" style="font:400 12px 'Noto Sans KR';color:var(--tx3)">오징어 게임</span></span><span style="font:400 12px 'Hanken Grotesk';color:var(--tx2)">2021 · KR · Netflix</span></div><span style="font:700 12px/1 'Hanken Grotesk';padding:6px 8px;border-radius:6px;background:var(--youbg);color:var(--you)">✦ 7.5</span></div>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px"><span style="font:600 14px 'Hanken Grotesk'">Franchise and collection tiles</span>
+      <div style="display:flex;gap:22px;padding-top:12px">
+        <div style="width:120px;display:flex;flex-direction:column;gap:6px"><div style="aspect-ratio:2/3;border-radius:9px;background:{{p4}};box-shadow:6px -6px 0 -2px #2a2445, 12px -12px 0 -5px #1f1a33"></div><span style="font:600 13px 'Hanken Grotesk'">Demon Slayer</span><span style="font:500 11px 'Hanken Grotesk';color:var(--tx2);margin-top:-4px">4 seasons · 1 film</span></div>
+        <div style="width:160px;display:flex;flex-direction:column;gap:6px"><div style="height:180px;display:grid;grid-template-columns:1fr 1fr;gap:3px;border-radius:9px;overflow:hidden"><sc-for list="{{wick}}" as="w" hint-placeholder-count="4"><div style="background:{{w}}"></div></sc-for></div><span style="font:600 13px 'Hanken Grotesk'">John Wick collection</span><span style="font:500 11px 'Hanken Grotesk';color:var(--tx2);margin-top:-4px">4 of 5 watched · <span style="color:#86dbb0">Ch. 5 new</span></span></div>
+      </div>
+      <span style="font:400 12px 'Hanken Grotesk';color:var(--tx3)">A franchise tile is drawn as a stack of volumes. A collection tile shows its posters in a 2×2 mosaic.</span>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px"><span style="font:600 14px 'Hanken Grotesk'">Tabs · segmented</span>
+      <div style="display:flex;gap:22px;border-bottom:1px solid var(--line)"><span style="height:44px;display:flex;align-items:center;font:600 15px 'Hanken Grotesk';border-bottom:2px solid var(--tx);margin-bottom:-1px">Series</span><span style="height:44px;display:flex;align-items:center;font:500 15px 'Hanken Grotesk';color:var(--tx2)">Movies</span><span style="height:44px;display:flex;align-items:center;gap:4px;font:500 15px 'Hanken Grotesk';color:var(--tx3)"><span class="ms" style="font-size:16px">visibility_off</span>18+</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);padding:3px;border-radius:12px;background:var(--bg);border:1px solid var(--line)"><span style="height:38px;border-radius:9px;background:var(--s3);display:flex;align-items:center;justify-content:center;font:600 14px 'Hanken Grotesk'">System</span><span style="height:38px;display:flex;align-items:center;justify-content:center;font:600 14px 'Hanken Grotesk';color:var(--tx2)">Light</span><span style="height:38px;display:flex;align-items:center;justify-content:center;font:600 14px 'Hanken Grotesk';color:var(--tx2)">Dark</span></div>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px"><span style="font:600 14px 'Hanken Grotesk'">Toast with undo · confirm dialog</span>
+      <div style="display:flex;align-items:center;gap:12px;padding:0 6px 0 16px;height:52px;border-radius:14px;background:#f4f1ff;color:#0b0b10;font:500 14px 'Hanken Grotesk'"><span style="flex:1">Removed “Lupin” from Library</span><button style="height:40px;padding:0 14px;border-radius:10px;border:0;background:transparent;color:#453a7a;font:700 14px 'Hanken Grotesk'">Undo</button></div>
+      <div style="padding:18px;border-radius:18px;background:var(--s3);display:flex;flex-direction:column;gap:10px;box-shadow:0 20px 40px rgba(0,0,0,.5)"><span style="font:600 18px/1.2 'Newsreader',serif">Delete “Lupin”?</span><span style="font:400 13px/1.45 'Hanken Grotesk';color:var(--tx2)">This deletes 2 watches, your rating and your review. You can undo for 10 seconds.</span><div style="display:flex;gap:8px;justify-content:flex-end"><button style="height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);background:transparent;color:var(--tx);font:600 14px 'Hanken Grotesk'">Keep</button><button style="height:44px;padding:0 16px;border-radius:12px;border:0;background:#c9433a;color:#fff;font:600 14px 'Hanken Grotesk'">Delete</button></div></div>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px;grid-column:span 2"><span style="font:600 14px 'Hanken Grotesk'">Diary heatmap · finished items per day</span>
+      <div style="display:grid;grid-template-columns:repeat(26,1fr);grid-template-rows:repeat(7,14px);grid-auto-flow:column;gap:3px"><sc-for list="{{heat}}" as="h" hint-placeholder-count="182"><span style="border-radius:3px;background:{{h}}"></span></sc-for></div>
+      <div style="display:flex;justify-content:space-between;font:400 12px 'Hanken Grotesk';color:var(--tx3)"><span>Apr – Sep 2026 · 148 finished</span><span style="display:flex;align-items:center;gap:4px">0<span style="width:12px;height:12px;border-radius:3px;background:var(--s2)"></span><span style="width:12px;height:12px;border-radius:3px;background:#453a7a"></span><span style="width:12px;height:12px;border-radius:3px;background:#6f5fc4"></span><span style="width:12px;height:12px;border-radius:3px;background:#ab9ef2"></span>4+</span></div>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px"><span style="font:600 14px 'Hanken Grotesk'">Tier row · drag handle</span>
+      <sc-for list="{{tiers}}" as="t" hint-placeholder-count="3"><div style="display:flex;gap:6px;align-items:stretch"><span style="width:44px;border-radius:8px;background:{{t.c}};color:#0b0b10;display:flex;align-items:center;justify-content:center;font:700 18px 'Newsreader',serif">{{t.l}}</span><div style="flex:1;min-height:60px;border-radius:8px;background:var(--s1);display:flex;gap:4px;padding:4px"><sc-for list="{{t.items}}" as="i" hint-placeholder-count="2"><div style="width:36px;border-radius:5px;background:{{i}}"></div></sc-for></div><span class="ms" style="align-self:center;color:var(--tx3)">drag_indicator</span></div></sc-for>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px"><span style="font:600 14px 'Hanken Grotesk'">Bars · hours by type</span>
+      <sc-for list="{{bars}}" as="b" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:70px 1fr 48px;gap:10px;align-items:center;font:500 13px 'Hanken Grotesk'"><span style="color:var(--tx2)">{{b.l}}</span><span style="height:12px;border-radius:3px;background:var(--line)"><span style="display:block;height:100%;width:{{b.pct}}%;background:var(--acc);border-radius:3px"></span></span><span style="text-align:right;font-variant-numeric:tabular-nums">{{b.v}}</span></div></sc-for>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px"><span style="font:600 14px 'Hanken Grotesk'">Distribution · your ratings</span>
+      <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px;align-items:end;height:110px"><sc-for list="{{dist}}" as="d" hint-placeholder-count="10"><span style="height:{{d}}%;border-radius:4px 4px 0 0;background:var(--you)"></span></sc-for></div>
+      <div style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px;font:500 11px 'Hanken Grotesk';color:var(--tx3);text-align:center"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span></div>
+      <span style="font:400 12px 'Hanken Grotesk';color:var(--tx2)">Average ✦ 7.6 vs the crowd's 7.3</span>
+    </div>
+
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px"><span style="font:600 14px 'Hanken Grotesk'">Donut · by country</span>
+      <div style="display:flex;gap:18px;align-items:center"><div style="width:112px;height:112px;border-radius:50%;background:conic-gradient(#ab9ef2 0 38%,#f0a8dd 38% 58%,#86dbb0 58% 72%,#f2c46d 72% 84%,#5f5880 84% 100%);display:flex;align-items:center;justify-content:center"><span style="width:70px;height:70px;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;font:600 18px 'Newsreader',serif">23</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px;font:500 13px 'Hanken Grotesk'"><span style="display:flex;gap:8px;align-items:center"><span style="width:10px;height:10px;border-radius:2px;background:#ab9ef2"></span>Japan 38%</span><span style="display:flex;gap:8px;align-items:center"><span style="width:10px;height:10px;border-radius:2px;background:#f0a8dd"></span>USA 20%</span><span style="display:flex;gap:8px;align-items:center"><span style="width:10px;height:10px;border-radius:2px;background:#86dbb0"></span>Türkiye 14%</span><span style="display:flex;gap:8px;align-items:center"><span style="width:10px;height:10px;border-radius:2px;background:#f2c46d"></span>Korea 12%</span><span style="display:flex;gap:8px;align-items:center"><span style="width:10px;height:10px;border-radius:2px;background:#5f5880"></span>19 others</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:20px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font:500 13px ui-monospace,Menlo,monospace;color:var(--tx3)">05</span><span style="font:500 30px/1 'Newsreader',serif">States</span><span style="font:400 14px 'Hanken Grotesk';color:var(--tx3)">Every screen has empty, loading, error and offline states</span></div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px">
+    <div style="border:1px solid var(--line);border-radius:20px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center">
+      <div style="width:96px;height:96px;border-radius:20px;background:repeating-linear-gradient(135deg,var(--s2) 0 6px,var(--s1) 6px 12px);display:flex;align-items:center;justify-content:center;position:relative"><span style="font-size:30px;color:var(--acc)">✦</span><span style="position:absolute;bottom:-18px;font:500 9px ui-monospace,Menlo,monospace;color:var(--tx3);white-space:nowrap">spellbook illustration</span></div>
+      <span style="font:500 20px/1.2 'Newsreader',serif;margin-top:16px">This chapter is unwritten</span>
+      <span style="font:400 13px/1.45 'Hanken Grotesk';color:var(--tx2)">No K-dramas yet. Add your first, or import a list from MyDramaList.</span>
+      <button style="height:44px;padding:0 16px;border-radius:12px;border:0;background:var(--accbg);color:var(--onacc);font:600 14px 'Hanken Grotesk'">Add a K-drama</button>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px"><span style="font:600 13px 'Hanken Grotesk';color:var(--tx2)">Loading · skeleton</span>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">{{skeleton}}</div>
+      <span style="font:400 12px 'Hanken Grotesk';color:var(--tx3)">Pulses at 1.4 s. With reduced motion it stays static.</span>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:20px;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
+      <span class="ms" style="font-size:36px;color:var(--err)">error</span>
+      <span style="font:500 20px/1.2 'Newsreader',serif">Couldn't reach AniList</span>
+      <span style="font:400 13px/1.45 'Hanken Grotesk';color:var(--tx2)">Your own data is safe. Online scores will refresh when AniList responds.</span>
+      <button style="height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line2);background:transparent;color:var(--tx);font:600 14px 'Hanken Grotesk'">Try again</button>
+    </div>
+    <div style="border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:12px"><span style="font:600 13px 'Hanken Grotesk';color:var(--tx2)">Offline banner</span>
+      <div style="padding:12px 14px;border-radius:12px;background:var(--s2);display:flex;gap:10px;align-items:flex-start"><span class="ms" style="color:var(--warn)">cloud_off</span><div style="display:flex;flex-direction:column;gap:3px"><span style="font:600 14px 'Hanken Grotesk'">You're offline</span><span style="font:400 13px/1.4 'Hanken Grotesk';color:var(--tx2)">3 logs are saved on this device and will sync when you reconnect.</span></div></div>
+      <span style="font:600 13px 'Hanken Grotesk';color:var(--tx2);margin-top:6px">404</span>
+      <div style="padding:14px;border-radius:12px;border:1px dashed var(--line2);display:flex;flex-direction:column;gap:4px"><span style="font:500 18px 'Newsreader',serif">This page was torn out</span><span style="font:400 13px 'Hanken Grotesk';color:var(--tx2)">Go back to <a href="#">Home</a></span></div>
+    </div>
+  </div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const P = (h, c = 0.07, l = 0.4) => `repeating-linear-gradient(135deg, oklch(${l} ${c} ${h}) 0 7px, oklch(${l - 0.04} ${c} ${h}) 7px 14px)`;
+    const sw = (rows) => rows.map(([k, hex, use, cr]) => ({ k, hex, v: hex, use, cr }));
+    const themes = [
+      { cls: 'th-dark', label: 'Dark (default)', sw: sw([
+        ['bg', '#0b0b10', 'Page · ink', ''], ['s1', '#14121c', 'Cards, sidebar, sheets', ''], ['s2', '#1f1a33', 'Callouts, active nav · deep violet', ''], ['s3', '#2a2445', 'Dialogs, selected segment', ''],
+        ['tx', '#f4f1ff', 'Primary text · paper', '18.6:1'], ['tx2', '#c3bde0', 'Secondary text', '11.3:1'], ['tx3', '#9d96c2', 'Meta, captions', '7.3:1'],
+        ['acc', '#ab9ef2', 'Links, focus, progress', '8.1:1'], ['accbg', '#5a4ca0', 'Primary button (white text 7.1:1)', ''], ['you', '#f0a8dd', 'Your rating, ✦ favourites', '10.9:1']]) },
+      { cls: 'th-light', label: 'Light', sw: sw([
+        ['bg', '#f6f4fb', 'Page · paper', ''], ['s1', '#ffffff', 'Cards, sidebar, sheets', ''], ['s2', '#ece8f8', 'Callouts, active nav', ''], ['s3', '#ddd7f1', 'Selected segment', ''],
+        ['tx', '#0b0b10', 'Primary text · ink', '18.4:1'], ['tx2', '#433d5e', 'Secondary text', '9.6:1'], ['tx3', '#5e5880', 'Meta, captions', '6.4:1'],
+        ['acc', '#4d4189', 'Links, focus, progress', '8.7:1'], ['accbg', '#453a7a', 'Primary button (white text 9.9:1)', ''], ['you', '#a3327b', 'Your rating, ✦ favourites', '6.1:1']]) }
+    ];
+    const brand = [['ink', '#0b0b10'], ['deep violet', '#1c1730'], ['violet', '#453a7a'], ['lavender', '#8b7ae0'], ['mist', '#e3defe'], ['petal', '#f0a8dd'], ['paper', '#f4f1ff']].map(([k, v]) => ({ k, v }));
+    const scale = [
+      ['Display', 'Newsreader 500 · 44/1.0', "500 44px/1 'Newsreader',serif", '-.015em', 'none', 'Up next'],
+      ['Title XL', 'Newsreader 600 · 60/1.0', "600 60px/1 'Newsreader',serif", '-.015em', 'none', 'ONE PIECE'],
+      ['Heading', 'Newsreader 500 · 30/1.1', "500 30px/1.1 'Newsreader',serif", '0', 'none', 'Your 2026, so far'],
+      ['Section', 'Grotesk 600 · 17/1.2', "600 17px/1.2 'Hanken Grotesk'", '0', 'none', 'Ready to watch · 3'],
+      ['Body', 'Grotesk 400 · 15/1.55', "400 15px/1.55 'Hanken Grotesk'", '0', 'none', 'Season 4 is out · 8 episodes'],
+      ['Meta', 'Grotesk 500 · 13/1.35', "500 13px/1.35 'Hanken Grotesk'", '0', 'none', '1999– · Anime · 24 min · 1,181 eps'],
+      ['Overline', 'Grotesk 700 · 11 · +10%', "700 11px/1 'Hanken Grotesk'", '.1em', 'uppercase', 'Online · Audience'],
+      ['Score', 'Newsreader 600 · 40', "600 40px/1 'Newsreader',serif", '0', 'none', '9.5 / 10']
+    ].map(([k, spec, font, ls, tt, sample], i) => ({ k, spec, font, ls, tt, sample, bt: i ? '1px solid var(--line)' : '0' }));
+    const bi = [
+      { code: 'TR', en: 'Resurrection: Ertuğrul', orig: 'Diriliş: Ertuğrul', lang: 'tr', dir: 'ltr', align: 'left', font: "500 16px/1.3 'Hanken Grotesk'" },
+      { code: 'JA', en: 'ONE PIECE', orig: 'ワンピース', lang: 'ja', dir: 'ltr', align: 'left', font: "500 16px/1.4 'Noto Sans JP'" },
+      { code: 'KO', en: 'Squid Game', orig: '오징어 게임', lang: 'ko', dir: 'ltr', align: 'left', font: "500 16px/1.4 'Noto Sans KR'" },
+      { code: 'ZH', en: 'Lord of Mysteries', orig: '诡秘之主', lang: 'zh-Hans', dir: 'ltr', align: 'left', font: "500 16px/1.4 'Noto Sans SC'" },
+      { code: 'UR · RTL', en: 'Meray Paas Tum Ho', orig: 'میرے پاس تم ہو', lang: 'ur', dir: 'rtl', align: 'right', font: "400 18px/2.1 'Noto Nastaliq Urdu'" }
+    ];
+    const radii = [[6, 'badge'], [10, 'poster, input'], [12, 'button'], [16, 'card'], [20, 'panel'], [26, 'sheet top']].map(([v, k]) => ({ v, k }));
+    const motion = [
+      { k: 'Tap feedback', spec: '120ms · ease-out', rm: 'colour change only' },
+      { k: 'Sheet / dialog', spec: '280ms · cubic(.2,.8,.2,1)', rm: '150ms fade, no slide' },
+      { k: 'Progress fill', spec: '320ms · ease-out', rm: 'jumps to the value' },
+      { k: 'Wrapped stories', spec: '400ms crossfade + parallax', rm: 'crossfade only, no parallax' }
+    ];
+    const F = c => `https://flagcdn.com/w40/${c}.png`;
+    const flags = [['jp', 'JP', 1], ['cn', 'CN', 0], ['kr', 'KR', 1], ['tr', 'TR', 0], ['pk', 'PK', 0], ['no', 'NO', 0], ['de', 'DE', 0], ['fr', 'FR', 0]].map(([c, l, on]) => ({ src: F(c), c: l, bg: on ? 'var(--s2)' : 'transparent', bd: on ? 'var(--acc)' : 'var(--line2)', fg: on ? 'var(--tx)' : 'var(--tx2)' }));
+    const pips = Array.from({ length: 10 }, (_, i) => ({ bg: 8.5 >= i + 1 ? 'var(--you)' : 8.5 >= i + .5 ? 'linear-gradient(90deg,var(--you) 50%,var(--line2) 50%)' : 'var(--line2)' }));
+    const statuses = [['Watching', 'Reading', '#86dbb0', 1], ['Completed', 'Read', '#ab9ef2', 0], ['Planned', 'Want to read', '#9d96c2', 0], ['Paused', 'Paused', '#f2c46d', 0], ['Dropped', 'Dropped', '#ff9a9a', 0]].map(([l, book, dot, on]) => ({ l, book, dot, on, bg: on ? 'var(--s2)' : 'transparent' }));
+    const seasons = ['S1', 'S2', 'S3', 'S4', 'S5'].map((l, i) => ({ l, bg: i === 2 ? 'var(--tx)' : 'transparent', fg: i === 2 ? 'var(--bg)' : i < 2 ? 'var(--tx)' : 'var(--tx2)', bd: i === 2 ? 'var(--tx)' : 'var(--line2)' }));
+    const epGrid = Array.from({ length: 20 }, (_, i) => { const n = 31 + i; return { n, bg: n < 41 ? '#453a7a' : n === 41 ? 'var(--acc)' : 'var(--s1)', fg: n === 41 ? '#0b0b10' : n < 41 ? '#f4f1ff' : 'var(--tx3)', ol: n === 41 ? '2px solid var(--acc)' : 'none' }; });
+    let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const hc = ['var(--s2)', '#453a7a', '#6f5fc4', '#ab9ef2'];
+    const heat = Array.from({ length: 182 }, () => { const r = rnd(); return hc[r < .45 ? 0 : r < .75 ? 1 : r < .92 ? 2 : 3]; });
+    const tiers = [{ l: 'S', c: '#f0a8dd', items: [P(28, .1), P(160, .08), P(60, .08)] }, { l: 'A', c: '#ab9ef2', items: [P(260, .08), P(15, .08)] }, { l: 'B', c: '#86dbb0', items: [P(245, .08)] }];
+    const bars = [['Anime', 62, '412 h'], ['TV', 48, '318 h'], ['Dizi', 30, '201 h'], ['Movies', 26, '172 h']].map(([l, pct, v]) => ({ l, pct, v }));
+    const dist = [2, 3, 5, 8, 18, 34, 62, 100, 74, 30];
+    const skeleton = React.createElement(React.Fragment, null, [0, 1, 2].map(i => React.createElement('div', { key: i, style: { display: 'flex', flexDirection: 'column', gap: 6 } },
+      React.createElement('div', { style: { aspectRatio: '2/3', borderRadius: 8, background: 'var(--s2)', animation: 'shimmer 1.4s ease-in-out infinite', animationDelay: i * .15 + 's' } }),
+      React.createElement('div', { style: { height: 10, width: '85%', borderRadius: 4, background: 'var(--s2)', animation: 'shimmer 1.4s ease-in-out infinite' } }),
+      React.createElement('div', { style: { height: 8, width: '55%', borderRadius: 4, background: 'var(--s1)' } }))));
+    return { themes, brand, scale, bi, space: [4, 8, 12, 16, 24, 32, 48, 64], radii, motion, flags, pips, statuses, seasons, epGrid, heat, tiers, bars, dist, skeleton,
+      posterBg: P(28, .1, .5), p1: P(200, .04, .34), p2: P(20, .07), p3: P(340, .09), p4: P(160, .08), wick: [P(300, .04, .34), P(260, .05, .34), P(220, .05, .34), P(20, .06, .34)] };
+  }
+}
+</script>
+</body>
+</html>

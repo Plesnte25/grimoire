@@ -318,7 +318,7 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 48. ✅ **Fixed** (`53f1e99`) — **Online scores use different scales** (medium). TMDB 0–10, AniList stored /10, Google Books raw 0–5, all shown
     side by side. **Fix:** normalise to /10 for display, always show source + vote count, hide below a vote
     threshold (#34).
-49. 🟡 **Built** (`0515907`): MAL live via Jikan; IMDb/RT/Metacritic switch on with `OMDB_API_KEY` — **No critic vs audience split** (medium). Only one source per medium. **Fix:** OMDb (free key, 1,000/day,
+49. ✅ **Done** (`0515907`; OMDb key live, MAL limited by #82) — **No critic vs audience split** (medium). Only one source per medium. **Fix:** OMDb (free key, 1,000/day,
     joined via TMDB `external_ids` → IMDb id) adds **IMDb** (audience), **Rotten Tomatoes** and **Metacritic**
     (critics) for movies/TV; Jikan (free, no key) adds the **MyAnimeList** score next to AniList for anime.
 50. ✅ **Done** (`daa95b0`, `4be2080`) — **No dates, no rewatches** (high). The schema has only `createdAt`/`updatedAt`, so there's no "started",
@@ -347,18 +347,18 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 
 **Accessibility**
 
-58. **Low-contrast text** (medium). 33 uses of `opacity-60` (plus `opacity-40/50`) on small text over dark glass,
+58. ➡️ **Folded into #83** (design foundation, Phase 4) — **Low-contrast text** (medium). 33 uses of `opacity-60` (plus `opacity-40/50`) on small text over dark glass,
     likely below WCAG AA 4.5:1. **Fix:** contrast tokens checked against AA; minimum 12 px for body text.
-59. **No visible keyboard focus** (medium). 18 inputs use `outline-none` and there are no `focus-visible` styles,
+59. ➡️ **Folded into #87** (design foundation, Phase 4) — **No visible keyboard focus** (medium). 18 inputs use `outline-none` and there are no `focus-visible` styles,
     so keyboard users can't see where they are. **Fix:** a global `focus-visible` ring; full keyboard path
     through search → add → rate.
-60. **Motion can't be turned off** (medium). Framer Motion in 5 components (Home, BigCategoryCard, CardStack,
+60. ➡️ **Folded into #87** (design foundation, Phase 4) — **Motion can't be turned off** (medium). Framer Motion in 5 components (Home, BigCategoryCard, CardStack,
     SearchModal, PasscodeGate) with no `prefers-reduced-motion` handling. **Fix:** `useReducedMotion` → fades
     instead of scale/tilt.
-61. **Screen-reader gaps** (low). Ratings are emoji (⭐ 🌍 read as "star", "globe"), the rating slider has no
+61. ➡️ **Folded into #84, #87** (design foundation, Phase 4) — **Screen-reader gaps** (low). Ratings are emoji (⭐ 🌍 read as "star", "globe"), the rating slider has no
     label, status buttons read raw enums, and only 12 `aria-` attributes exist app-wide. Native titles
     (日本語 / 한국어 / Türkçe / اردو) need `lang`, and Urdu needs `dir="rtl"`.
-62. **Touch targets and theme** (low). `text-xs px-2 py-1` chips are well under 44 px; dark only, no text-size
+62. ➡️ **Folded into #83, #84, #87** (design foundation, Phase 4) — **Touch targets and theme** (low). `text-xs px-2 py-1` chips are well under 44 px; dark only, no text-size
     option. **Fix:** 44 px targets on touch, Settings → Appearance (System / Light / Dark, text size).
 
 **New features (personalisation)**, in suggested priority:
@@ -382,6 +382,116 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 73. **Trailers & where to watch**: TMDB videos (trailer button) and watch providers (where data exists; none for
     PK, see #37 note).
 74. **Share a list**: a read-only public link to a single list or Top 10 (the rest of the app stays private).
+
+### Design handoff review (2026-10-01)
+
+Claude Design delivered the design system and four key screens (Home, Category, Detail, Log sheet) at 390 and
+1440 px. The files are in `docs/design/` (open the `.dc.html` files in a browser with `support.js` next to them);
+`docs/design/README.md` is the spec. **Fidelity is literal** (layout, labels, chart types), except posters/backdrops
+(placeholders) and the score numbers (invented). Not designed yet: Search & add, Franchise, Lists / Tier list,
+Diary, Stats / Wrapped, Tonight, Settings, Shared list, Unlock. These are built from the system's components.
+
+**What the design changes about decisions already made**
+- Home stops being category tiles. It becomes **"Up next"**: Ready to watch, Coming soon, Continue, Tonight,
+  Goals, Rewatch nudge, Favourites. The eight categories (incl. the four regional ones, #37) move to a
+  **Library** hub, the desktop sidebar (with counts and "N new" pills) and the phone tab bar.
+- Navigation: phone **bottom tab bar** (Home · Library · Search · Lists · You); desktop **sidebar + top bar** (global
+  search with a `/` shortcut, "Watch tonight", "Log").
+- Your rating input becomes **10 cells** (tap twice for a half point), not 10 stars. "You" is always pink with
+  the ✦ sigil; online scores are neutral text under "ONLINE · AUDIENCE" / "ONLINE · CRITICS".
+- Diary heatmap: **26 weeks**, ramp `--s2 → #453a7a → #6f5fc4 → #ab9ef2` (replaces the year view and the ramp in
+  `Diary.tsx`). Tier colours: S pink, A lavender, B green, C amber, D grey (replaces `TierListPage.tsx`'s).
+- Flags are **images** with the country name as `alt` (bundled SVGs), not emoji.
+- No glassmorphism, no 3D tilt, no blur except the spoiler shield: the current Aceternity-style effects
+  (`BigCategoryCard` accordion/tilt, `.glass`) go.
+- Goals (#69), Tonight (#65) and the rewatch nudge (#72) are on Home, so they move earlier in the order.
+
+**Design foundation**
+
+83. **Tokens + themes.** CSS custom properties from the spec (`--bg`, `--s1…s3`, `--line`, `--tx…tx3`, `--acc`,
+    `--accbg`, `--you`, `--youbg`, `--ok/warn/err`, `--scrim`), dark + light, **System / Light / Dark** setting.
+    Surfaces step in lightness; shadows only on posters, dialogs, toasts. Replaces #58 (contrast) and the
+    theme part of #62.
+84. **Type + icons + fonts.** Newsreader (titles, scores), Hanken Grotesk (UI), Noto Sans JP / KR / SC, Noto
+    Nastaliq Urdu (`dir="rtl"`, its own 18px/2.1 box), Material Symbols Rounded. Sizes in `rem` so the **text-size
+    setting** scales the root. Self-hosted for the PWA; CJK/Urdu fonts loaded by `unicode-range` so they don't
+    weigh down Latin-only pages. Bilingual title block per spec (#32).
+85. **App shell.** Phone tab bar (54px tabs, filled icon when active); desktop 256px sidebar (wordmark ✦ Grimoire,
+    nav, Library sub-items with counts + "N new", "Lock now") and top bar. New **Library hub** and **You** pages.
+86. **Component kit** (`docs/design/Grimoire Design System.dc.html`): buttons (primary/secondary/ghost/destructive,
+    44px icon button), solid poster badges (NEW, airing, Ended, Caught up, DUB, 18+, rating), flag chip + filter
+    chips + status chips, status menu with dots, segmented control, underline tabs, toast with Undo, confirm dialog
+    ("Keep · Delete"), bottom sheet (drag to dismiss) / dialog, skeletons, empty ("This chapter is unwritten"),
+    error ("Couldn't reach AniList · Try again"), offline banner, 404 ("This page was torn out").
+87. **Accessibility built in.** 2px `--acc` focus ring on every control, 44px touch targets (40 on desktop
+    secondary), reduced-motion alternative for every animation, `aria-label` on icon buttons, `lang`/`dir` on
+    original titles. Replaces the separate sweep #59–62.
+88. **Rating input v2:** 10 cells, `role="slider"`, half points by tapping a cell twice, arrows ±0.5,
+    Delete clears. Replaces the star `RatingInput` (#47).
+89. **Poster-accent hero tint** on the detail page: sample the poster's dominant colour (canvas; TMDB/AniList
+    images allow CORS), keep it dark (oklch L ≈ 0.35), 55% → transparent gradient. Toggleable.
+90. **Missing asset:** the empty-state **spellbook illustration** is "still to be supplied" (by the user / Claude
+    Design). Until then the empty state uses the ✦ sigil.
+
+**Screen changes against what's built**
+
+91. **Home → "Up next"** (design 1a/1b/1c): Ready to watch cards (16:9 backdrop, badge, flag + title + original,
+    line, sub, contextual primary action "Start S4 E1" / "Log Ep 1170" / "Mark watched", snooze menu: 1 day /
+    1 week / until next episode / Dismiss with Undo); Coming soon rows (date block, "in 3 days" pill); Continue
+    (progress bar + "+1" / "+10" quick increment that re-sorts); Tonight card; 2026 goals; rewatch nudge;
+    Favourites ✦ shelf. Desktop `1fr | 360px`. Needs the airing data (#39–43).
+92. **Category** (2a/2b): underline sub-tabs (Series · Movies · 18+ hidden), search + filter button with count,
+    status chips with counts (single select), **country flag chips (multi-select)**, Genre ▾ / Tags ▾ dropdowns,
+    "Clear", **Sort** (Recently updated ▾) and **grid/list toggle**. Poster card: badge top-left, flag top-right,
+    your ✦ rating bottom-left, DUB bottom-right (DUB = you watch it dubbed: latest log's `watchMode`), then title,
+    original title, one meta line. Franchise tile = stacked-volume effect; collection tile = 2×2 mosaic with
+    "4 of 5 watched · Ch. 5 new". 6 columns desktop, 3 phone.
+93. **Detail** (3a/3b): hero with poster-accent (#89), breadcrumb, title + original, meta line with studio and
+    AIRING badge, "Add to list", ⋯ menu (Move to…, Delete). Airing banner ("Ep 1182 airs Sun 4 Oct · 09:30 JST ·
+    in 3 days · 12 aired since your last" + "Remind me"). Status dropdown + primary "Log Ep N". Progress card with
+    stepper and "Edit total episodes". **You** panel (pink, "Rated 2 Mar 2026 · Clear") + **Online** panel
+    (audience/critics). Tabs: **Episodes** (arc picker, per-episode rows, spoiler shield) · History · Review & notes
+    · Cast & crew · Franchise. Where to watch. Tags with "+ Tag" and "In 2 lists". Desktop right rail 380px.
+94. **Log sheet** (4a/4b): Finished = Today / Yesterday / date; 10-cell rating with "Last time: ✦ 10 on 12 Sep
+    2023"; review + Spoilers switch; Where = chips (Cinema · Netflix · Crunchyroll · YouTube · Other); How =
+    segmented Sub / Dub / Original; With whom; **Rewatch switch with ordinal** ("Rewatch · 3rd"); "Save to diary";
+    toast "Logged Your Name. · ✦ 10" with Undo (6 s). Esc closes, ⌘↵ saves. The design has no "Started" field:
+    the start date comes from marking it Watching. **Logging the final episode opens this sheet prefilled
+    Completed.** Replaces `LogDialog.tsx`.
+95. **Undesigned screens** (Search & add, Franchise, Lists / Tier list, Diary, Stats / Wrapped, Tonight, Settings,
+    Shared list, Unlock) get restyled from the kit; Franchise / Lists / Tier list / Diary already exist and only
+    change look. Settings gains: theme, text size, reduced motion, **show 18+** (hidden by default), **spoiler
+    shield**, where-to-watch country.
+
+**Data the design needs that the app doesn't store yet**
+
+96. **When you rated it:** `yourRatingAt` ("Rated 2 Mar 2026"), and the previous log's rating/date for "Last time".
+97. **Watch log episode range + label:** `fromEpisode`, `toEpisode`, `label` ("Rewatch · Wano arc · Ep 890 → 1085")
+    and the rewatch ordinal (computed: "3rd").
+98. **Episode list:** per-episode titles, air dates and arcs for the Episodes tab and the spoiler shield. TV:
+    TMDB `/tv/{id}/season/{n}`. Anime: via #99 (TMDB groups long anime into arc-named seasons), Jikan
+    `/anime/{id}/episodes` as fallback. Cached, fetched when the tab opens.
+99. **Link anime to TMDB / IMDb.** The design shows TMDB, IMDb and where-to-watch on ONE PIECE. AniList items have
+    no TMDB id: match by original title + year + Japan/China/Korea + Animation, store `tmdbId`/`imdbId` on the
+    anime item, then reuse the movie/TV score and provider code.
+100. **AniList score as %, with a count:** the design shows "AniList 87% (412k)". AniList has no vote count; use
+     its `stats.scoreDistribution` total (or `popularity`) as the count.
+101. **Snoozes / dismissals** stored server-side (`{itemId, eventKey, until}`) so they hold across devices, not in
+     localStorage.
+102. **Settings record:** theme and text size per device (localStorage); show 18+, spoiler shield and
+     where-to-watch country account-wide (DB).
+103. **"N new" per category** for the sidebar/Library, from the Up Next computation.
+104. **Offline logging** (offline banner: "3 logs are saved on this device"): queue log/progress writes in the
+     PWA when offline and sync on reconnect. Part of the PWA work.
+105. **Global "Log" button:** pick an item from the library (search), then the log sheet.
+
+**Open questions for the user**
+
+106. **"Remind me"** on the airing banner: email is declined (#44). Options: a web-push notification (needs the
+     PWA + permission), or just pin it to the top of Coming soon.
+107. **Where to watch** is per country in TMDB. Which country's streaming catalogue should it show?
+108. The **undesigned screens** (#95): build them from the kit, or run a second Claude Design round first
+     (Search & add, Stats / Wrapped and Tonight are the most visual)?
 
 ### Build order (agreed 2026-10-01)
 
@@ -415,33 +525,42 @@ Each step: one commit per item, verified against the real library, then deployed
    migration for tiers).
 8. Personal tags & moods: filters everywhere (#66).
 
-**Phase 3: catalogue structure** ✅ built + verified on a copy of the live data (`109c6dd`…`477ddf4`), deploy
-pending; OMDb key pending for IMDb/RT/Metacritic
+**Phase 3: catalogue structure** ✅ deployed 2026-10-01 (`f1c5209`; OMDb key on the VM; re-enrichment run
+for scores in `backups/enrich-phase3.log`)
 9. Anime franchise tile + page (E–I), then reuse for movie collections (#21); cast/crew/studio pages (#52).
 10. International: regional categories + flags (#37), manual add (#38), romanization retry (#33), vote
     threshold (#34), dub badges (#35).
 11. Critic vs audience scores: OMDb (IMDb / Rotten Tomatoes / Metacritic) + Jikan (MAL) (#49).
 
-**Phase 4: what's next & what to watch**
-12. Airing & release updates: daily job, Up Next on Home, badges/banners (#39–43). No email digest (#44 declined).
-13. **Spoiler shield (#71)**: uses progress + airing data.
-14. **Taste-based suggestions (#68)**, rating-weighted (#57), region-aware (#36); fix suggestion caching (#30).
-15. **"What should I watch tonight?" (#65)**: needs progress, tags/moods, regions.
-16. **Rewatch / re-read nudges (#72)**: needs WatchLog ratings + dates.
-17. **Trailers & where to watch (#73)**.
+**Phase 4: design foundation** (from the handoff; everything after builds on it)
+12. Tokens, light/dark/system themes, fonts, icons, bundled SVG flags (#83, #84).
+13. App shell: phone tab bar, desktop sidebar + top bar, Library hub, You page (#85).
+14. Component kit + states + accessibility rules (#86, #87), rating cells (#88), poster-accent (#89).
+15. Remove the old visual layer: glass, tilt, the Home accordion (`BigCategoryCard`), framer-motion where the spec
+    doesn't call for motion.
 
-**Phase 5: reflection & sharing**
-18. **Stats & Year in review / "Grimoire Wrapped" (#63)**: needs WatchLog, credits, countries, ratings.
-19. **Goals (#69)**: small migration; progress from WatchLog.
-20. **Export / import (#56)**: export covers every table above, so it lands after they exist; imports from
-    AniList/MAL, Letterboxd/IMDb CSV, Trakt, Goodreads.
-21. **Share a list (#74)**: read-only public link (small migration: share tokens; the only unauthenticated route).
+**Phase 5: built screens in the new design + the data they need**
+16. Data: `yourRatingAt` (#96), log episode range/label (#97), settings record (#102), AniList % + count (#100),
+    anime ↔ TMDB/IMDb link (#99).
+17. Category (#92), Detail (#93, without the Episodes tab), Log sheet (#94).
+18. Restyle Franchise, Collection, Person, Lists, Tier list, Diary, Search & add, Settings, Unlock (#95).
+19. Episodes tab + spoiler shield (#98, #71).
 
-**Throughout / last sweep**
-22. Accessibility pass (#58–62): contrast tokens, focus rings, reduced motion, screen-reader labels + `lang`/`dir`,
-    touch targets, Appearance settings. New UI from every phase follows these rules as it's built; the sweep fixes
-    the existing screens.
-23. Polish: cover images (#25), Books API key (#26), deploy script (#6), uptime check (#7), stale comments (#8).
+**Phase 6: Up next**
+20. Airing & release updates: daily job (also retries missing MAL scores, #82), snoozes (#101), badges/banners,
+    "N new" counts (#103) (#39–43).
+21. Home "Up next" (#91): Ready to watch, Coming soon, Continue, Favourites shelf.
+22. Goals (#69), "What should I watch tonight?" (#65), rewatch nudges (#72): all three sit on Home.
+23. Where to watch + trailers (#73; needs the answer to #107), "Remind me" (#106).
+
+**Phase 7: reflection, sharing, app**
+24. Taste-based suggestions (#68), rating-weighted (#57), region-aware (#36); suggestion caching (#30).
+25. Stats & Year in review / "Grimoire Wrapped" (#63) with the design's charts: bars, rating distribution in pink
+    ("Average ✦ 7.6 vs the crowd's 7.3"), donut by country.
+26. Export / import (#56).
+27. Share a list (#74).
+28. PWA: installable, self-hosted fonts, offline log queue (#104).
+29. Polish: cover images (#25), deploy script (#6), uptime check (#7).
 
 ## Polish / optimization
 
