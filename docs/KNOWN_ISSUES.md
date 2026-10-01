@@ -151,12 +151,12 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
 
 **Books**
 
-24. 🟡 **Code done** (`de565e8`; blocked by Google's anonymous quota until `GOOGLE_BOOKS_API_KEY` is set, #26) — **Edition data instead of the book** (medium). Google Books returns editions: *The Alchemist* shows 2015,
+24. ✅ **Fixed** (`de565e8`, `5d93428`; live 2026-10-01: Canterville Ghost 1887, Alchemist 1988, Kite Runner 2003) — **Edition data instead of the book** (medium). Google Books returns editions: *The Alchemist* shows 2015,
     *The Kite Runner* 2020. No author or page count is stored. **Fix:** store `authors`, `pageCount`, ISBN; take the
     original year from Open Library (`/search.json?isbn=` → `first_publish_year`, free, no key).
 25. **Low-res `http://` covers** (low). All 3 covers are `http://books.google.com/...&zoom=1` thumbnails. **Fix:**
     rewrite to `https://`, request `zoom=0`/larger, fall back to Open Library covers by ISBN.
-26. **No API key** (low). Requests share Google's anonymous quota and can 429. **Fix:** add `GOOGLE_BOOKS_API_KEY`
+26. ✅ **Fixed** (key "API key 1" from the azubiweg GCP project in the VM `.env`; 429 backoff in `de565e8`) — **No API key** (low). Requests share Google's anonymous quota and can 429. **Fix:** add `GOOGLE_BOOKS_API_KEY`
     (free) to `.env`.
 
 **Music**: ⛔ **Obsolete, superseded by #45 (Music category removed).** Kept for reference.
@@ -387,7 +387,7 @@ Each step: one commit per item, verified against the real library, then deployed
    Safe delete with confirm + undo (#55). Status labels per medium (#53).
 
 **Phase 1: data foundation (one migration, one backfill)** ✅ built + verified on a copy of the local data
-(`9252d3c`, `de565e8`), deploy pending
+(`9252d3c`, `de565e8`), ✅ deployed 2026-10-01 (`5d93428`): backfill 192/192, 47 franchises, 1,085 credits
 3. **One schema migration** for the shared data: Franchise table + anime fields (A); `creator` (#18);
    `metaCheckedAt` (#19); TV `seasons`/`episodes` (#22); `countryOfOrigin`/`originalLanguage`/`nativeTitle`
    (#31–32); `region`/`regionOverride` (#37); airing snapshot (#39); **WatchLog** with started/finished dates,
