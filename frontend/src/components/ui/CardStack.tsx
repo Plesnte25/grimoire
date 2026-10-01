@@ -9,12 +9,10 @@ export function CardStack({
   items,
   collectionName,
   onOpenItem,
-  onDeleteItem,
 }: {
   items: MediaItem[];
   collectionName?: string | null;
   onOpenItem: (item: MediaItem) => void;
-  onDeleteItem?: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const top3 = items.slice(0, 3);
@@ -133,7 +131,6 @@ export function CardStack({
                       setExpanded(false);
                       onOpenItem(it);
                     }}
-                    onDelete={onDeleteItem}
                   />
                 ))}
               </div>

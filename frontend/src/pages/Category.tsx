@@ -1,13 +1,14 @@
 import { useMemo, useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import type { MediaType } from "../types";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { fetchLibrary } from "../app/api";
 import { MediaCard, safeParseGenres } from "../components/MediaCard";
 import { CardStack } from "../components/ui/CardStack";
 import { SearchModal } from "../components/SearchModal";
 import { SuggestionsCarousel } from "../components/SuggestionsCarousel";
 import { groupByCollection } from "../lib/groupByCollection";
+import { STATUSES, statusLabel } from "../lib/status";
 
 type StatusTab =
   | "ALL"
@@ -87,7 +88,6 @@ export function Category() {
   const isAnime = mediaType === "ANIME";
 
   const nav = useNavigate();
-  const qc = useQueryClient();
 
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -109,31 +109,12 @@ export function Category() {
     );
   }, [items]);
 
-  async function deleteLibraryItem(id: string) {
-    const res = await fetch(`/api/library/${id}`, { method: "DELETE" });
-    if (!res.ok) throw new Error("Failed to delete");
-  }
-
-  const del = useMutation({
-    mutationFn: (id: string) => deleteLibraryItem(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["library", mediaType] });
-      qc.invalidateQueries({ queryKey: ["library", "all"] });
-      qc.invalidateQueries({ queryKey: ["suggestions", mediaType] });
-    },
-  });
-
   const STATUS_OPTIONS = useMemo(
-    () =>
-      [
-        { key: "ALL", label: "All" },
-        { key: "PLANNED", label: "Planning" },
-        { key: "IN_PROGRESS", label: "Watching" },
-        { key: "ON_HOLD", label: "Paused" },
-        { key: "COMPLETED", label: "Completed" },
-        { key: "DROPPED", label: "Dropped" },
-      ] as const,
-    []
+    () => [
+      { key: "ALL" as const, label: "All" },
+      ...STATUSES.map((key) => ({ key, label: statusLabel(key, mediaType) })),
+    ],
+    [mediaType]
   );
 
   // ---- Anime buckets (library) ----
@@ -410,14 +391,12 @@ export function Category() {
                   items={g.stack}
                   collectionName={g.primary.collectionName}
                   onOpenItem={(it) => nav(`/media/${it.id}`)}
-                  onDeleteItem={(id) => del.mutate(id)}
                 />
               ) : (
                 <MediaCard
                   key={g.primary.id}
                   item={g.primary}
                   onOpen={() => nav(`/media/${g.primary.id}`)}
-                  onDelete={(id) => del.mutate(id)}
                   variant="tile"
                 />
               )

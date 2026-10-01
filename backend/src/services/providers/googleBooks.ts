@@ -16,8 +16,9 @@ export async function googleBooksSearch(q: string) {
         description: b.volumeInfo?.description ?? "",
         posterUrl: b.volumeInfo?.imageLinks?.thumbnail ?? null,
         backdropUrl: null,
+        // Google rates 0–5; every online score in Grimoire is stored on 0–10.
         globalRating:
-            typeof b.volumeInfo?.averageRating === "number" ? b.volumeInfo.averageRating : undefined,
+            typeof b.volumeInfo?.averageRating === "number" ? b.volumeInfo.averageRating * 2 : undefined,
         globalRatingText:
             typeof b.volumeInfo?.ratingsCount === "number"
                 ? `Google Books (${b.volumeInfo.ratingsCount} ratings)`
@@ -43,8 +44,9 @@ export async function googleBooksDetails(providerId: string) {
         description: b.volumeInfo?.description ?? "",
         posterUrl: b.volumeInfo?.imageLinks?.thumbnail ?? null,
         backdropUrl: null,
+        // Google rates 0–5; every online score in Grimoire is stored on 0–10.
         globalRating:
-            typeof b.volumeInfo?.averageRating === "number" ? b.volumeInfo.averageRating : undefined,
+            typeof b.volumeInfo?.averageRating === "number" ? b.volumeInfo.averageRating * 2 : undefined,
         globalRatingText:
             typeof b.volumeInfo?.ratingsCount === "number"
                 ? `Google Books (${b.volumeInfo.ratingsCount} ratings)`

@@ -309,13 +309,17 @@ libraryRouter.patch(
     asyncHandler(async (req, res) => {
         const schema = z.object({
             status: z.enum(["PLANNED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "DROPPED"]).optional(),
+            // null clears the rating ("Not rated"); 0.5–10 in half steps otherwise.
             yourRating: z
-                .union([z.number(), z.string()])
+                .union([z.number(), z.string(), z.null()])
                 .optional()
                 .transform((v) => {
-                    if (v === undefined) return undefined;
+                    if (v === undefined || v === null) return v;
                     const n = typeof v === "number" ? v : Number(String(v));
                     return Number.isFinite(n) ? n : undefined;
+                })
+                .refine((v) => v == null || (v >= 0.5 && v <= 10 && Number.isInteger(v * 2)), {
+                    message: "Rating must be 0.5–10 in half steps",
                 }),
             yourNotes: nonEmptyString,
             progressText: nonEmptyString,

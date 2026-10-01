@@ -1,4 +1,6 @@
 import type { MediaItem } from "../types";
+import { formatScore, onlineRating, personalRating } from "../lib/ratings";
+import { statusLabel } from "../lib/status";
 
 type Variant = "tile" | "row";
 
@@ -39,22 +41,14 @@ export function safeParseGenres(genres: any): string[] {
   return [];
 }
 
-function prettyStatus(status?: string) {
-  if (!status) return "";
-  if (status === "IN_PROGRESS") return "Ongoing";
-  if (status === "PLANNING") return "Planning";
-  if (status === "COMPLETED") return "Completed";
-  if (status === "ON_HOLD") return "On Hold";
-  if (status === "DROPPED") return "Dropped";
-  return status;
-}
-
-function ratingText(item: any) {
-  const r = item?.yourRating ?? item?.globalRating;
-  if (typeof r !== "number") return null;
-  const label =
-    item?.yourRating != null ? "You" : item?.globalRatingText ?? "TMDB";
-  return `★ ${r.toFixed(1)} (${label})`;
+// Personal and online scores are always labelled separately: "You 8.5 · TMDB 7.9".
+function ratingText(item: MediaItem) {
+  const mine = personalRating(item);
+  const online = onlineRating(item);
+  const parts: string[] = [];
+  if (mine != null) parts.push(`You ${formatScore(mine)}`);
+  if (online) parts.push(`${online.source} ${formatScore(online.value)}`);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 function durationText(item: any) {
@@ -83,12 +77,10 @@ function durationText(item: any) {
 export function MediaCard({
   item,
   onOpen,
-  onDelete,
   variant = "row",
 }: {
   item: MediaItem;
   onOpen?: () => void;
-  onDelete?: (id: string) => void;
   variant?: Variant;
   onQuickAdd?: (item: MediaItem) => void;
   onToggleWatched?: (item: MediaItem) => void;
@@ -101,19 +93,6 @@ export function MediaCard({
   const rating = ratingText(item);
 
   if (variant === "tile") {
-    const statusLabel =
-      status === "IN_PROGRESS"
-        ? "Watching"
-        : status === "PLANNED"
-        ? "Planning"
-        : status === "ON_HOLD"
-        ? "Paused"
-        : status === "COMPLETED"
-        ? "Completed"
-        : status === "DROPPED"
-        ? "Dropped"
-        : "";
-
     const metaGenres = genres.slice(0, 3).join(" · ");
     const metaYear = year ? String(year) : "";
     const metaRating = ratingText(item);
@@ -173,29 +152,6 @@ export function MediaCard({
             {/* subtle dark gradient */}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-60" />
           </div>
-
-          {/* ✕ Delete (shows on hover) */}
-          {onDelete ? (
-            <button
-              className="
-      absolute top-2 right-2 z-20
-      h-7 w-7 rounded-full
-      bg-black/50 backdrop-blur-md border border-white/15
-      flex items-center justify-center
-      opacity-0 group-hover:opacity-100 transition
-      hover:bg-black/70
-    "
-              aria-label={`Delete ${item.title}`}
-              title="Remove from library"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onDelete((item as any).id);
-              }}
-            >
-              <span className="text-white/90 text-sm leading-none">×</span>
-            </button>
-          ) : null}
 
           {/* Hover info panel */}
           <div
@@ -266,7 +222,7 @@ export function MediaCard({
         <div className="flex items-center justify-between gap-3">
           <div className="text-base font-semibold truncate">{item.title}</div>
           {status ? (
-            <div className="text-xs opacity-70">{prettyStatus(status)}</div>
+            <div className="text-xs opacity-70">{statusLabel(status, item.mediaType)}</div>
           ) : null}
         </div>
 

@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchItem, updateItem, fetchLists, addItemToList } from "../app/api";
+import { RatingInput } from "../components/RatingInput";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { formatScore, onlineRating, onlineRatingText, personalRating } from "../lib/ratings";
+import { STATUSES, statusLabel } from "../lib/status";
+import { deleteWithUndo } from "../lib/deleteWithUndo";
 
 export function MediaDetail() {
   const { id } = useParams();
@@ -19,6 +24,7 @@ export function MediaDetail() {
 
   const [progressText, setProgressText] = useState("");
   const [notes, setNotes] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Sync local editable state from the loaded item so "Save" without editing
   // reflects the real current value instead of overwriting it with "".
@@ -48,6 +54,9 @@ export function MediaDetail() {
   });
 
   if (!item) return <div className="min-h-screen p-6">Loading…</div>;
+
+  const mine = personalRating(item);
+  const online = onlineRating(item);
 
   return (
     <div className="min-h-screen px-4 md:px-8 py-6 max-w-4xl mx-auto">
@@ -88,13 +97,16 @@ export function MediaDetail() {
                 {item.mediaType}
                 {item.year ? ` · ${item.year}` : ""}
               </div>
-              <div className="text-sm opacity-80 mt-2">
-                ⭐ {item.yourRating ?? item.globalRating} &nbsp;&nbsp; 🌍{" "}
-                {item.globalRating ?? "—"}{" "}
-                <span className="opacity-60">
-                  {item.globalRatingText ?? ""}
-                </span>
-              </div>
+              <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                <div className="flex gap-1.5">
+                  <dt className="text-white/70">You</dt>
+                  <dd className="font-semibold">{mine != null ? formatScore(mine) : "Not rated"}</dd>
+                </div>
+                <div className="flex gap-1.5">
+                  <dt className="text-white/70">Online</dt>
+                  <dd className="font-semibold">{online ? onlineRatingText(online) : "No rating"}</dd>
+                </div>
+              </dl>
               <div className="mt-2 flex flex-wrap gap-2">
                 {genres.slice(0, 6).map((g) => (
                   <span
@@ -125,15 +137,7 @@ export function MediaDetail() {
             <div className="glass rounded-2xl p-4">
               <div className="text-sm font-semibold opacity-90">Track</div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {(
-                  [
-                    "PLANNED",
-                    "IN_PROGRESS",
-                    "COMPLETED",
-                    "ON_HOLD",
-                    "DROPPED",
-                  ] as const
-                ).map((s) => (
+                {STATUSES.map((s) => (
                   <button
                     key={s}
                     className={`text-xs px-3 py-2 rounded-full transition ${
@@ -141,26 +145,22 @@ export function MediaDetail() {
                         ? "bg-white/20"
                         : "bg-white/10 hover:bg-white/15"
                     }`}
+                    aria-pressed={item.status === s}
                     onClick={() => mut.mutate({ status: s })}
                   >
-                    {s}
+                    {statusLabel(s, item.mediaType)}
                   </button>
                 ))}
               </div>
 
               <div className="mt-4">
-                <div className="text-xs opacity-70">Your rating (0–10)</div>
-                <input
-                  type="range"
-                  min={0}
-                  max={10}
-                  step={0.5}
-                  value={item.yourRating ?? 0}
-                  onChange={(e) =>
-                    mut.mutate({ yourRating: Number(e.target.value) })
-                  }
-                  className="w-full mt-2"
-                />
+                <div className="text-xs text-white/70">Your rating</div>
+                <div className="mt-1">
+                  <RatingInput
+                    value={mine}
+                    onChange={(v) => mut.mutate({ yourRating: v })}
+                  />
+                </div>
               </div>
 
               <div className="mt-4">
@@ -221,8 +221,33 @@ export function MediaDetail() {
               </div>
             </div>
           </div>
+
+          <div className="border-t border-white/10 pt-4">
+            <button
+              type="button"
+              className="min-h-11 rounded-xl px-4 text-sm text-rose-300 hover:bg-rose-500/10"
+              onClick={() => setConfirmDelete(true)}
+            >
+              Remove from library
+            </button>
+          </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={`Remove "${item.title}"?`}
+        body="Its status, rating, progress and notes are removed too. You can undo for 10 seconds."
+        confirmLabel="Remove"
+        onCancel={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          deleteWithUndo(qc, item);
+          // Opened from a direct link there's no in-app history to go back to.
+          if ((window.history.state?.idx ?? 0) > 0) nav(-1);
+          else nav(`/category/${item.mediaType}`);
+        }}
+      />
     </div>
   );
 }
