@@ -473,20 +473,13 @@ async function enrichAnilist(item: MediaItem): Promise<Enrichment | null> {
 
 /* ---------------------------- Google Books ---------------------------- */
 
-async function openLibraryFirstYear(isbn: string | null, title: string, author?: string): Promise<number | null> {
-    // By ISBN when we have one; otherwise by title + author, ranked by edition
-    // count so the original work beats graphic novels and study guides.
-    const params = isbn
-        ? { isbn, fields: "first_publish_year", limit: 1 }
-        : {
-              q: `title:"${title}"${author ? ` author:"${author}"` : ""}`,
-              sort: "editions",
-              fields: "first_publish_year",
-              limit: 1,
-          };
+async function openLibrarySearch(params: Record<string, string | number>): Promise<number | null> {
     for (let attempt = 0; attempt < 2; attempt++) {
         try {
-            const res = await axios.get("https://openlibrary.org/search.json", { params, timeout: 12_000 });
+            const res = await axios.get("https://openlibrary.org/search.json", {
+                params: { ...params, fields: "first_publish_year", limit: 1 },
+                timeout: 12_000,
+            });
             const y = res.data?.docs?.[0]?.first_publish_year;
             return typeof y === "number" ? y : null;
         } catch (err) {
@@ -494,6 +487,22 @@ async function openLibraryFirstYear(isbn: string | null, title: string, author?:
         }
     }
     return null;
+}
+
+/**
+ * When the book first came out. By ISBN first; many editions aren't in Open
+ * Library, so fall back to title + author ranked by edition count (the
+ * original work beats graphic novels and study guides).
+ */
+async function openLibraryFirstYear(isbn: string | null, title: string, author?: string): Promise<number | null> {
+    if (isbn) {
+        const byIsbn = await openLibrarySearch({ isbn });
+        if (byIsbn) return byIsbn;
+    }
+    return openLibrarySearch({
+        q: `title:"${title}"${author ? ` author:"${author}"` : ""}`,
+        sort: "editions",
+    });
 }
 
 function httpsCover(url?: string | null) {
