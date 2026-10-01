@@ -474,12 +474,26 @@ async function enrichAnilist(item: MediaItem): Promise<Enrichment | null> {
 /* ---------------------------- Google Books ---------------------------- */
 
 async function openLibraryFirstYear(isbn: string | null, title: string, author?: string): Promise<number | null> {
+    // By ISBN when we have one; otherwise by title + author, ranked by edition
+    // count so the original work beats graphic novels and study guides.
     const params = isbn
         ? { isbn, fields: "first_publish_year", limit: 1 }
-        : { title, author, fields: "first_publish_year", limit: 1 };
-    const res = await axios.get("https://openlibrary.org/search.json", { params, timeout: 12_000 });
-    const y = res.data?.docs?.[0]?.first_publish_year;
-    return typeof y === "number" ? y : null;
+        : {
+              q: `title:"${title}"${author ? ` author:"${author}"` : ""}`,
+              sort: "editions",
+              fields: "first_publish_year",
+              limit: 1,
+          };
+    for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+            const res = await axios.get("https://openlibrary.org/search.json", { params, timeout: 12_000 });
+            const y = res.data?.docs?.[0]?.first_publish_year;
+            return typeof y === "number" ? y : null;
+        } catch (err) {
+            if (attempt === 1) throw err;
+        }
+    }
+    return null;
 }
 
 function httpsCover(url?: string | null) {
