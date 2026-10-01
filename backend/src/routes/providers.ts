@@ -53,13 +53,12 @@ providersRouter.get("/search", asyncHandler(async (req, res) => {
     res.json({ results });
 }));
 
-providersRouter.get("/details", async (req, res) => {
+providersRouter.get("/details", asyncHandler(async (req, res) => {
     const data = parseOrThrow(z.object({
         provider: z.string(),
         providerId: z.string(),
         mediaType: z.enum(["MOVIE", "TV", "ANIME", "BOOK", "MUSIC"])
     }), req.query);
-
 
     try {
         let details: any = null;
@@ -78,7 +77,7 @@ providersRouter.get("/details", async (req, res) => {
         console.error("Provider details error:", err);
         res.status(502).json({ error: "Failed to fetch provider details" });
     }
-});
+}));
 
 providersRouter.get("/track-meta", asyncHandler(async (req, res) => {
     const data = parseOrThrow(z.object({

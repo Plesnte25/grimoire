@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchItem, updateItem, fetchLists, addItemToList } from "../app/api";
@@ -19,6 +19,15 @@ export function MediaDetail() {
 
   const [progressText, setProgressText] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Sync local editable state from the loaded item so "Save" without editing
+  // reflects the real current value instead of overwriting it with "".
+  useEffect(() => {
+    if (item) {
+      setProgressText(item.progressText ?? "");
+      setNotes(item.yourNotes ?? "");
+    }
+  }, [item?.id, item?.progressText, item?.yourNotes]);
 
   const genres = useMemo(() => {
     if (!item?.genres) return [];
@@ -160,7 +169,7 @@ export function MediaDetail() {
                   <input
                     className="flex-1 rounded-xl bg-black/30 border border-white/10 px-3 py-2 outline-none text-sm"
                     placeholder="e.g. S2E5 / Page 123 / Listened 12x"
-                    defaultValue={item.progressText ?? ""}
+                    value={progressText}
                     onChange={(e) => setProgressText(e.target.value)}
                   />
                   <button
@@ -200,7 +209,7 @@ export function MediaDetail() {
                 <div className="text-xs opacity-70">Notes</div>
                 <textarea
                   className="mt-2 w-full min-h-[90px] rounded-xl bg-black/30 border border-white/10 px-3 py-2 outline-none text-sm"
-                  defaultValue={item.yourNotes ?? ""}
+                  value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                 />
                 <button
