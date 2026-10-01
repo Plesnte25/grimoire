@@ -50,3 +50,37 @@ export function onlineRatingText(r: OnlineRating): string {
   const votes = r.votes != null ? ` · ${formatVotes(r.votes)} votes` : "";
   return `${r.source} ${formatScore(r.value)}${votes}`;
 }
+
+export type ScoreChip = { source: string; text: string; label: string };
+
+/**
+ * Every online score split into audience vs critics (KNOWN_ISSUES #49).
+ * Low-vote audience scores are left out rather than shown as if meaningful.
+ */
+export function scoreGroups(item: MediaItem): { audience: ScoreChip[]; critics: ScoreChip[] } {
+  const audience: ScoreChip[] = [];
+  const critics: ScoreChip[] = [];
+  const votes = (n?: number | null) => (n ? ` · ${formatVotes(n)} votes` : "");
+
+  const primary = onlineRating(item);
+  if (primary && !primary.lowConfidence) {
+    audience.push({
+      source: primary.source,
+      text: `${formatScore(primary.value)}${votes(primary.votes)}`,
+      label: `${primary.source} ${formatScore(primary.value)} out of 10`,
+    });
+  }
+  if (item.imdbRating != null && (item.imdbVotes ?? 0) >= MIN_VOTES) {
+    audience.push({ source: "IMDb", text: `${formatScore(item.imdbRating)}${votes(item.imdbVotes)}`, label: `IMDb ${formatScore(item.imdbRating)} out of 10` });
+  }
+  if (item.malScore != null && (item.malVotes ?? 0) >= MIN_VOTES) {
+    audience.push({ source: "MyAnimeList", text: `${formatScore(item.malScore)}${votes(item.malVotes)}`, label: `MyAnimeList ${formatScore(item.malScore)} out of 10` });
+  }
+  if (item.rtCritics != null) {
+    critics.push({ source: "Rotten Tomatoes", text: `${item.rtCritics}%`, label: `Rotten Tomatoes ${item.rtCritics} percent` });
+  }
+  if (item.metascore != null) {
+    critics.push({ source: "Metacritic", text: `${item.metascore}/100`, label: `Metacritic ${item.metascore} out of 100` });
+  }
+  return { audience, critics };
+}

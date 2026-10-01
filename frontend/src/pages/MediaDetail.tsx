@@ -22,7 +22,7 @@ import { HistorySection } from "../components/HistorySection";
 import { TagEditor } from "../components/TagEditor";
 import { ListsPanel } from "../components/ListsPanel";
 import { safeParseGenres } from "../components/MediaCard";
-import { formatScore, onlineRating, onlineRatingText, personalRating } from "../lib/ratings";
+import { formatScore, onlineRating, onlineRatingText, personalRating, scoreGroups } from "../lib/ratings";
 import { STATUSES, statusLabel } from "../lib/status";
 import { deleteWithUndo } from "../lib/deleteWithUndo";
 import { showToast } from "../lib/toast";
@@ -105,6 +105,7 @@ export function MediaDetail() {
 
   const mine = personalRating(item);
   const online = onlineRating(item);
+  const scores = scoreGroups(item);
   const genres = safeParseGenres(item.genres);
   const tags = (item.tags ?? []).map((t) => t.tag);
   const credits = item.credits ?? [];
@@ -157,9 +158,21 @@ export function MediaDetail() {
                   <dd className="font-semibold">{mine != null ? formatScore(mine) : "Not rated"}</dd>
                 </div>
                 <div className="flex gap-1.5">
-                  <dt className="text-white/75">Online</dt>
-                  <dd className="font-semibold">{online ? onlineRatingText(online) : "No rating"}</dd>
+                  <dt className="text-white/75">Audience</dt>
+                  <dd className="font-semibold">
+                    {scores.audience.length
+                      ? scores.audience.map((c) => `${c.source} ${c.text}`).join("  ·  ")
+                      : online
+                        ? onlineRatingText(online)
+                        : "No rating"}
+                  </dd>
                 </div>
+                {scores.critics.length ? (
+                  <div className="flex gap-1.5">
+                    <dt className="text-white/75">Critics</dt>
+                    <dd className="font-semibold">{scores.critics.map((c) => `${c.source} ${c.text}`).join("  ·  ")}</dd>
+                  </div>
+                ) : null}
               </dl>
             </div>
           </div>

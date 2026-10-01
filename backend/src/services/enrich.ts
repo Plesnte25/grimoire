@@ -85,10 +85,81 @@ function slug(s: string) {
         .replace(/^-|-$/g, "");
 }
 
+/* ------------------------------- scores ------------------------------- */
+
+const OMDB_API_KEY = process.env.OMDB_API_KEY;
+
+function sleep(ms: number) {
+    return new Promise((r) => setTimeout(r, ms));
+}
+
+function num(v: unknown): number | null {
+    const n = Number(String(v ?? "").replace(/[,%]/g, "").split("/")[0]);
+    return Number.isFinite(n) && String(v ?? "").trim() !== "" && v !== "N/A" ? n : null;
+}
+
+/**
+ * IMDb (audience) + Rotten Tomatoes / Metacritic (critics) from OMDb, by IMDb id.
+ * Only runs when OMDB_API_KEY is set (free key, 1,000 requests/day).
+ */
+async function omdbScores(imdbId: string | null): Promise<Prisma.MediaItemUncheckedUpdateInput> {
+    if (!OMDB_API_KEY || !imdbId) return {};
+    const res = await axios.get("https://www.omdbapi.com/", { params: { i: imdbId, apikey: OMDB_API_KEY }, timeout: 12_000 });
+    const d = res.data;
+    if (d?.Response !== "True") return {};
+    const rating = (source: string) => (d.Ratings ?? []).find((r: any) => r.Source === source)?.Value;
+    return {
+        imdbRating: num(d.imdbRating),
+        imdbVotes: num(d.imdbVotes),
+        rtCritics: num(rating("Rotten Tomatoes")),
+        metascore: num(d.Metascore) ?? num(rating("Metacritic")),
+        scoresCheckedAt: new Date(),
+    };
+}
+
+// Jikan (MyAnimeList, no key): 3 requests/s, 60/min. Keep a gap; retry 429s.
+let lastJikanAt = 0;
+async function jikanScore(malId: number | null): Promise<Prisma.MediaItemUncheckedUpdateInput> {
+    if (!malId) return {};
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const gap = lastJikanAt + 1100 - Date.now();
+        if (gap > 0) await sleep(gap);
+        lastJikanAt = Date.now();
+        try {
+            const res = await axios.get(`https://api.jikan.moe/v4/anime/${malId}`, { timeout: 12_000 });
+            const d = res.data?.data;
+            return {
+                malId,
+                malScore: typeof d?.score === "number" ? d.score : null,
+                malVotes: typeof d?.scored_by === "number" ? d.scored_by : null,
+                scoresCheckedAt: new Date(),
+            };
+        } catch (err: any) {
+            const status = err?.response?.status;
+            if (status === 404) return { malId };
+            // 429 = rate limit; 5xx = Jikan waiting on MyAnimeList. Both pass.
+            const retryable = status === 429 || (status >= 500 && status < 600) || err?.code === "ECONNABORTED";
+            if (!retryable || attempt === 2) throw err;
+            await sleep(3000 * (attempt + 1));
+        }
+    }
+    return {};
+}
+
+/** Score lookups are extras: a failure leaves the rest of the enrichment intact. */
+async function safeScores(load: () => Promise<Prisma.MediaItemUncheckedUpdateInput>, label: string) {
+    try {
+        return await load();
+    } catch (err: any) {
+        console.error(`Score lookup failed (${label}):`, err?.message ?? err);
+        return {};
+    }
+}
+
 /* -------------------------------- TMDB -------------------------------- */
 
 async function enrichTmdbMovie(item: MediaItem): Promise<Enrichment | null> {
-    const r = await tmdbGet(`/movie/${item.providerId}`, { append_to_response: "credits,release_dates" });
+    const r = await tmdbGet(`/movie/${item.providerId}`, { append_to_response: "credits,release_dates,external_ids" });
     if (!r) return null;
 
     const country: string | null = r.origin_country?.[0] ?? r.production_countries?.[0]?.iso_3166_1 ?? null;
@@ -131,6 +202,8 @@ async function enrichTmdbMovie(item: MediaItem): Promise<Enrichment | null> {
             collectionId: r.belongs_to_collection?.id != null ? String(r.belongs_to_collection.id) : null,
             collectionName: r.belongs_to_collection?.name ?? null,
             collectionSource: r.belongs_to_collection?.id != null ? "tmdb" : null,
+            imdbId: r.imdb_id ?? r.external_ids?.imdb_id ?? null,
+            ...(await safeScores(() => omdbScores(r.imdb_id ?? r.external_ids?.imdb_id ?? null), `omdb ${item.title}`)),
         },
         credits: [
             ...directors.map((d: any, i: number) => ({
@@ -164,7 +237,7 @@ const TMDB_TV_STATUS: Record<string, string> = {
 };
 
 async function enrichTmdbTv(item: MediaItem): Promise<Enrichment | null> {
-    const r = await tmdbGet(`/tv/${item.providerId}`, { append_to_response: "credits" });
+    const r = await tmdbGet(`/tv/${item.providerId}`, { append_to_response: "credits,external_ids" });
     if (!r) return null;
 
     const last = r.last_episode_to_air ?? null;
@@ -218,6 +291,8 @@ async function enrichTmdbTv(item: MediaItem): Promise<Enrichment | null> {
             announcedNext: upcoming ? `Season ${upcoming.season_number}` : null,
             announcedNextDate: upcoming ? dateOrNull(upcoming.air_date) : null,
             airCheckedAt: new Date(),
+            imdbId: r.external_ids?.imdb_id ?? null,
+            ...(await safeScores(() => omdbScores(r.external_ids?.imdb_id ?? null), `omdb ${item.title}`)),
         },
         credits: [
             ...creators.map((c: any, i: number) => ({
@@ -253,7 +328,7 @@ const ANIME_QUERY = `
   query ($id: Int) {
     Media(id: $id, type: ANIME) {
       ${ANIME_NODE}
-      episodes duration isAdult genres averageScore
+      idMal episodes duration isAdult genres averageScore
       description(asHtml: false)
       nextAiringEpisode { episode airingAt }
       studios(isMain: true) { nodes { id name } }
@@ -465,6 +540,8 @@ async function enrichAnilist(item: MediaItem): Promise<Enrichment | null> {
             announcedNext: sequel ? aniTitle(sequel.node.title) : null,
             announcedNextDate: sequel ? aniDate(sequel.node.startDate) : null,
             airCheckedAt: new Date(),
+            malId: typeof m.idMal === "number" ? m.idMal : null,
+            ...(await safeScores(() => jikanScore(typeof m.idMal === "number" ? m.idMal : null), `jikan ${item.title}`)),
         },
         credits: studios.map((s: any, i: number) => ({
             contributorId: `anilist-studio:${s.id}`,

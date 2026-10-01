@@ -82,6 +82,18 @@ model MediaItem {
   announcedNextDate  DateTime?
   digitalReleaseDate DateTime? // movies still in cinemas
 
+  // Extra audience / critic scores (KNOWN_ISSUES #49). IMDb, Rotten Tomatoes
+  // and Metacritic come from OMDb (needs OMDB_API_KEY); MyAnimeList via Jikan.
+  imdbId          String?
+  imdbRating      Float? // 0–10
+  imdbVotes       Int?
+  rtCritics       Int? // Rotten Tomatoes Tomatometer, 0–100 %
+  metascore       Int? // Metacritic, 0–100
+  malId           Int?
+  malScore        Float? // 0–10
+  malVotes        Int?
+  scoresCheckedAt DateTime?
+
   // When provider metadata was last fetched (also set when it found nothing,
   // so library loads never re-fetch).
   metaCheckedAt DateTime?

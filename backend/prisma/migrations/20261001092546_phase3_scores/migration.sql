@@ -1,0 +1,10 @@
+-- AlterTable
+ALTER TABLE "MediaItem" ADD COLUMN "imdbId" TEXT;
+ALTER TABLE "MediaItem" ADD COLUMN "imdbRating" REAL;
+ALTER TABLE "MediaItem" ADD COLUMN "imdbVotes" INTEGER;
+ALTER TABLE "MediaItem" ADD COLUMN "malId" INTEGER;
+ALTER TABLE "MediaItem" ADD COLUMN "malScore" REAL;
+ALTER TABLE "MediaItem" ADD COLUMN "malVotes" INTEGER;
+ALTER TABLE "MediaItem" ADD COLUMN "metascore" INTEGER;
+ALTER TABLE "MediaItem" ADD COLUMN "rtCritics" INTEGER;
+ALTER TABLE "MediaItem" ADD COLUMN "scoresCheckedAt" DATETIME;

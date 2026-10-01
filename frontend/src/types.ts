@@ -77,6 +77,12 @@ export type MediaItem = {
     lastAiredSeason?: number | null;
     lastAiredEpisode?: number | null;
     tags?: { tag: Tag }[];
+    imdbRating?: number | null;
+    imdbVotes?: number | null;
+    rtCritics?: number | null;
+    metascore?: number | null;
+    malScore?: number | null;
+    malVotes?: number | null;
     credits?: {
         role: "DIRECTOR" | "CREATOR" | "AUTHOR" | "CAST" | "STUDIO";
         character?: string | null;
