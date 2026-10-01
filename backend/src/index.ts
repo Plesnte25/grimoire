@@ -39,6 +39,13 @@ app.use(
             directives: {
                 ...helmet.contentSecurityPolicy.getDefaultDirectives(),
                 "img-src": ["'self'", "data:", "https:"],
+                // Default helmet directive tells browsers to silently retry every
+                // request over HTTPS on the same port. Harmless on the public
+                // site (already HTTPS via Caddy), but it breaks plain-HTTP-only
+                // access paths (e.g. a private Tailscale address with no TLS
+                // cert) — browsers get a CSP-driven scheme upgrade that then
+                // fails against a port that only speaks HTTP.
+                "upgrade-insecure-requests": null,
             },
         },
     })
