@@ -43,7 +43,7 @@ commit once done. Issues are discussed and fixed one at a time.
 
 ### Found while shipping Phase 0 (2026-10-01)
 
-75. **Notes and progress can't be cleared** (low). `PATCH /library/:id` validates `yourNotes`/`progressText` with
+75. ✅ **Done** (`daa95b0`, `4be2080`) — **Notes and progress can't be cleared** (low). `PATCH /library/:id` validates `yourNotes`/`progressText` with
     `nonEmptyString` (`routes/library.ts`), which turns `""` into `undefined`, so emptying the field and saving
     leaves the old text. **Fix:** accept `""`/`null` on PATCH to clear (keep `nonEmptyString` for POST). Folded into
     Phase 2 with typed progress (#17) and reviews/notes (#51).
@@ -62,6 +62,12 @@ commit once done. Issues are discussed and fixed one at a time.
     the user regroup it.
 79. **Co-productions can land in the wrong region** (low). *The Transporter* (English-language, French production
     company) gets `origin_country: FR` → European. Covered by `regionOverride` ("Move to…", #37).
+
+80. ✅ **Fixed** (`daa95b0`, `4be2080`) — **AniList descriptions show raw `<br>` tags** (medium). AniList's
+    `description(asHtml: false)` still returns `<br>`, `<i>` and entities; every anime description showed them.
+    Stripped at display (`lib/text.ts`) and at enrichment (stored text cleaned on the next enrich).
+81. ✅ **Fixed** (`4be2080`) — **Genre chips never showed on the detail page** (low). The page ran `JSON.parse` on
+    `genres`, which the API already returns as an array, so it always fell back to none.
 
 ### Anime pipeline review (2026-10-01)
 
@@ -87,7 +93,7 @@ Findings below are from the local DB (78 anime) and live AniList queries. Decisi
     initialises as `0/null`. AniList's `nextAiringEpisode` gives the aired count.
 15. ✅ **Fixed** (`de565e8`) — **Donghua / Korean anime are mostly ONA** (medium). Grouping accepts only TV/TV_SHORT as mainline, so CN/KR
     series (e.g. *Lord of Mysteries*, CN ONA) can't chain their seasons.
-16. **Dead `pages/Anime.tsx` + `/anime` route** (low). Nothing links to it; it never renders library items. The
+16. ✅ **Fixed** (`4be2080`) — **Dead `pages/Anime.tsx` + `/anime` route** (low). Nothing links to it; it never renders library items. The
     real anime page is `pages/Category.tsx`.
 
 **Fix plan (in order, one commit each, verified against the real library):**
@@ -115,7 +121,7 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
 
 **Shared by all pipelines**
 
-17. **Progress is free text and never initialised correctly** (medium). `SearchModal.add` seeds progress from
+17. ✅ **Done** (`daa95b0`, `4be2080`) — **Progress is free text and never initialised correctly** (medium). `SearchModal.add` seeds progress from
     `details.totalEpisodes ?? details.runtime`, but no provider returns `totalEpisodes` (TMDB returns `episodes`,
     AniList `episodes`), so TV/anime never get a total and movies would get runtime minutes as a "total". Progress
     also doesn't follow status: *Friends* is COMPLETED with progress `0/228`.
@@ -143,7 +149,7 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
 
 **TV**
 
-22. 🟡 **Data stored** (`de565e8`; season/episode picker in Phase 2) — **No seasons/episodes stored** (medium). `tmdbDetails` returns `seasons`/`episodes` but nothing saves them
+22. ✅ **Done** (`de565e8` data, `4be2080` season → episode picker) — **No seasons/episodes stored** (medium). `tmdbDetails` returns `seasons`/`episodes` but nothing saves them
     (`episodes` is null for all 9 shows). **Fix:** store them on add/backfill; a season → episode progress picker from
     TMDB `/tv/{id}/season/{n}`; for airing shows, show `next_episode_to_air` ("S3E5 airs Fri").
 23. TV spinoff grouping (*Young Sheldon* ↔ *Big Bang Theory*): **not planned.** TMDB has no relation data for TV;
@@ -195,7 +201,7 @@ Digital), *Meray Paas Tum Ho*, *Dark* (DE), *Lupin* (FR), *La casa de papel* (ES
 34. **Ratings from a handful of votes** (low). Pakistani dramas have 2–8 TMDB votes (*Meray Paas Tum Ho*: 2), so
     `globalRating` can be a misleading 10.0 or 4.0. **Fix:** show the TMDB rating only at ≥ 20 votes; otherwise
     "Not enough ratings".
-35. **Dubs are separate entries with different episode counts** (low). "Ertugrul Ghazi Urdu" (TMDB 207645) is
+35. 🟡 **Progress-total override done** (`4be2080`; dub badges in search come with Phase 3) — **Dubs are separate entries with different episode counts** (low). "Ertugrul Ghazi Urdu" (TMDB 207645) is
     separate from the Turkish original (66017), and the Urdu dub's episode split doesn't match 150. **Fix:** mark
     dub entries in search results ("Urdu dub" badge when `original_language` ≠ the country's language or the
     title says "Urdu/Dubbed"), and let the progress total be overridden per item (#17).
@@ -311,11 +317,11 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 49. **No critic vs audience split** (medium). Only one source per medium. **Fix:** OMDb (free key, 1,000/day,
     joined via TMDB `external_ids` → IMDb id) adds **IMDb** (audience), **Rotten Tomatoes** and **Metacritic**
     (critics) for movies/TV; Jikan (free, no key) adds the **MyAnimeList** score next to AniList for anime.
-50. **No dates, no rewatches** (high). The schema has only `createdAt`/`updatedAt`, so there's no "started",
+50. ✅ **Done** (`daa95b0`, `4be2080`) — **No dates, no rewatches** (high). The schema has only `createdAt`/`updatedAt`, so there's no "started",
     "finished", or rewatch count. **Fix:** a `WatchLog` table (one row per watch/read: started, finished, rating at
     the time, rewatch flag). The detail page shows the history; a status change to COMPLETED prompts for the finish
     date (defaults to today).
-51. **Review and notes are the same field** (medium). **Fix:** a written **review** (with spoiler flag) per watch,
+51. ✅ **Done** (`daa95b0`, `4be2080`) — **Review and notes are the same field** (medium). **Fix:** a written **review** (with spoiler flag) per watch,
     kept apart from private **notes**.
 52. **No cast/crew/studio** (medium). You can't see or browse "everything by Denis Villeneuve" or "all MAPPA
     anime". **Fix:** store director/creator + top cast (TMDB credits), studio (AniList `studios`), author (#18);
@@ -323,7 +329,7 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 53. ✅ **Fixed** (`53f1e99`) — **Status wording is inconsistent and medium-blind** (low). Raw enums on the detail page ("IN_PROGRESS"),
     "Ongoing" on cards, "Watching" on Category; `MediaCard.prettyStatus` checks `"PLANNING"`, which never exists.
     Books should say Reading / Want to read. **Fix:** one label map per media type.
-54. **Lists are create-only** (medium). No rename, delete, reorder, remove item, or "already in this list"
+54. ✅ **Done** (`daa95b0`, `4be2080`) — **Lists are create-only** (medium). No rename, delete, reorder, remove item, or "already in this list"
     state; "+ Add to …" gives no feedback. **Fix:** full list management, ranked lists with per-item notes.
 55. ✅ **Fixed** (`53f1e99`) — **Delete has no confirmation or undo and is hover-only** (high). The card's delete button is `opacity-0`
     until hover: invisible on phones and to the keyboard, and one click removes the item with its rating/notes.
@@ -356,17 +362,17 @@ serious tracker (Letterboxd / AniList / Trakt / Goodreads) treats as table stake
 63. **Stats & Year in review**: hours watched (runtime × episodes), counts per medium/country/genre/decade, your
     rating distribution, **"you vs the crowd"** (your rating minus the online one: your most contrarian takes),
     favourite directors/studios/countries; a yearly "Grimoire Wrapped" page.
-64. **Diary**: a calendar/heatmap of what you finished each day (from #50), Letterboxd-style.
+64. ✅ **Done** (`daa95b0`, `4be2080`) — **Diary**: a calendar/heatmap of what you finished each day (from #50), Letterboxd-style.
 65. **"What should I watch tonight?"**: picks from your Planned list by time available (runtime / episodes
     left), mood tag, medium, region, language; one tap to start.
-66. **Personal tags & moods**: free tags ("comfort watch", "with family", "rewatchable") + optional mood; usable
+66. ✅ **Done** (`daa95b0`, `4be2080`) — **Personal tags & moods**: free tags ("comfort watch", "with family", "rewatchable") + optional mood; usable
     as filters everywhere.
-67. **Favourites & tier lists**: an all-time Top 10 per medium and drag-and-drop S/A/B/C tiers for a franchise or
+67. ✅ **Done** (`daa95b0`, `4be2080`) — **Favourites & tier lists**: an all-time Top 10 per medium and drag-and-drop S/A/B/C tiers for a franchise or
     genre; shown on Home.
 68. **Taste-based suggestions**: "Because you rated *Dark* 9.5" built from your highest-rated items, their
     creators/studios and countries, not only genres (builds on #36, #57).
 69. **Goals**: yearly targets ("50 films", "12 books", "finish 5 backlog anime") with progress on Home.
-70. **Watch details per log**: where (cinema / Netflix / YouTube), how (sub / dub / original language), with whom.
+70. ✅ **Done** (`daa95b0`, `4be2080`) — **Watch details per log**: where (cinema / Netflix / YouTube), how (sub / dub / original language), with whom.
 71. **Spoiler shield**: blur synopses/episode titles of shows you're mid-way through (pairs with airing updates).
 72. **Rewatch / re-read nudges**: "You rated *Your Name.* 10 three years ago": occasional resurfacing on Home.
 73. **Trailers & where to watch**: TMDB videos (trailer button) and watch providers (where data exists; none for
@@ -397,7 +403,8 @@ Each step: one commit per item, verified against the real library, then deployed
 4. **Server-side enrichment on add** for every provider (C, #19) + **one backfill script** for all types
    (D, #20, #22, #24, credits #52, countries #31).
 
-**Phase 2: tracking core**
+**Phase 2: tracking core** ✅ built + verified end-to-end on a copy of the live data (`daa95b0`, `4be2080`),
+deploy pending
 5. Typed progress (#17) + TV season picker (#22) + progress-total override (#35).
 6. Diary and logging UI: watch history on the detail page, finish-date prompt, reviews (#50, #51, #70);
    **Diary heatmap (#64)**.
