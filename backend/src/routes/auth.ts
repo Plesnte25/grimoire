@@ -206,9 +206,11 @@ authRouter.post(
         const device = existingDevice
             ? await prisma.trustedDevice.update({
                   where: { id: existingDevice.id },
-                  data: { verifiedEmail },
+                  data: { verifiedEmail, userAgent: req.get("user-agent") ?? null },
               })
-            : await prisma.trustedDevice.create({ data: { verifiedEmail } });
+            : await prisma.trustedDevice.create({
+                  data: { verifiedEmail, userAgent: req.get("user-agent") ?? null },
+              });
 
         // A brand-new device just joined an existing account — tell the owner,
         // so a login they didn't make doesn't go unnoticed. Best-effort: a mail
@@ -300,7 +302,11 @@ authRouter.post(
     requireSession,
     asyncHandler(async (req, res) => {
         const data = parseOrThrow(
-            z.object({ currentPin: pinSchema, newPin: pinSchema }),
+            z.object({
+                currentPin: pinSchema,
+                newPin: pinSchema,
+                revokeOtherDevices: z.boolean().optional().default(false),
+            }),
             req.body
         );
 
@@ -315,11 +321,55 @@ authRouter.post(
             where: { id: 1 },
             data: { pinSaltHex: saltHex, pinHashHex: hashHex },
         });
+        const currentSession = await prisma.session.findUnique({
+            where: { id: req.cookies.gr_session },
+            select: { deviceId: true },
+        });
         // A PIN change is the "someone else got in" response, so it ends every
         // other unlocked session; this one stays signed in.
         await prisma.session.deleteMany({ where: { id: { not: req.cookies.gr_session } } });
+        if (data.revokeOtherDevices && currentSession) {
+            await prisma.trustedDevice.deleteMany({ where: { id: { not: currentSession.deviceId } } });
+        }
 
         res.json({ ok: true });
+    })
+);
+
+authRouter.get(
+    "/devices",
+    requireSession,
+    asyncHandler(async (req, res) => {
+        const devices = await prisma.trustedDevice.findMany({
+            orderBy: { lastSeenAt: "desc" },
+            select: { id: true, label: true, userAgent: true, createdAt: true, lastSeenAt: true },
+        });
+        res.json({
+            devices: devices.map((device) => ({
+                ...device,
+                isCurrent: device.id === req.cookies?.gr_device,
+            })),
+        });
+    })
+);
+
+authRouter.delete(
+    "/devices/:deviceId",
+    requireSession,
+    asyncHandler(async (req, res) => {
+        const { deviceId } = parseOrThrow(z.object({ deviceId: z.string().min(1) }), req.params);
+        const device = await prisma.trustedDevice.findUnique({ where: { id: deviceId } });
+        if (!device) throw httpError(404, "DEVICE_NOT_FOUND", "Trusted device not found");
+        await prisma.$transaction([
+            prisma.session.deleteMany({ where: { deviceId } }),
+            prisma.trustedDevice.delete({ where: { id: deviceId } }),
+        ]);
+        const isCurrent = deviceId === req.cookies?.gr_device;
+        if (isCurrent) {
+            res.clearCookie("gr_device", { path: "/" });
+            res.clearCookie("gr_session", { path: "/" });
+        }
+        res.json({ ok: true, isCurrent });
     })
 );
 

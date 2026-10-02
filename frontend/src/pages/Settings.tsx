@@ -3,8 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchAccountPreferences,
+  fetchTrustedDevices,
   setAccountPin,
   lock,
+  revokeTrustedDevice,
   updateAccountPreferences,
 } from "../app/api";
 import { useTheme } from "../app/ThemeProvider";
@@ -25,6 +27,7 @@ export function Settings() {
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
+  const [revokeOtherDevices, setRevokeOtherDevices] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -32,6 +35,20 @@ export function Settings() {
   const { data: preferences, isLoading: preferencesLoading, isError: preferencesLoadError } = useQuery({
     queryKey: ["account-preferences"],
     queryFn: fetchAccountPreferences,
+  });
+  const {
+    data: devices = [],
+    isLoading: devicesLoading,
+    isError: devicesError,
+    refetch: refetchDevices,
+  } = useQuery({ queryKey: ["trusted-devices"], queryFn: fetchTrustedDevices });
+  const deviceMutation = useMutation({
+    mutationFn: revokeTrustedDevice,
+    onSuccess: async ({ isCurrent }) => {
+      await refetchDevices();
+      if (isCurrent) window.location.reload();
+    },
+    onError: (e: any) => setError(e?.response?.data?.error ?? "Could not revoke this device"),
   });
   const browserRegion = browserCountry();
   const [watchCountryDraft, setWatchCountryDraft] = useState("");
@@ -54,10 +71,11 @@ export function Settings() {
     if (newPin !== confirmPin) return setError("New PINs don't match");
     setBusy(true);
     try {
-      await setAccountPin(currentPin, newPin);
+      await setAccountPin(currentPin, newPin, revokeOtherDevices);
       setCurrentPin("");
       setNewPin("");
       setConfirmPin("");
+      setRevokeOtherDevices(false);
       setSuccess(true);
     } catch (e: any) {
       setError(e?.response?.data?.error ?? "Could not change PIN");
@@ -210,6 +228,15 @@ export function Settings() {
         <input id="confirm-pin" type="password" autoComplete="new-password"
           className="mt-1 min-h-11 w-full rounded-xl border border-[var(--line2)] bg-[var(--bg)] px-3 text-sm text-[var(--tx)]"
           value={confirmPin} onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" />
+        <label className="mt-3 flex min-h-11 items-center gap-3 text-sm text-[var(--tx2)]">
+          <input
+            type="checkbox"
+            checked={revokeOtherDevices}
+            onChange={(event) => setRevokeOtherDevices(event.target.checked)}
+            className="h-5 w-5 accent-[var(--accbg)]"
+          />
+          Also revoke every other trusted device
+        </label>
         {error && <div role="alert" className="mt-2 text-sm text-[var(--err)]">{error}</div>}
         {success && <div role="status" className="mt-2 text-sm text-[var(--ok)]">PIN changed.</div>}
         <button
@@ -220,6 +247,42 @@ export function Settings() {
           {busy ? "Changing…" : "Change PIN"}
         </button>
       </div>
+
+      <section className="surface-card mt-4 rounded-[var(--radius-panel)] p-4 md:p-5" aria-labelledby="devices-heading">
+        <h2 id="devices-heading" className="font-semibold">Trusted devices</h2>
+        <p className="mt-1 text-sm text-[var(--tx3)]">Remove a device you no longer use. It will need email verification to sign in again.</p>
+        {devicesLoading ? <p className="mt-4 text-sm text-[var(--tx3)]">Loading devices…</p> : null}
+        {devicesError ? <p role="alert" className="mt-4 text-sm text-[var(--err)]">Could not load trusted devices.</p> : null}
+        {devices.length ? (
+          <ul className="mt-4 divide-y divide-[var(--line)]">
+            {devices.map((device) => {
+              const browser = /Edg\//.test(device.userAgent ?? "") ? "Edge"
+                : /Firefox\//.test(device.userAgent ?? "") ? "Firefox"
+                  : /Chrome\//.test(device.userAgent ?? "") ? "Chrome"
+                    : /Safari\//.test(device.userAgent ?? "") ? "Safari"
+                      : "Unknown browser";
+              return (
+                <li key={device.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{device.label || browser}{device.isCurrent ? " · This device" : ""}</p>
+                    <p className="mt-1 text-xs text-[var(--tx3)]">
+                      First seen {new Date(device.createdAt).toLocaleDateString()} · Last active {new Date(device.lastSeenAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={deviceMutation.isPending}
+                    onClick={() => deviceMutation.mutate(device.id)}
+                    className="min-h-11 rounded-xl border border-[var(--line2)] px-3 text-sm text-[var(--err)] hover:bg-[var(--s2)] disabled:opacity-50"
+                  >
+                    {deviceMutation.isPending ? "Revoking…" : "Revoke"}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : !devicesLoading && !devicesError ? <p className="mt-4 text-sm text-[var(--tx3)]">No trusted devices found.</p> : null}
+      </section>
 
       <div className="surface-card mt-4 rounded-[var(--radius-panel)] p-4 md:p-5">
         <div className="font-semibold">This device</div>

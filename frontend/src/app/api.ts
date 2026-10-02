@@ -1,7 +1,7 @@
 import axios from "axios";
 import type {
     AccountPreferences, MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
-    CatalogEntry,
+    CatalogEntry, Episode, TrustedDevice,
 } from "../types";
 
 const API_BASE =
@@ -46,8 +46,18 @@ export async function lock() {
     await api.post("/api/auth/lock");
 }
 
-export async function setAccountPin(currentPin: string, newPin: string) {
-    await api.post("/api/auth/pin", { currentPin, newPin });
+export async function setAccountPin(currentPin: string, newPin: string, revokeOtherDevices = false) {
+    await api.post("/api/auth/pin", { currentPin, newPin, revokeOtherDevices });
+}
+
+export async function fetchTrustedDevices(): Promise<TrustedDevice[]> {
+    const res = await api.get("/api/auth/devices");
+    return res.data.devices;
+}
+
+export async function revokeTrustedDevice(id: string): Promise<{ isCurrent: boolean }> {
+    const res = await api.delete(`/api/auth/devices/${encodeURIComponent(id)}`);
+    return res.data;
 }
 
 export async function fetchAccountPreferences(): Promise<AccountPreferences> {
@@ -265,6 +275,11 @@ export async function fetchDiary(year: number): Promise<DiaryLog[]> {
 export async function fetchSeasons(mediaId: string): Promise<Season[]> {
     const res = await api.get(`/api/library/${mediaId}/seasons`);
     return res.data.seasons;
+}
+
+export async function fetchEpisodes(mediaId: string, season: number): Promise<{ episodes: Episode[]; available: boolean }> {
+    const res = await api.get(`/api/library/${mediaId}/seasons/${season}/episodes`);
+    return res.data;
 }
 
 // --- Tags ---

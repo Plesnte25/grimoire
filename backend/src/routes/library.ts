@@ -168,6 +168,83 @@ libraryRouter.get(
 );
 
 libraryRouter.get(
+    "/:id/seasons/:season/episodes",
+    asyncHandler(async (req, res) => {
+        const { season } = parseOrThrow(
+            z.object({ season: z.coerce.number().int().min(1).max(100) }),
+            req.params
+        );
+        const item = await prisma.mediaItem.findUnique({ where: { id: req.params.id } });
+        if (!item) return res.status(404).json({ error: "Not found" });
+        if (item.mediaType !== "TV" && item.mediaType !== "ANIME") {
+            return res.json({ episodes: [], available: false });
+        }
+
+        const cached = await prisma.episode.findMany({
+            where: { mediaId: item.id, seasonNumber: season },
+            orderBy: { episodeNumber: "asc" },
+        });
+        const cacheStatus = await prisma.episodeSeasonCache.findUnique({
+            where: { mediaId_seasonNumber: { mediaId: item.id, seasonNumber: season } },
+        });
+        if (cacheStatus && Date.now() - cacheStatus.checkedAt.getTime() < 7 * 24 * 60 * 60 * 1000) {
+            return res.json({ episodes: cached, available: true });
+        }
+        const tmdbId = item.provider === "tmdb" && item.mediaType === "TV"
+            ? item.providerId
+            : item.tmdbId && item.tmdbMediaType === "TV"
+              ? item.tmdbId
+              : null;
+        if (!tmdbId) return res.json({ episodes: cached, available: cached.length > 0 });
+
+        const remote = await tmdbGet<{
+            episodes?: {
+                episode_number: number;
+                name?: string;
+                overview?: string;
+                air_date?: string;
+                runtime?: number;
+                still_path?: string;
+            }[];
+        }>(`/tv/${tmdbId}/season/${season}`);
+        if (!remote || !Array.isArray(remote.episodes)) {
+            return res.json({ episodes: cached, available: cached.length > 0 });
+        }
+
+        const rows = remote.episodes
+            .filter((episode) => Number.isInteger(episode.episode_number) && episode.episode_number > 0)
+            .map((episode) => ({
+                mediaId: item.id,
+                seasonNumber: season,
+                episodeNumber: episode.episode_number,
+                name: String(episode.name || `Episode ${episode.episode_number}`),
+                overview: episode.overview || null,
+                airDate: episode.air_date && /^\d{4}-\d{2}-\d{2}$/.test(episode.air_date)
+                    ? new Date(`${episode.air_date}T00:00:00.000Z`)
+                    : null,
+                runtime: Number.isInteger(episode.runtime) ? episode.runtime : null,
+                stillUrl: episode.still_path
+                    ? `https://image.tmdb.org/t/p/w300${episode.still_path}`
+                    : null,
+            }));
+        await prisma.$transaction(async (tx) => {
+            await tx.episode.deleteMany({ where: { mediaId: item.id, seasonNumber: season } });
+            await tx.episode.createMany({ data: rows });
+            await tx.episodeSeasonCache.upsert({
+                where: { mediaId_seasonNumber: { mediaId: item.id, seasonNumber: season } },
+                create: { mediaId: item.id, seasonNumber: season },
+                update: { checkedAt: new Date() },
+            });
+        });
+        const episodes = await prisma.episode.findMany({
+            where: { mediaId: item.id, seasonNumber: season },
+            orderBy: { episodeNumber: "asc" },
+        });
+        res.json({ episodes, available: true });
+    })
+);
+
+libraryRouter.get(
     "/:id",
     asyncHandler(async (req, res) => {
         const include = {

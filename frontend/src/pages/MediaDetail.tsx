@@ -32,6 +32,7 @@ import { plainText } from "../lib/text";
 import { REGIONS, REGION_LABEL, countryName } from "../lib/regions";
 import { ManualDetailsEditor } from "../components/ManualDetailsEditor";
 import { CountryFlag } from "../components/CountryFlag";
+import { EpisodeGuide } from "../components/EpisodeGuide";
 
 const TYPE_LABEL = { MOVIE: "Movie", TV: "TV", ANIME: "Anime", BOOK: "Book" } as const;
 const CREATOR_LABEL = { MOVIE: "Directed by", TV: "Created by", ANIME: "Studio", BOOK: "By" } as const;
@@ -55,12 +56,19 @@ export function MediaDetail() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [logEditor, setLogEditor] = useState<LogEditor>(null);
   const [posterAccent, setPosterAccent] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<"overview" | "episodes">("overview");
+  const [descriptionRevealed, setDescriptionRevealed] = useState(false);
 
   // Sync the notes draft from the loaded item so saving without editing keeps
   // the real value instead of overwriting it.
   useEffect(() => {
     if (item) setNotes(item.yourNotes ?? "");
   }, [item?.id, item?.yourNotes]);
+
+  useEffect(() => {
+    setDetailTab("overview");
+    setDescriptionRevealed(false);
+  }, [item?.id]);
 
   useEffect(() => {
     setPosterAccent(null);
@@ -323,7 +331,45 @@ export function MediaDetail() {
             </ul>
           ) : null}
 
-          {item.description ? (
+          {item.mediaType === "TV" || item.mediaType === "ANIME" ? (
+            <div className="space-y-4">
+              <div className="flex gap-2 border-b border-[var(--line)]" role="tablist" aria-label="Title details">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={detailTab === "overview"}
+                  className={`min-h-11 border-b-2 px-3 text-sm ${detailTab === "overview" ? "border-[var(--acc)] text-[var(--tx)]" : "border-transparent text-[var(--tx3)]"}`}
+                  onClick={() => setDetailTab("overview")}
+                >
+                  Overview
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={detailTab === "episodes"}
+                  className={`min-h-11 border-b-2 px-3 text-sm ${detailTab === "episodes" ? "border-[var(--acc)] text-[var(--tx)]" : "border-transparent text-[var(--tx3)]"}`}
+                  onClick={() => setDetailTab("episodes")}
+                >
+                  Episodes
+                </button>
+              </div>
+              {detailTab === "episodes" ? (
+                <EpisodeGuide item={item} shieldSpoilers={preferences?.spoilerShield ?? true} />
+              ) : item.description ? (
+                <div>
+                  <h2 className="text-sm font-semibold">Description</h2>
+                  <p className={`mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--tx2)] ${preferences?.spoilerShield !== false && item.status !== "COMPLETED" && !descriptionRevealed ? "select-none blur-sm" : ""}`}>
+                    {plainText(item.description)}
+                  </p>
+                  {preferences?.spoilerShield !== false && item.status !== "COMPLETED" && !descriptionRevealed ? (
+                    <button type="button" className="mt-2 min-h-11 text-xs font-semibold text-[var(--acc)] underline underline-offset-2" onClick={() => setDescriptionRevealed(true)}>
+                      Reveal description
+                    </button>
+                  ) : null}
+                </div>
+              ) : <p className="text-sm text-[var(--tx3)]">No description is available.</p>}
+            </div>
+          ) : item.description ? (
             <div>
               <h2 className="text-sm font-semibold">Description</h2>
               <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--tx2)]">{plainText(item.description)}</p>

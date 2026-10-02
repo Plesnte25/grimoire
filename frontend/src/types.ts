@@ -147,6 +147,26 @@ export type DiaryLog = WatchLog & {
 
 export type Season = { season: number; name: string; episodes: number; airDate: string | null };
 
+export type Episode = {
+    id: string;
+    seasonNumber: number;
+    episodeNumber: number;
+    name: string;
+    overview?: string | null;
+    airDate?: string | null;
+    runtime?: number | null;
+    stillUrl?: string | null;
+};
+
+export type TrustedDevice = {
+    id: string;
+    label?: string | null;
+    userAgent?: string | null;
+    createdAt: string;
+    lastSeenAt: string;
+    isCurrent: boolean;
+};
+
 export type Tier = "S" | "A" | "B" | "C" | "D";
 
 export type TierList = {
