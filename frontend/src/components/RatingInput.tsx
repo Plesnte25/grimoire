@@ -73,7 +73,7 @@ export function RatingInput({
         aria-valuemax={MAX}
         aria-valuenow={draft ?? 0}
         aria-valuetext={draft == null ? "Not rated" : `${formatScore(draft)} out of 10`}
-        className="flex cursor-pointer select-none rounded-lg py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        className="flex min-h-11 cursor-pointer select-none items-center gap-1 rounded-lg py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         onKeyDown={onKeyDown}
         onPointerMove={(e) => e.pointerType === "mouse" && setHover(fromPointer(e))}
         onPointerLeave={() => setHover(null)}
@@ -81,17 +81,8 @@ export function RatingInput({
       >
         {Array.from({ length: MAX }, (_, i) => {
           const fill = Math.min(Math.max(shown - i, 0), 1);
-          return (
-            <span key={i} aria-hidden="true" className="relative inline-block w-[1em] text-2xl leading-none">
-              <span className="text-white/25">★</span>
-              <span
-                className="absolute inset-0 overflow-hidden text-amber-300"
-                style={{ width: `${fill * 100}%` }}
-              >
-                ★
-              </span>
-            </span>
-          );
+          const state = fill >= 1 ? "full" : fill > 0 ? "half" : "empty";
+          return <span key={i} aria-hidden="true" className="rating-cell flex-1" data-fill={state} />;
         })}
       </div>
       <span className="text-sm tabular-nums" aria-hidden="true">
@@ -100,7 +91,7 @@ export function RatingInput({
       {draft != null ? (
         <button
           type="button"
-          className="text-sm underline underline-offset-2 opacity-80 hover:opacity-100"
+          className="min-h-11 px-2 text-sm text-[var(--acc)] underline underline-offset-2"
           onClick={() => commit(null)}
         >
           Clear

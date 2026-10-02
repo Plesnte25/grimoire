@@ -1,18 +1,29 @@
 /* Tailwind PostCSS entry (kept in .pcss to avoid unknown at-rule linting) */
+@import "./tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: var(--err);
 }
 
 body {
-  margin: 0;
-  background: #0b0b10;
-  color: #eaeaf2;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-    Helvetica, Arial;
+  min-width: 320px;
 }
 
 * {
@@ -25,16 +36,6 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Utility to hide native scrollbars while keeping scrolling functional */
-.hide-scrollbar {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
-}
-.hide-scrollbar::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
-}
-
-/* Utility to hide native scrollbars while keeping scrolling functional */
 .hide-scrollbar {
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
@@ -49,4 +50,118 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+[class~="text-white"] {
+  color: var(--tx);
+}
+
+[class~="text-white/95"] { color: color-mix(in srgb, var(--tx) 95%, transparent); }
+[class~="text-white/90"] { color: color-mix(in srgb, var(--tx) 90%, transparent); }
+[class~="text-white/85"] { color: color-mix(in srgb, var(--tx) 85%, transparent); }
+[class~="text-white/80"] { color: color-mix(in srgb, var(--tx) 80%, transparent); }
+[class~="text-white/75"] { color: color-mix(in srgb, var(--tx) 75%, transparent); }
+[class~="text-white/70"] { color: color-mix(in srgb, var(--tx) 70%, transparent); }
+[class~="text-white/60"] { color: color-mix(in srgb, var(--tx) 60%, transparent); }
+[class~="text-white/50"] { color: color-mix(in srgb, var(--tx) 50%, transparent); }
+
+[class~="bg-white/5"],
+[class~="bg-white/10"] { background-color: var(--s1); }
+[class~="bg-white/12"],
+[class~="bg-white/15"],
+[class~="bg-white/20"] { background-color: var(--s2); }
+[class~="hover:bg-white/10"]:hover,
+[class~="hover:bg-white/12"]:hover,
+[class~="hover:bg-white/15"]:hover,
+[class~="hover:bg-white/18"]:hover { background-color: var(--s3); }
+
+[class~="border-white/10"] { border-color: var(--line); }
+[class~="border-white/15"],
+[class~="border-white/20"] { border-color: var(--line2); }
+
+.surface-card {
+  background: var(--s1);
+  border: 1px solid var(--line);
+}
+
+.surface-raised {
+  background: var(--s2);
+  border: 1px solid var(--line);
+}
+
+.app-sidebar {
+  background: var(--s1);
+  border-right: 1px solid var(--line);
+}
+
+.app-nav-link {
+  min-height: 2.75rem;
+  color: var(--tx2);
+  transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+
+.app-nav-link:hover,
+.app-nav-link[aria-current="page"] {
+  background: var(--s2);
+  color: var(--tx);
+}
+
+.app-nav-link[aria-current="page"] .material-symbols-rounded {
+  color: var(--acc);
+}
+
+.rating-cell {
+  min-width: 0.75rem;
+  height: 1.5rem;
+  border-radius: var(--radius-badge);
+  background: var(--line2);
+}
+
+.rating-cell[data-fill="full"] {
+  background: var(--you);
+}
+
+.rating-cell[data-fill="half"] {
+  background: linear-gradient(90deg, var(--you) 50%, var(--line2) 50%);
+}
+
+.detail-hero {
+  --poster-accent: transparent;
+}
+
+.detail-hero::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--poster-accent) 55%, transparent),
+    transparent 68%
+  );
+}
+
+.detail-hero-shade {
+  background: linear-gradient(
+    to top,
+    var(--bg),
+    color-mix(in srgb, var(--bg) 56%, transparent),
+    transparent
+  );
+}
+
+.catalog-banner-shade {
+  background: linear-gradient(
+    to top,
+    var(--bg),
+    color-mix(in srgb, var(--bg) 58%, transparent),
+    transparent
+  );
+}
+
+@media (max-width: 767px) {
+  .app-main {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
 }

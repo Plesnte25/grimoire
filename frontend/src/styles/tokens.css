@@ -1,0 +1,224 @@
+:root {
+  color-scheme: dark;
+  --bg: oklch(15.21% 0.0107 285.1);
+  --s1: oklch(18.96% 0.0202 293.5);
+  --s2: oklch(23.71% 0.0473 291.6);
+  --s3: oklch(28.43% 0.0595 290.5);
+  --line: oklch(96.45% 0.0189 295.9 / 11%);
+  --line2: oklch(96.45% 0.0189 295.9 / 22%);
+  --tx: oklch(96.45% 0.0189 295.9);
+  --tx2: oklch(81.45% 0.0491 293.1);
+  --tx3: oklch(69.46% 0.0643 291.9);
+  --acc: oklch(74.27% 0.12 290.3);
+  --accbg: oklch(39.36% 0.1048 288.5);
+  --acc-ink: oklch(100% 0 0);
+  --you: oklch(81.64% 0.1081 336.6);
+  --youbg: oklch(81.64% 0.1081 336.6 / 13%);
+  --ok: oklch(82.55% 0.1035 160.9);
+  --warn: oklch(84.33% 0.1178 81.9);
+  --err: oklch(79.03% 0.1213 20.1);
+  --scrim: oklch(12% 0.015 290 / 72%);
+  --heat-1: oklch(39% 0.085 286);
+  --heat-2: oklch(51% 0.105 286);
+  --heat-3: oklch(65% 0.12 286);
+  --heat-4: oklch(83% 0.095 286);
+  --tier-s: oklch(78% 0.13 350);
+  --tier-a: oklch(79% 0.11 300);
+  --tier-b: oklch(68% 0.13 285);
+  --tier-c: oklch(49% 0.09 285);
+  --tier-d: oklch(34% 0.06 285);
+  --tier-ink: oklch(15.21% 0.0107 285.1);
+
+  --font-display: "Newsreader Variable", Georgia, serif;
+  --font-body: "Hanken Grotesk Variable", "Noto Sans JP Variable", "Noto Sans KR Variable",
+    "Noto Sans SC Variable", "Noto Nastaliq Urdu", system-ui, sans-serif;
+  --font-icons: "Material Symbols Rounded";
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  --radius-badge: 0.375rem;
+  --radius-poster: 0.625rem;
+  --radius-button: 0.75rem;
+  --radius-card: 1rem;
+  --radius-panel: 1.25rem;
+  --radius-dialog: 1.375rem;
+  --radius-pill: 999px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 120ms;
+  --dur-short: 220ms;
+  --dur-dialog: 280ms;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: oklch(97.07% 0.0095 299.2);
+  --s1: oklch(100% 0 0);
+  --s2: oklch(93.88% 0.0218 297.4);
+  --s3: oklch(89.18% 0.0359 296.2);
+  --line: oklch(18.96% 0.0202 293.5 / 12%);
+  --line2: oklch(18.96% 0.0202 293.5 / 24%);
+  --tx: oklch(15.21% 0.0107 285.1);
+  --tx2: oklch(34% 0.04 291);
+  --tx3: oklch(48% 0.05 291);
+  --acc: oklch(39.36% 0.1048 288.5);
+  --accbg: oklch(39.36% 0.1048 288.5);
+  --acc-ink: oklch(100% 0 0);
+  --you: oklch(50.83% 0.1668 345);
+  --youbg: oklch(50.83% 0.1668 345 / 12%);
+  --ok: oklch(46% 0.11 160.9);
+  --warn: oklch(48% 0.11 81.9);
+  --err: oklch(50% 0.16 25);
+  --scrim: oklch(12% 0.015 290 / 50%);
+  --heat-1: oklch(88% 0.04 290);
+  --heat-2: oklch(76% 0.085 290);
+  --heat-3: oklch(62% 0.12 290);
+  --heat-4: oklch(45% 0.13 290);
+  --tier-s: oklch(76% 0.12 350);
+  --tier-a: oklch(73% 0.095 300);
+  --tier-b: oklch(62% 0.12 285);
+  --tier-c: oklch(48% 0.10 285);
+  --tier-d: oklch(35% 0.07 285);
+  --tier-ink: oklch(100% 0 0);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--font-body);
+  font-size: var(--text-scale, 100%);
+  overflow-x: clip;
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a,
+[role="button"],
+[role="slider"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 3px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  border-color: var(--acc);
+}
+
+.surface-card {
+  background: var(--s1);
+  border: 1px solid var(--line);
+}
+
+.surface-raised {
+  background: var(--s2);
+  border: 1px solid var(--line);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+[lang^="ja"] {
+  font-family: "Noto Sans JP Variable", var(--font-body);
+}
+
+[lang^="ko"] {
+  font-family: "Noto Sans KR Variable", var(--font-body);
+}
+
+[lang^="zh"] {
+  font-family: "Noto Sans SC Variable", var(--font-body);
+}
+
+[lang="ur"] {
+  font-family: "Noto Nastaliq Urdu", var(--font-body);
+}
+
+.material-symbols-rounded {
+  font-family: var(--font-icons);
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: "liga";
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:root[data-reduced-motion="true"] *,
+:root[data-reduced-motion="true"] *::before,
+:root[data-reduced-motion="true"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --page-gutter: 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --page-gutter: 2.5rem;
+  }
+}

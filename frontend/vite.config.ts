@@ -22,6 +22,29 @@ export default defineConfig({
         VitePWA({
             registerType: "autoUpdate",
             includeAssets: ["favicon.svg"],
+            workbox: {
+                globIgnores: ["**/noto-sans-*.woff2"],
+                runtimeCaching: [
+                    {
+                        urlPattern: /\/assets\/noto-sans-.*\.woff2$/,
+                        handler: "CacheFirst",
+                        options: {
+                            cacheName: "grimoire-script-fonts",
+                            expiration: { maxEntries: 256, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                            cacheableResponse: { statuses: [0, 200] },
+                        },
+                    },
+                    {
+                        urlPattern: /\/assets\/[a-z]{2}-[A-Za-z0-9_-]+\.svg$/,
+                        handler: "CacheFirst",
+                        options: {
+                            cacheName: "grimoire-country-flags",
+                            expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 365 },
+                            cacheableResponse: { statuses: [0, 200] },
+                        },
+                    },
+                ],
+            },
             manifest: {
                 name: "Grimoire",
                 short_name: "Grimoire",
