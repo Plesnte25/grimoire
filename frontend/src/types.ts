@@ -207,6 +207,18 @@ export type WatchProvider = {
 
 export type Trailer = { id: string; name: string; type: string; url: string };
 
+export type YearStats = {
+    year: number;
+    finishedLogCount: number;
+    completedTitleCount: number;
+    monthly: number[];
+    ratingDistribution: { rating: number; count: number }[];
+    averagePersonalRating: number | null;
+    averageProviderRating: number | null;
+    countries: { country: string; count: number }[];
+    mediaTypes: { mediaType: MediaType; count: number }[];
+};
+
 export type Tier = "S" | "A" | "B" | "C" | "D";
 
 export type TierList = {

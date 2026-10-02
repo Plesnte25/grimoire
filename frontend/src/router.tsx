@@ -12,6 +12,7 @@ import { CollectionPage } from "./pages/CollectionPage";
 import { ContributorPage } from "./pages/ContributorPage";
 import { Library } from "./pages/Library";
 import { You } from "./pages/You";
+import { Stats } from "./pages/Stats";
 import { AppShell } from "./components/AppShell";
 import { PasscodeGate } from "./components/PasscodeGate";
 
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
           { path: "/", element: <Home /> },
           { path: "/library", element: <Library /> },
           { path: "/you", element: <You /> },
+          { path: "/stats", element: <Stats /> },
           { path: "/category/:type", element: <Category /> },
           { path: "/region/:key", element: <Category /> },
           { path: "/media/:id", element: <MediaDetail /> },

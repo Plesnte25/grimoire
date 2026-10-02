@@ -7,6 +7,7 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { tmdbDiscoverByGenres } from "../services/providers/tmdb.js";
 import { anilistDiscoverByGenres } from "../services/providers/anilist.js";
 import { googleBooksSearch } from "../services/providers/googleBooks.js";
+import { regionForCountry } from "../lib/regions.js";
 
 export const suggestionsRouter = Router();
 
@@ -61,7 +62,8 @@ function pickTopGenres(items: any[], max = 6): string[] {
     for (const it of items) {
         for (const g of safeParseGenres(it.genres)) {
             const key = String(g);
-            freq.set(key, (freq.get(key) ?? 0) + 1);
+            const weight = typeof it.yourRating === "number" ? Math.max(0.25, it.yourRating / 10) : 1;
+            freq.set(key, (freq.get(key) ?? 0) + weight);
         }
     }
     return [...freq.entries()]
@@ -143,6 +145,9 @@ suggestionsRouter.get("/", asyncHandler(async (req, res) => {
             backdropUrl: true,
             globalRating: true,
             globalRatingText: true,
+            yourRating: true,
+            isAdult: true,
+            countryOfOrigin: true,
             description: true,
             createdAt: true,
             updatedAt: true,
@@ -155,6 +160,19 @@ suggestionsRouter.get("/", asyncHandler(async (req, res) => {
 
     const inProgress = library.filter((x) => x.status === "IN_PROGRESS").slice(0, 12);
     const topGenres = pickTopGenres(library, 6);
+    const account = await prisma.accountConfig.findUnique({
+        where: { id: 1 },
+        select: { showAdultContent: true, watchCountry: true },
+    });
+    const preferredRegion = regionForCountry(account?.watchCountry);
+    const visibleResults = (results: any[]) => results
+        .filter((result) => account?.showAdultContent || !result.isAdult)
+        .sort((a, b) => {
+            if (!preferredRegion) return 0;
+            const aPreferred = regionForCountry(a.countryOfOrigin) === preferredRegion ? 1 : 0;
+            const bPreferred = regionForCountry(b.countryOfOrigin) === preferredRegion ? 1 : 0;
+            return bPreferred - aPreferred;
+        });
 
     // Shuffle top genres deterministically
     const shuffledTop = seededShuffle(topGenres, rand);
@@ -168,6 +186,19 @@ suggestionsRouter.get("/", asyncHandler(async (req, res) => {
     const cachedBecause = isExplicitRefresh ? null : sugGet(cacheKey);
 
     let becauseYouLike: any[] = [];
+    if (cachedBecause !== null) {
+        becauseYouLike = cachedBecause;
+        const visible = visibleResults(becauseYouLike);
+        return res.json({
+            cursor,
+            seed: seedNum,
+            inProgress,
+            becauseYouLike: visible,
+            nudge: [],
+            topGenres,
+            results: visible,
+        });
+    }
 
     try {
         if (mediaType === "MOVIE" || mediaType === "TV") {
@@ -221,15 +252,16 @@ suggestionsRouter.get("/", asyncHandler(async (req, res) => {
         becauseYouLike = cachedBecause ?? [];
     }
 
+    const visible = visibleResults(becauseYouLike);
     res.json({
         cursor,
         seed: seedNum,
         inProgress,
-        becauseYouLike,
+        becauseYouLike: visible,
         nudge: [],
         topGenres,
         // optional aggregate (helps frontend compatibility)
-        results: becauseYouLike,
+        results: visible,
     });
 }));
 

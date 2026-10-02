@@ -57,6 +57,10 @@ export function You() {
 
       <section className="mt-10" aria-labelledby="account-heading">
         <h2 id="account-heading" className="font-display text-2xl font-medium">Account</h2>
+        <Link to="/stats" className="surface-card mt-4 flex min-h-16 items-center justify-between rounded-[var(--radius-card)] px-4 py-3 text-sm no-underline">
+          <span className="text-[var(--tx)]">Grimoire Wrapped</span>
+          <span aria-hidden="true" className="text-[var(--acc)]">→</span>
+        </Link>
         <Link to="/settings" className="surface-card mt-4 flex min-h-16 items-center justify-between rounded-[var(--radius-card)] px-4 py-3 text-sm no-underline">
           <span className="text-[var(--tx)]">Settings and appearance</span>
           <span aria-hidden="true" className="text-[var(--acc)]">→</span>

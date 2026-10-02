@@ -21,6 +21,7 @@ import { providersRouter } from "./routes/providers.js";
 import suggestionsRouter from "./routes/suggestions.js";
 import { authRouter } from "./routes/auth.js";
 import { homeRouter } from "./routes/home.js";
+import { statsRouter } from "./routes/stats.js";
 import { requireSession } from "./middleware/requireSession.js";
 import { scheduleDailyMetadataRefresh } from "./services/dailyRefresh.js";
 
@@ -62,6 +63,7 @@ app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 app.use("/api/auth", authRouter);
 
 app.use("/api/home", requireSession, homeRouter);
+app.use("/api/stats", requireSession, statsRouter);
 app.use("/api/providers", requireSession, providersRouter);
 app.use("/api/library", requireSession, libraryRouter);
 app.use("/api/lists", requireSession, listsRouter);

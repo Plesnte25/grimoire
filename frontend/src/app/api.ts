@@ -1,7 +1,7 @@
 import axios from "axios";
 import type {
     AccountPreferences, MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
-    CatalogEntry, Episode, TrustedDevice, HomeSnapshot, WatchProvider, Trailer,
+    CatalogEntry, Episode, TrustedDevice, HomeSnapshot, WatchProvider, Trailer, YearStats,
 } from "../types";
 
 const API_BASE =
@@ -80,6 +80,11 @@ export async function deleteReminder(mediaId: string) {
 export async function setAnnualGoal(year: number, scope: "ALL" | MediaType, target: number) {
     const res = await api.put(`/api/home/goals/${year}/${scope}`, { target });
     return res.data.goal;
+}
+
+export async function fetchYearStats(year: number): Promise<YearStats> {
+    const res = await api.get("/api/stats/year", { params: { year } });
+    return res.data;
 }
 
 export async function fetchAccountPreferences(): Promise<AccountPreferences> {
