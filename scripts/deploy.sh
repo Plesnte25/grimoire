@@ -59,6 +59,6 @@ remote_command="cd $remote_dir &&
   npx prisma migrate deploy &&
   sudo systemctl restart grimoire &&
   sudo systemctl is-active --quiet grimoire &&
-  curl --fail --silent --show-error http://127.0.0.1:5050/health"
+  curl --fail --silent --show-error --retry 30 --retry-connrefused --retry-delay 1 --retry-max-time 30 http://127.0.0.1:5050/health"
 
 gcloud compute ssh "$instance" --zone "$zone" --project "$project" --command "$remote_command"
