@@ -8,6 +8,15 @@ function day(iso?: string | null) {
   return iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
 }
 
+function ordinal(value: number) {
+  const remainder = value % 100;
+  if (remainder >= 11 && remainder <= 13) return `${value}th`;
+  if (value % 10 === 1) return `${value}st`;
+  if (value % 10 === 2) return `${value}nd`;
+  if (value % 10 === 3) return `${value}rd`;
+  return `${value}th`;
+}
+
 function Review({ log }: { log: WatchLog }) {
   const [revealed, setRevealed] = useState(false);
   if (!log.review) return null;
@@ -37,6 +46,13 @@ export function HistorySection({
   onEdit: (log: WatchLog) => void;
 }) {
   const isBook = mediaType === "BOOK";
+  const watchOrder = new Map(
+    logs
+      .filter((log) => log.finishedAt)
+      .slice()
+      .sort((a, b) => (a.finishedAt ?? "").localeCompare(b.finishedAt ?? ""))
+      .map((log, index) => [log.id, index + 1] as const),
+  );
   return (
     <section aria-labelledby="history-heading" className="space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -56,13 +72,17 @@ export function HistorySection({
             const started = day(log.startedAt);
             const facts = [
               log.rating != null ? `Rated ${formatScore(log.rating)}` : null,
-              log.isRewatch ? (isBook ? "Re-read" : "Rewatch") : null,
+              log.isRewatch ? (isBook ? "Re-read" : `Rewatch · ${ordinal(watchOrder.get(log.id) ?? 2)}`) : null,
+              log.label,
+              log.fromEpisode != null || log.toEpisode != null
+                ? `Ep ${log.fromEpisode ?? log.toEpisode}${log.toEpisode != null && log.toEpisode !== log.fromEpisode ? ` → ${log.toEpisode}` : ""}`
+                : null,
               log.watchedOn,
               log.watchMode ? MODE_LABEL[log.watchMode] : null,
               log.watchedWith ? `with ${log.watchedWith}` : null,
             ].filter(Boolean);
             return (
-              <li key={log.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <li key={log.id} className="surface-card rounded-[var(--radius-card)] p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="text-sm">
                     <span className="font-semibold">

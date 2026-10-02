@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createLog,
   deleteLog,
+  fetchAccountPreferences,
   fetchItem,
   fetchItemLogs,
   fetchTags,
@@ -27,8 +29,9 @@ import { STATUSES, statusLabel } from "../lib/status";
 import { deleteWithUndo } from "../lib/deleteWithUndo";
 import { showToast } from "../lib/toast";
 import { plainText } from "../lib/text";
-import { REGIONS, REGION_LABEL, countryFlag, countryName } from "../lib/regions";
+import { REGIONS, REGION_LABEL, countryName } from "../lib/regions";
 import { ManualDetailsEditor } from "../components/ManualDetailsEditor";
+import { CountryFlag } from "../components/CountryFlag";
 
 const TYPE_LABEL = { MOVIE: "Movie", TV: "TV", ANIME: "Anime", BOOK: "Book" } as const;
 const CREATOR_LABEL = { MOVIE: "Directed by", TV: "Created by", ANIME: "Studio", BOOK: "By" } as const;
@@ -41,18 +44,68 @@ export function MediaDetail() {
   const qc = useQueryClient();
 
   const { data: item } = useQuery({ queryKey: ["item", id], queryFn: () => fetchItem(id!) });
+  const { data: preferences, isError: preferencesError } = useQuery({
+    queryKey: ["account-preferences"],
+    queryFn: fetchAccountPreferences,
+  });
   const { data: logs = [] } = useQuery({ queryKey: ["logs", id], queryFn: () => fetchItemLogs(id!), enabled: !!id });
   const { data: allTags = [] } = useQuery({ queryKey: ["tags"], queryFn: fetchTags });
 
   const [notes, setNotes] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [logEditor, setLogEditor] = useState<LogEditor>(null);
+  const [posterAccent, setPosterAccent] = useState<string | null>(null);
 
   // Sync the notes draft from the loaded item so saving without editing keeps
   // the real value instead of overwriting it.
   useEffect(() => {
     if (item) setNotes(item.yourNotes ?? "");
   }, [item?.id, item?.yourNotes]);
+
+  useEffect(() => {
+    setPosterAccent(null);
+    if (!item?.posterUrl) return;
+    let active = true;
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => {
+      if (!active) return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 24;
+        canvas.height = 24;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (!context) return;
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+        let red = 0;
+        let green = 0;
+        let blue = 0;
+        let count = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          if (pixels[i + 3] < 180) continue;
+          red += pixels[i];
+          green += pixels[i + 1];
+          blue += pixels[i + 2];
+          count++;
+        }
+        if (!count) return;
+        red /= count;
+        green /= count;
+        blue /= count;
+        const luminance = (red * 0.2126 + green * 0.7152 + blue * 0.0722) / 255;
+        const scale = luminance > 0.28 ? 0.28 / luminance : 1;
+        setPosterAccent(`rgb(${Math.round(red * scale)} ${Math.round(green * scale)} ${Math.round(blue * scale)})`);
+      } catch {
+        // Cross-origin images without CORS permission keep the untinted fallback.
+      }
+    };
+    image.src = item.posterUrl;
+    return () => {
+      active = false;
+      image.onload = null;
+    };
+  }, [item?.posterUrl]);
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["item", id] });
@@ -102,6 +155,25 @@ export function MediaDetail() {
   };
 
   if (!item) return <div className="min-h-screen p-6">Loading…</div>;
+  if (item.isAdult && !preferences && preferencesError) {
+    return <div role="alert" className="mx-auto max-w-xl px-5 py-16 text-center text-sm text-[var(--err)]">Couldn't load account content preferences. Refresh and try again.</div>;
+  }
+  if (item.isAdult && !preferences) return <div className="min-h-screen p-6">Loading…</div>;
+  if (item.isAdult && !preferences?.showAdultContent) {
+    return (
+      <div className="mx-auto max-w-xl px-5 py-16 text-center">
+        <h1 className="font-display text-3xl">18+ title hidden</h1>
+        <p className="mt-3 text-sm text-[var(--tx2)]">Enable adult titles in account settings to view this page.</p>
+        <button
+          type="button"
+          className="mt-5 min-h-11 rounded-xl bg-[var(--accbg)] px-4 text-sm font-semibold text-[var(--acc-ink)]"
+          onClick={() => nav("/settings")}
+        >
+          Open settings
+        </button>
+      </div>
+    );
+  }
 
   const mine = personalRating(item);
   const online = onlineRating(item);
@@ -114,7 +186,6 @@ export function MediaDetail() {
   const facts = [
     TYPE_LABEL[item.mediaType],
     item.year ? String(item.year) : null,
-    item.countryOfOrigin ? `${countryFlag(item.countryOfOrigin)} ${countryName(item.countryOfOrigin)}` : null,
     item.seasons ? `${item.seasons} season${item.seasons === 1 ? "" : "s"}` : null,
     item.mediaType !== "MOVIE" && item.episodes ? `${item.episodes} episodes` : null,
     item.mediaType === "BOOK" && item.pageCount ? `${item.pageCount} pages` : null,
@@ -127,15 +198,18 @@ export function MediaDetail() {
         ← Back
       </button>
 
-      <div className="mt-2 glass rounded-2xl overflow-hidden">
-        <div className="relative">
+      <div className="surface-card mt-2 overflow-hidden rounded-[var(--radius-panel)]">
+        <div
+          className="detail-hero relative"
+          style={{ "--poster-accent": posterAccent ?? "transparent" } as CSSProperties}
+        >
           {item.backdropUrl ? (
-            <img src={item.backdropUrl} alt="" className="w-full h-52 object-cover opacity-80" />
+            <img src={item.backdropUrl} alt="" className="relative z-0 h-52 w-full object-cover opacity-80" />
           ) : (
-            <div className="w-full h-52 bg-white/5" />
+            <div className="relative z-0 h-52 w-full bg-white/5" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0b0b10] via-black/40 to-transparent" />
-          <div className="absolute bottom-0 left-0 p-4 flex gap-4">
+          <div className="detail-hero-shade absolute inset-0 z-0" />
+          <div className="absolute bottom-0 left-0 z-10 flex gap-4 p-4">
             <div className="w-20 h-28 shrink-0 rounded-xl overflow-hidden bg-white/5">
               {item.posterUrl ? <img src={item.posterUrl} alt="" className="w-full h-full object-cover" /> : null}
             </div>
@@ -147,11 +221,20 @@ export function MediaDetail() {
               ) : null}
               <h1 className="text-xl md:text-2xl font-semibold">{item.title}</h1>
               {item.nativeTitle && item.nativeTitle !== item.title ? (
-                <div className="text-sm text-white/80" lang={item.originalLanguage ?? undefined}>
+                <div className="text-sm text-white/80" lang={item.originalLanguage ?? undefined} dir={item.originalLanguage === "ur" ? "rtl" : undefined}>
                   {item.nativeTitle}
                 </div>
               ) : null}
-              <div className="text-sm text-white/80 mt-1">{facts.join(" · ")}</div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-white/80">
+                {item.countryOfOrigin ? (
+                  <span className="inline-flex items-center gap-1">
+                    <CountryFlag code={item.countryOfOrigin} />
+                    {countryName(item.countryOfOrigin)}
+                  </span>
+                ) : null}
+                {item.countryOfOrigin && facts.length ? <span aria-hidden="true">·</span> : null}
+                <span>{facts.join(" · ")}</span>
+              </div>
               <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
                 <div className="flex gap-1.5">
                   <dt className="text-white/75">You</dt>
@@ -240,15 +323,15 @@ export function MediaDetail() {
             </ul>
           ) : null}
 
-          {item.description && (
+          {item.description ? (
             <div>
               <h2 className="text-sm font-semibold">Description</h2>
-              <p className="text-sm text-white/85 mt-2 leading-relaxed whitespace-pre-line">{plainText(item.description)}</p>
+              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--tx2)]">{plainText(item.description)}</p>
             </div>
-          )}
+          ) : null}
 
           <div className="grid md:grid-cols-2 gap-4">
-            <section className="glass rounded-2xl p-4 space-y-5" aria-labelledby="track-heading">
+            <section className="surface-card space-y-5 rounded-[var(--radius-panel)] p-4" aria-labelledby="track-heading">
               <h2 id="track-heading" className="text-sm font-semibold">Track</h2>
               <div className="flex flex-wrap gap-2" role="group" aria-label="Status">
                 {STATUSES.map((s: MediaStatus) => (
@@ -270,6 +353,11 @@ export function MediaDetail() {
                 <div className="mt-1">
                   <RatingInput value={mine} onChange={(v) => mut.mutate({ yourRating: v })} />
                 </div>
+                {item.yourRatingAt && mine != null ? (
+                  <p className="mt-1 text-xs text-[var(--tx3)]">
+                    Rated {new Date(item.yourRatingAt).toLocaleDateString()}
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -278,7 +366,7 @@ export function MediaDetail() {
               </div>
             </section>
 
-            <section className="glass rounded-2xl p-4 space-y-5" aria-labelledby="lists-heading">
+            <section className="surface-card space-y-5 rounded-[var(--radius-panel)] p-4" aria-labelledby="lists-heading">
               <h2 id="lists-heading" className="text-sm font-semibold">Lists</h2>
               <ListsPanel item={item} />
               <TagEditor tags={tags} allTags={allTags} onChange={saveTags} />
@@ -353,6 +441,8 @@ export function MediaDetail() {
         title={logEditor?.title ?? ""}
         mediaType={item.mediaType}
         log={logEditor?.log}
+        previousRating={logs.find((entry) => entry.id !== logEditor?.log?.id && entry.rating != null) ?? null}
+        rewatchOrdinal={logs.filter((entry) => entry.finishedAt && entry.id !== logEditor?.log?.id).length + 1}
         onSave={saveLog}
         onDelete={logEditor?.log ? removeLog : undefined}
         onClose={() => setLogEditor(null)}

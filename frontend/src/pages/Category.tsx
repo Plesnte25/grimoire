@@ -1,11 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import type { MediaType } from "../types";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import type { MediaItem, MediaType } from "../types";
 import { useQuery } from "@tanstack/react-query";
-import { fetchLibrary } from "../app/api";
+import { fetchAccountPreferences, fetchLibrary } from "../app/api";
 import { MediaCard, safeParseGenres } from "../components/MediaCard";
 import { GroupTile } from "../components/GroupTile";
-import { SearchModal } from "../components/SearchModal";
+import { useAppSearch } from "../components/AppShell";
+import { CountryFlag } from "../components/CountryFlag";
 import { SuggestionsCarousel } from "../components/SuggestionsCarousel";
 import { groupByCollection } from "../lib/groupByCollection";
 import { STATUSES, statusLabel } from "../lib/status";
@@ -20,6 +21,7 @@ type StatusTab =
   | "DROPPED";
 
 type AnimeTab = "SERIES" | "MOVIES" | "HENTAI";
+type CategorySort = "UPDATED" | "TITLE" | "YEAR";
 
 function classifyAnime(it: any): "SERIES" | "MOVIES" | "HENTAI" {
   const genres = safeParseGenres(it.genres).map((g) => g.toLowerCase());
@@ -95,17 +97,24 @@ export function Category() {
 
   const nav = useNavigate();
 
-  const [searchOpen, setSearchOpen] = useState(false);
+  const { openSearch } = useAppSearch();
 
   const [statusTab, setStatusTab] = useState<StatusTab>("ALL");
   const [genreTab, setGenreTab] = useState<string>("ALL");
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<CategorySort>("UPDATED");
+  const [view, setView] = useState<"GRID" | "LIST">("GRID");
   const [q, setQ] = useState("");
   const [animeTab, setAnimeTab] = useState<AnimeTab>("SERIES");
 
   const { data: items = [] } = useQuery({
     queryKey: ["library", region ?? mediaType],
     queryFn: () => fetchLibrary(region ?? mediaType),
+  });
+  const { data: preferences } = useQuery({
+    queryKey: ["account-preferences"],
+    queryFn: fetchAccountPreferences,
   });
 
   const existingProviderIds = useMemo(() => {
@@ -134,17 +143,25 @@ export function Category() {
       HENTAI: [],
     };
 
-    for (const it of items as any[]) {
+    for (const it of items as MediaItem[]) {
+      if (it.isAdult && !preferences?.showAdultContent) continue;
       buckets[classifyAnime(it)].push(it);
     }
 
     return buckets;
-  }, [isAnime, items]);
+  }, [isAnime, items, preferences?.showAdultContent]);
 
   // Base set = category items, narrowed by anime sub-tab if ANIME
   const baseItems = useMemo(() => {
-    if (region) return (items as any[]).filter((it) => it.mediaType === (regionTab === "SERIES" ? "TV" : "MOVIE"));
-    if (!isAnime) return items as any[];
+    if (region) {
+      return (items as MediaItem[]).filter((item) =>
+        item.mediaType === (regionTab === "SERIES" ? "TV" : "MOVIE") &&
+        (!item.isAdult || preferences?.showAdultContent)
+      );
+    }
+    if (!isAnime) {
+      return (items as MediaItem[]).filter((item) => !item.isAdult || preferences?.showAdultContent);
+    }
     const bucket = (animeBuckets?.[animeTab] ?? []) as any[];
     if (animeTab !== "SERIES") return bucket;
     // Series tab: one tile per franchise, so a franchise's movies fold into its
@@ -154,7 +171,7 @@ export function Category() {
     );
     const folded = (animeBuckets?.MOVIES ?? []).filter((it: any) => withSeries.has(it.franchiseId));
     return [...bucket, ...folded];
-  }, [isAnime, items, animeBuckets, animeTab, region, regionTab]);
+  }, [isAnime, items, animeBuckets, animeTab, region, regionTab, preferences?.showAdultContent]);
 
   // Reset genre to ALL when switching anime tabs (prevents “stuck” genre)
   useEffect(() => {
@@ -181,6 +198,11 @@ export function Category() {
 
     return counts;
   }, [baseItems]);
+  const presentCountries = useMemo(
+    () => [...new Set((baseItems as MediaItem[]).map((item) => item.countryOfOrigin).filter((code): code is string => !!code))]
+      .sort((a, b) => a.localeCompare(b)),
+    [baseItems],
+  );
 
   // Genre chips
   const allGenres = useMemo(() => {
@@ -259,12 +281,15 @@ export function Category() {
           return t.includes(qq) || native.includes(qq) || d.includes(qq);
         });
 
-    return [...filteredByQuery].sort((a: any, b: any) =>
-      (a.title ?? "").localeCompare(b.title ?? "", undefined, {
-        sensitivity: "base",
-      })
-    );
-  }, [baseItems, isAnime, statusTab, genreTab, tagFilter, q]);
+    const filteredByCountry = selectedCountries.length
+      ? filteredByQuery.filter((item: MediaItem) => selectedCountries.includes(item.countryOfOrigin ?? ""))
+      : filteredByQuery;
+    return [...filteredByCountry].sort((a: MediaItem, b: MediaItem) => {
+      if (sortBy === "TITLE") return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+      if (sortBy === "YEAR") return (b.year ?? 0) - (a.year ?? 0);
+      return b.updatedAt.localeCompare(a.updatedAt);
+    });
+  }, [baseItems, statusTab, genreTab, tagFilter, q, selectedCountries, sortBy]);
 
   // Franchise/series grouping ("card stack") — groups sharing a collectionId
   // render as one tile linking to the franchise / collection page; the rest as cards.
@@ -285,7 +310,7 @@ export function Category() {
 
         <button
           className="h-10 w-10 rounded-full bg-white/10 hover:bg-white/15 transition flex items-center justify-center"
-          onClick={() => setSearchOpen(true)}
+          onClick={() => openSearch(region ? { region } : { mediaTypeFilter: mediaType })}
           aria-label="Add"
           title="Add"
         >
@@ -309,6 +334,11 @@ export function Category() {
                 · {statusCounts.PLANNED} planning
               </span>
             ) : null}
+            {isAnime && !preferences?.showAdultContent ? (
+              <p className="mt-3 text-sm text-[var(--tx3)]">
+                18+ titles are hidden. <Link className="text-[var(--acc)] underline underline-offset-2" to="/settings">Enable them in Settings</Link>.
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -316,8 +346,9 @@ export function Category() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            aria-label={`Search your ${pageTitle}`}
             placeholder={`Search in ${pageTitle}…`}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm outline-none focus:border-white/20"
+            className="min-h-11 w-full rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-sm focus-visible:border-[var(--acc)]"
           />
         </div>
       </div>
@@ -336,7 +367,7 @@ export function Category() {
                 onClick={() => setRegionTab(t)}
                 className={[
                   "min-h-9 px-3 py-1 rounded-lg text-sm border transition flex items-center gap-2",
-                  regionTab === t ? "border-white/30 bg-white/10" : "border-white/10 text-white/70 hover:text-white",
+                  regionTab === t ? "border-[var(--acc)] bg-[var(--s2)]" : "border-[var(--line)] text-[var(--tx2)] hover:text-[var(--tx)]",
                 ].join(" ")}
               >
                 <span>{t === "SERIES" ? "Series" : "Movies"}</span>
@@ -354,7 +385,7 @@ export function Category() {
             [
               { key: "SERIES", label: "Series" },
               { key: "MOVIES", label: "Movies" },
-              { key: "HENTAI", label: "Hentai (18+)" },
+              ...(preferences?.showAdultContent ? [{ key: "HENTAI" as const, label: "Hentai (18+)" }] : []),
             ] as const
           ).map((t) => {
             const bucket = animeBuckets?.[t.key] ?? [];
@@ -367,10 +398,10 @@ export function Category() {
                 key={t.key}
                 onClick={() => setAnimeTab(t.key)}
                 className={[
-                  "px-3 py-1 rounded-lg text-sm border transition flex items-center gap-2",
+                  "min-h-11 px-3 rounded-lg text-sm border transition flex items-center gap-2",
                   animeTab === t.key
-                    ? "border-white/30 bg-white/10 opacity-100"
-                    : "border-white/10 opacity-60 hover:opacity-90",
+                    ? "border-[var(--acc)] bg-[var(--s2)] text-[var(--tx)]"
+                    : "border-[var(--line)] text-[var(--tx2)] hover:text-[var(--tx)]",
                 ].join(" ")}
               >
                 <span>{t.label}</span>
@@ -388,10 +419,10 @@ export function Category() {
             key={s.key}
             onClick={() => setStatusTab(s.key)}
             className={[
-              "px-3 py-1 rounded-lg text-sm border transition flex items-center gap-2",
+              "min-h-11 px-3 rounded-lg text-sm border transition flex items-center gap-2",
               statusTab === s.key
-                ? "border-white/30 opacity-100"
-                : "border-white/10 opacity-60 hover:opacity-90",
+                ? "border-[var(--acc)] bg-[var(--s2)] text-[var(--tx)]"
+                : "border-[var(--line)] text-[var(--tx2)] hover:text-[var(--tx)]",
             ].join(" ")}
           >
             <span>{s.label}</span>
@@ -409,10 +440,10 @@ export function Category() {
             key={g}
             onClick={() => setGenreTab(g)}
             className={[
-              "px-3 py-1 rounded-full text-sm border transition",
+              "min-h-11 px-3 rounded-full text-sm border transition",
               genreTab === g
-                ? "border-white/30 bg-white/10 opacity-100"
-                : "border-white/10 opacity-60 hover:opacity-90",
+                ? "border-[var(--acc)] bg-[var(--s2)] text-[var(--tx)]"
+                : "border-[var(--line)] text-[var(--tx2)] hover:text-[var(--tx)]",
             ].join(" ")}
           >
             {g === "ALL" ? "All" : g}
@@ -439,8 +470,76 @@ export function Category() {
         </div>
       ) : null}
 
+      {presentCountries.length ? (
+        <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1" role="group" aria-label="Filter by country">
+          {presentCountries.map((code) => {
+            const selected = selectedCountries.includes(code);
+            return (
+              <button
+                key={code}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setSelectedCountries((current) =>
+                  selected ? current.filter((value) => value !== code) : [...current, code]
+                )}
+                className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-sm ${
+                  selected ? "border-[var(--acc)] bg-[var(--s2)]" : "border-[var(--line2)] hover:bg-[var(--s2)]"
+                }`}
+              >
+                <CountryFlag code={code} />
+                {code}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       {/* Grid */}
       <div className="mt-6" style={{ minHeight: "60vh" }}>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            className="min-h-11 rounded-xl px-3 text-sm text-[var(--tx2)] underline underline-offset-2 hover:bg-[var(--s2)]"
+            onClick={() => {
+              setStatusTab("ALL");
+              setGenreTab("ALL");
+              setTagFilter(null);
+              setSelectedCountries([]);
+              setQ("");
+            }}
+          >
+            Clear filters
+          </button>
+          <div className="flex items-center gap-2">
+            <label className="flex min-h-11 items-center gap-2 text-sm text-[var(--tx2)]">
+              Sort
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as CategorySort)}
+                className="min-h-11 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-[var(--tx)]"
+              >
+                <option value="UPDATED">Recently updated</option>
+                <option value="TITLE">Title</option>
+                <option value="YEAR">Year</option>
+              </select>
+            </label>
+            <div className="flex rounded-xl border border-[var(--line2)] p-0.5" role="group" aria-label="View mode">
+              {(["GRID", "LIST"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={view === mode}
+                  onClick={() => setView(mode)}
+                  className={`min-h-10 rounded-lg px-3 text-xs font-semibold ${
+                    view === mode ? "bg-[var(--s2)] text-[var(--tx)]" : "text-[var(--tx3)] hover:text-[var(--tx)]"
+                  }`}
+                >
+                  {mode === "GRID" ? "Grid" : "List"}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
         {items.length === 0 ? (
           <div className="text-sm opacity-70">
             No items yet. Click “+” to add your first one.
@@ -451,13 +550,9 @@ export function Category() {
           </div>
         ) : (
           <div
-            className="
-              grid gap-3 md:gap-4
-              [grid-template-columns:repeat(auto-fill,minmax(120px,1fr))]
-              sm:[grid-template-columns:repeat(auto-fill,minmax(140px,1fr))]
-              md:[grid-template-columns:repeat(auto-fill,minmax(170px,1fr))]
-              lg:[grid-template-columns:repeat(auto-fill,minmax(190px,1fr))]
-            "
+            className={view === "GRID"
+              ? "grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3 sm:grid-cols-[repeat(auto-fill,minmax(140px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(170px,1fr))] lg:grid-cols-[repeat(auto-fill,minmax(190px,1fr))] md:gap-4"
+              : "grid grid-cols-1 gap-2"}
           >
             {groupedDisplayed.map((g) =>
               g.stack.length > 1 ? (
@@ -472,7 +567,7 @@ export function Category() {
                   key={g.primary.id}
                   item={g.primary}
                   onOpen={() => nav(`/media/${g.primary.id}`)}
-                  variant="tile"
+                  variant={view === "GRID" ? "tile" : "row"}
                 />
               )
             )}
@@ -503,12 +598,6 @@ export function Category() {
         )}
       </div>
 
-      <SearchModal
-        open={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        mediaTypeFilter={region ? undefined : mediaType}
-        region={region ?? undefined}
-      />
     </div>
   );
 }
