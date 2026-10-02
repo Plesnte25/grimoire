@@ -278,7 +278,8 @@ export function Category() {
               ""
           ).toLowerCase();
 
-          return t.includes(qq) || native.includes(qq) || d.includes(qq);
+          const creator = String(x.creator ?? "").toLowerCase();
+          return t.includes(qq) || native.includes(qq) || d.includes(qq) || creator.includes(qq);
         });
 
     const filteredByCountry = selectedCountries.length

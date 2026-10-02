@@ -104,6 +104,7 @@ export function MediaCard({
         <span className="mt-1 block truncate text-xs text-[var(--tx3)]">
           {[titleMeta(item), ratingText(item)].filter(Boolean).join(" · ")}
         </span>
+        {item.creator ? <span className="mt-1 block truncate text-xs text-[var(--tx2)]">{item.creator}</span> : null}
       </button>
     );
   }
@@ -117,6 +118,7 @@ export function MediaCard({
         <span className="block truncate text-sm font-semibold text-[var(--tx)]">{item.title}</span>
         {item.nativeTitle && item.nativeTitle !== item.title ? <span className="mt-0.5 block truncate text-xs text-[var(--tx3)]" lang={item.originalLanguage ?? undefined} dir={item.originalLanguage === "ur" ? "rtl" : undefined}>{item.nativeTitle}</span> : null}
         <span className="mt-1 block text-xs text-[var(--tx3)]">{titleMeta(item)}{titleMeta(item) ? " · " : ""}{statusLabel(item.status, item.mediaType)}</span>
+        {item.creator ? <span className="mt-1 block truncate text-xs text-[var(--tx2)]">{item.creator}</span> : null}
         {item.progressText ? <span className="mt-1 block text-xs tabular-nums text-[var(--tx2)]">{item.progressText}</span> : null}
         {airingLabel(item) ? <span className="mt-1 block text-xs font-medium text-[var(--acc)]">{airingLabel(item)}</span> : null}
       </span>
