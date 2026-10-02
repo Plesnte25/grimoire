@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Outlet } from "react-router-dom";
 import {
   authStatus,
   bootstrapAccount,
@@ -8,8 +7,6 @@ import {
   verifyOtp,
   unlockWithPin,
 } from "../app/api";
-
-const EASE = [0.22, 1, 0.36, 1] as const;
 
 type Stage =
   | "loading"
@@ -23,7 +20,7 @@ function errMessage(e: any, fallback: string) {
   return e?.response?.data?.error ?? fallback;
 }
 
-export function PasscodeGate({ children }: { children: ReactNode }) {
+export function PasscodeGate() {
   const [stage, setStage] = useState<Stage>("loading");
   const [deviceTrusted, setDeviceTrusted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +145,7 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
     }
   }
 
-  if (stage === "unlocked") return <>{children}</>;
+  if (stage === "unlocked") return <Outlet />;
 
   if (stage === "loading") {
     return (
@@ -159,28 +156,8 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center px-6 overflow-hidden">
-      {/* ambient background glow */}
-      <div className="pointer-events-none absolute inset-0">
-        <div
-          className="absolute -top-1/4 -left-1/4 h-[60vh] w-[60vh] rounded-full opacity-40 blur-[120px]"
-          style={{ background: "radial-gradient(circle, rgba(139,92,246,0.55), transparent 70%)" }}
-        />
-        <div
-          className="absolute -bottom-1/4 -right-1/4 h-[55vh] w-[55vh] rounded-full opacity-30 blur-[120px]"
-          style={{ background: "radial-gradient(circle, rgba(236,72,153,0.45), transparent 70%)" }}
-        />
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={stage}
-          initial={{ opacity: 0, y: 12, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -8, scale: 0.98 }}
-          transition={{ duration: 0.24, ease: EASE }}
-          className="relative glass rounded-2xl p-6 w-full max-w-sm shadow-2xl shadow-black/40"
-        >
+    <div className="flex min-h-screen items-center justify-center px-6">
+        <div className="surface-card w-full max-w-sm rounded-[var(--radius-dialog)] p-6">
           {stage === "login" && (
             <>
               <div className="text-xl font-semibold">Log in</div>
@@ -190,14 +167,14 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
                   : "New device — we'll email a code after this."}
               </div>
               <input
-                className="mt-4 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none"
+                className="mt-4 min-h-11 w-full rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-4 py-3"
                 placeholder="Email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
               <input
-                className="mt-3 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none"
+                className="mt-3 min-h-11 w-full rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-4 py-3"
                 placeholder="PIN"
                 inputMode="numeric"
                 value={pin}
@@ -221,7 +198,7 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
                 Check {email || "your email"} for a 6-digit code.
               </div>
               <input
-                className="mt-4 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none text-center tracking-[0.3em] text-lg"
+                className="mt-4 min-h-11 w-full rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-4 py-3 text-center text-lg tracking-[0.3em]"
                 placeholder="000000"
                 inputMode="numeric"
                 value={code}
@@ -253,21 +230,21 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
                 every device you've verified.
               </div>
               <input
-                className="mt-4 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none"
+                className="mt-4 min-h-11 w-full rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-4 py-3"
                 placeholder="Email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
               <input
-                className="mt-3 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none"
+                className="mt-3 min-h-11 w-full rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-4 py-3"
                 placeholder="PIN (4-6 digits)"
                 inputMode="numeric"
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
               />
               <input
-                className="mt-3 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none"
+                className="mt-3 min-h-11 w-full rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-4 py-3"
                 placeholder="Confirm PIN"
                 inputMode="numeric"
                 value={confirmPin}
@@ -293,7 +270,7 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
                 Check {email || "your email"} for a 6-digit code.
               </div>
               <input
-                className="mt-4 w-full rounded-xl bg-black/30 border border-white/10 px-4 py-3 outline-none text-center tracking-[0.3em] text-lg"
+                className="mt-4 min-h-11 w-full rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-4 py-3 text-center text-lg tracking-[0.3em]"
                 placeholder="000000"
                 inputMode="numeric"
                 value={code}
@@ -316,8 +293,7 @@ export function PasscodeGate({ children }: { children: ReactNode }) {
               </button>
             </>
           )}
-        </motion.div>
-      </AnimatePresence>
+        </div>
     </div>
   );
 }

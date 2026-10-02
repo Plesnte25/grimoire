@@ -10,18 +10,34 @@ import { TierListPage } from "./pages/TierListPage";
 import { FranchisePage } from "./pages/FranchisePage";
 import { CollectionPage } from "./pages/CollectionPage";
 import { ContributorPage } from "./pages/ContributorPage";
+import { Library } from "./pages/Library";
+import { You } from "./pages/You";
+import { AppShell } from "./components/AppShell";
+import { PasscodeGate } from "./components/PasscodeGate";
 
 export const router = createBrowserRouter([
-  { path: "/", element: <Home /> },
-  { path: "/category/:type", element: <Category /> },
-  { path: "/region/:key", element: <Category /> },
-  { path: "/media/:id", element: <MediaDetail /> },
-  { path: "/lists", element: <Lists /> },
-  { path: "/lists/:id", element: <ListDetail /> },
-  { path: "/tier-lists/:id", element: <TierListPage /> },
-  { path: "/diary", element: <Diary /> },
-  { path: "/franchise/:id", element: <FranchisePage /> },
-  { path: "/collection/:id", element: <CollectionPage /> },
-  { path: "/people/:id", element: <ContributorPage /> },
-  { path: "/settings", element: <Settings /> },
+  {
+    element: <PasscodeGate />,
+    children: [
+      {
+        element: <AppShell />,
+        children: [
+          { path: "/", element: <Home /> },
+          { path: "/library", element: <Library /> },
+          { path: "/you", element: <You /> },
+          { path: "/category/:type", element: <Category /> },
+          { path: "/region/:key", element: <Category /> },
+          { path: "/media/:id", element: <MediaDetail /> },
+          { path: "/lists", element: <Lists /> },
+          { path: "/lists/:id", element: <ListDetail /> },
+          { path: "/tier-lists/:id", element: <TierListPage /> },
+          { path: "/diary", element: <Diary /> },
+          { path: "/franchise/:id", element: <FranchisePage /> },
+          { path: "/collection/:id", element: <CollectionPage /> },
+          { path: "/people/:id", element: <ContributorPage /> },
+          { path: "/settings", element: <Settings /> },
+        ],
+      },
+    ],
+  },
 ]);
