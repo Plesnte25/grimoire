@@ -24,7 +24,7 @@ import { requireSession } from "./middleware/requireSession.js";
 
 const app = express();
 
-// Behind Cloudflare Tunnel / a reverse proxy in production — trust its
+// Behind Caddy in production — trust its
 // X-Forwarded-For so express-rate-limit can identify clients correctly.
 app.set("trust proxy", 1);
 
@@ -100,5 +100,8 @@ process.on("uncaughtException", (err) => {
     console.error("UNCAUGHT_EXCEPTION:", err);
 });
 
+// Loopback only: Caddy on the same box is the sole public entry point, so the
+// app is never reachable directly on its own port, whatever the firewall says.
 const port = Number(process.env.PORT || 5050);
-app.listen(port, () => console.log(`Backend running on http://localhost:${port}`));
+const host = process.env.HOST || "127.0.0.1";
+app.listen(port, host, () => console.log(`Backend running on http://${host}:${port}`));

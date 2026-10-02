@@ -210,6 +210,27 @@ authRouter.post(
               })
             : await prisma.trustedDevice.create({ data: { verifiedEmail } });
 
+        // A brand-new device just joined an existing account — tell the owner,
+        // so a login they didn't make doesn't go unnoticed. Best-effort: a mail
+        // failure mustn't block the login itself.
+        const account = await prisma.accountConfig.findUnique({ where: { id: 1 } });
+        if (account && !existingDevice) {
+            sendEmail(
+                account.email,
+                "Grimoire: new device signed in",
+                [
+                    "A new device was just verified for your Grimoire account.",
+                    "",
+                    `Time: ${new Date().toUTCString()}`,
+                    `IP address: ${req.ip ?? "unknown"}`,
+                    `Browser: ${req.get("user-agent") ?? "unknown"}`,
+                    "",
+                    "If this wasn't you, change your PIN in Settings straight away —",
+                    "that also signs out every other session.",
+                ].join("\n")
+            ).catch((err) => console.error("NEW_DEVICE_ALERT_FAILED:", err));
+        }
+
         setDeviceCookie(res, device.id);
         res.clearCookie("gr_pending_device", { path: "/" });
 
@@ -275,6 +296,7 @@ authRouter.post(
 
 authRouter.post(
     "/pin",
+    unlockLimiter,
     requireSession,
     asyncHandler(async (req, res) => {
         const data = parseOrThrow(
@@ -293,6 +315,9 @@ authRouter.post(
             where: { id: 1 },
             data: { pinSaltHex: saltHex, pinHashHex: hashHex },
         });
+        // A PIN change is the "someone else got in" response, so it ends every
+        // other unlocked session; this one stays signed in.
+        await prisma.session.deleteMany({ where: { id: { not: req.cookies.gr_session } } });
 
         res.json({ ok: true });
     })
