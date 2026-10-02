@@ -3,6 +3,24 @@ import axios from "axios";
 const API_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 const BASE = "https://www.googleapis.com/books/v1";
 
+export function bestGoogleBookCover(imageLinks?: Record<string, string> | null, isbn?: string | null) {
+    const googleCover = imageLinks?.extraLarge ?? imageLinks?.large ?? imageLinks?.medium ?? imageLinks?.thumbnail;
+    if (googleCover) {
+        const url = new URL(googleCover.replace(/^http:\/\//, "https://"));
+        url.searchParams.set("zoom", "0");
+        url.searchParams.delete("edge");
+        return url.toString();
+    }
+    return isbn ? `https://covers.openlibrary.org/b/isbn/${encodeURIComponent(isbn)}-L.jpg?default=false` : null;
+}
+
+function bookIsbn(volumeInfo: any): string | null {
+    const ids = volumeInfo?.industryIdentifiers ?? [];
+    return ids.find((entry: any) => entry.type === "ISBN_13")?.identifier
+        ?? ids.find((entry: any) => entry.type === "ISBN_10")?.identifier
+        ?? null;
+}
+
 function sleep(ms: number) {
     return new Promise((r) => setTimeout(r, ms));
 }
@@ -41,7 +59,7 @@ export async function googleBooksSearch(q: string) {
             ? Number(String(b.volumeInfo.publishedDate).slice(0, 4)) || undefined
             : undefined,
         description: b.volumeInfo?.description ?? "",
-        posterUrl: b.volumeInfo?.imageLinks?.thumbnail ?? null,
+        posterUrl: bestGoogleBookCover(b.volumeInfo?.imageLinks, bookIsbn(b.volumeInfo)),
         backdropUrl: null,
         // Google rates 0–5; every online score in Grimoire is stored on 0–10.
         globalRating:
@@ -67,7 +85,7 @@ export async function googleBooksDetails(providerId: string) {
             ? Number(String(b.volumeInfo.publishedDate).slice(0, 4)) || undefined
             : undefined,
         description: b.volumeInfo?.description ?? "",
-        posterUrl: b.volumeInfo?.imageLinks?.thumbnail ?? null,
+        posterUrl: bestGoogleBookCover(b.volumeInfo?.imageLinks, bookIsbn(b.volumeInfo)),
         backdropUrl: null,
         // Google rates 0–5; every online score in Grimoire is stored on 0–10.
         globalRating:

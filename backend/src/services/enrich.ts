@@ -3,7 +3,7 @@ import type { MediaItem, Prisma } from "@prisma/client";
 import { prisma } from "../db.js";
 import { tmdbGet, TMDB_IMAGE_BASE } from "./providers/tmdb.js";
 import { postAniList } from "./providers/anilist.js";
-import { googleBooksGet } from "./providers/googleBooks.js";
+import { bestGoogleBookCover, googleBooksGet } from "./providers/googleBooks.js";
 import { regionForItem } from "../lib/regions.js";
 
 // Provider metadata is fetched once per item (on add, or by the backfill
@@ -696,7 +696,7 @@ async function enrichGoogleBook(item: MediaItem): Promise<Enrichment | null> {
             // Year is replaced: the stored one was the edition's.
             year: year ?? undefined,
             description: fill(item.description, v.description || null),
-            posterUrl: httpsCover(item.posterUrl) ?? httpsCover(v.imageLinks?.thumbnail),
+            posterUrl: bestGoogleBookCover(v.imageLinks, isbn) ?? httpsCover(item.posterUrl),
             genres: fill(item.genres, genresJson(v.categories)),
             pageCount: v.printedPageCount ?? v.pageCount ?? null,
             isbn,
