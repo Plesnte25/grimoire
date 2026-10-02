@@ -1,4 +1,5 @@
 import axios from "axios";
+import { queueOfflineLog } from "../lib/offlineLogQueue";
 import type {
     AccountPreferences, MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
     CatalogEntry, Episode, TrustedDevice, HomeSnapshot, WatchProvider, Trailer, YearStats, SharedList,
@@ -280,9 +281,39 @@ export async function fetchItemLogs(mediaId: string): Promise<WatchLog[]> {
     return res.data.logs;
 }
 
+export class OfflineLogQueuedError extends Error {
+    constructor() {
+        super("This log is saved on this device and will sync when you are online.");
+        this.name = "OfflineLogQueuedError";
+    }
+}
+
+export function isOfflineLogQueuedError(error: unknown): error is OfflineLogQueuedError {
+    return error instanceof OfflineLogQueuedError;
+}
+
 export async function createLog(mediaId: string, input: LogInput): Promise<WatchLog> {
-    const res = await api.post(`/api/library/${mediaId}/logs`, input);
-    return res.data.log;
+    const clientMutationId = crypto.randomUUID();
+    const queuedAt = new Date().toISOString();
+    const enqueue = () => queueOfflineLog({ mediaId, input, clientMutationId, queuedAt });
+    if (!navigator.onLine) {
+        enqueue();
+        throw new OfflineLogQueuedError();
+    }
+    try {
+        const res = await api.post(`/api/library/${mediaId}/logs`, { ...input, clientMutationId });
+        return res.data.log;
+    } catch (error) {
+        if (
+            axios.isAxiosError(error) &&
+            !error.response &&
+            (!error.code || ["ERR_NETWORK", "ECONNABORTED"].includes(error.code))
+        ) {
+            enqueue();
+            throw new OfflineLogQueuedError();
+        }
+        throw error;
+    }
 }
 
 export async function updateLog(logId: string, input: LogInput): Promise<WatchLog> {

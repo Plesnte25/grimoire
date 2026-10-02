@@ -14,6 +14,7 @@ import {
   setItemTags,
   updateItem,
   updateLog,
+  isOfflineLogQueuedError,
   type ItemPatch,
   type LogInput,
 } from "../app/api";
@@ -157,6 +158,11 @@ export function MediaDetail() {
       setLogEditor(null);
       refresh();
     } catch (err: any) {
+      if (isOfflineLogQueuedError(err)) {
+        setLogEditor(null);
+        showToast({ message: "Saved on this device. It will sync when you’re online.", timeoutMs: 6000 });
+        return;
+      }
       showToast({ message: err?.response?.data?.error ?? "Couldn't save this entry", timeoutMs: 6000 });
     }
   };

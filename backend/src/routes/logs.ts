@@ -112,11 +112,25 @@ itemLogsRouter.post(
     "/",
     asyncHandler(async (req, res) => {
         const mediaId = (req.params as any).id as string;
-        const data = parseOrThrow(logSchema, req.body);
+        const { clientMutationId, ...data } = parseOrThrow(
+            logSchema.and(z.object({ clientMutationId: z.string().uuid().optional() })),
+            req.body
+        );
         const earlier = await prisma.watchLog.count({ where: { mediaId, finishedAt: { not: null } } });
-        const log = await prisma.watchLog.create({
-            data: { ...data, mediaId, isRewatch: data.isRewatch ?? earlier > 0 },
-        });
+        const logData = { ...data, mediaId, isRewatch: data.isRewatch ?? earlier > 0 };
+        const log = clientMutationId
+            ? await prisma.watchLog.upsert({
+                  where: { clientMutationId },
+                  create: { ...logData, clientMutationId },
+                  update: {},
+              })
+            : await prisma.watchLog.create({ data: logData });
+        if (log.mediaId !== mediaId) {
+            const err: any = new Error("This client mutation id belongs to another title");
+            err.status = 409;
+            err.code = "IDEMPOTENCY_KEY_CONFLICT";
+            throw err;
+        }
         await syncItemRating(mediaId, data.rating);
         res.json({ log });
     })
