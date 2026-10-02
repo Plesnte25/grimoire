@@ -36,7 +36,7 @@ function NoteEditor({ entry, onSave }: { entry: Entry; onSave: (note: string | n
     >
       <textarea
         aria-label={`Note for ${entry.media.title}`}
-        className="w-full min-h-20 rounded-xl bg-black/30 border border-white/15 px-3 py-2 text-sm"
+        className="min-h-20 w-full rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 py-2 text-sm text-[var(--tx)]"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
       />
@@ -73,7 +73,7 @@ export function ListDetail() {
     qc.invalidateQueries({ queryKey: ["top10"] });
   };
 
-  if (!list) return <div className="min-h-screen p-6">Loading…</div>;
+  if (!list) return <div className="mx-auto max-w-4xl px-5 py-12 text-sm text-[var(--tx3)]">Loading list…</div>;
 
   const isTop10 = list.kind === "TOP10";
   const ranked = isTop10 || list.isRanked;
@@ -94,8 +94,8 @@ export function ListDetail() {
   };
 
   return (
-    <div className="min-h-screen px-4 md:px-8 py-6 max-w-4xl mx-auto">
-      <button className="min-h-11 text-sm text-white/80 hover:text-white" onClick={() => nav(-1)}>
+    <div className="mx-auto max-w-4xl px-5 py-7 md:px-10 md:py-10">
+      <button className="min-h-11 text-sm text-[var(--tx2)] hover:text-[var(--tx)]" onClick={() => nav(-1)}>
         ← Back
       </button>
 
@@ -111,13 +111,13 @@ export function ListDetail() {
               refresh();
             }}
           >
-            <input aria-label="List name" className="min-h-11 rounded-xl bg-black/30 border border-white/15 px-3" value={name} onChange={(e) => setName(e.target.value)} />
-            <button type="submit" className="min-h-11 rounded-xl px-4 bg-white/10">Save</button>
+            <input aria-label="List name" className="min-h-11 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-[var(--tx)]" value={name} onChange={(e) => setName(e.target.value)} />
+            <button type="submit" className="min-h-11 rounded-xl bg-[var(--accbg)] px-4 text-sm font-semibold text-[var(--acc-ink)]">Save</button>
           </form>
         ) : (
           <div>
-            <h1 className="text-2xl font-semibold">{title}</h1>
-            <p className="text-sm text-white/75 mt-1">
+            <h1 className="font-display text-3xl font-medium">{title}</h1>
+            <p className="mt-1 text-sm text-[var(--tx3)]">
               {items.length} item{items.length === 1 ? "" : "s"}
               {isTop10 ? " of 10" : ""}
             </p>
@@ -163,7 +163,7 @@ export function ListDetail() {
                 if (dragIndex != null) move(dragIndex, i);
                 setDragIndex(null);
               }}
-              className={`flex gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 ${dragIndex === i ? "opacity-50" : ""}`}
+              className={`surface-card flex gap-3 rounded-[var(--radius-card)] p-3 ${dragIndex === i ? "opacity-50" : ""}`}
             >
               {ranked ? (
                 <div className="w-8 shrink-0 pt-1 text-xl font-semibold tabular-nums text-white/85" aria-label={`Rank ${i + 1}`}>

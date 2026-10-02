@@ -11,15 +11,15 @@ const TOP10_TYPES: { type: MediaType; label: string }[] = [
   { type: "BOOK", label: "Books" },
 ];
 
-const card = "w-full min-h-11 text-left glass rounded-2xl p-4 hover:bg-white/10 transition";
+const card = "surface-card w-full min-h-11 text-left rounded-[var(--radius-card)] p-4 transition-colors hover:bg-[var(--s2)]";
 
 function Top10Card({ type, label }: { type: MediaType; label: string }) {
   const nav = useNavigate();
   const { data } = useQuery({ queryKey: ["top10", type], queryFn: () => fetchTop10(type) });
   return (
     <button className={card} onClick={() => data && nav(`/lists/${data.id}`)} disabled={!data}>
-      <div className="font-semibold">Top 10 {label}</div>
-      <div className="text-sm text-white/75 mt-1">{data ? `${data.items.length}/10` : "…"}</div>
+      <div className="font-display text-lg font-medium">Top 10 {label}</div>
+      <div className="mt-1 text-sm text-[var(--tx3)]">{data ? `${data.items.length}/10` : "Loading…"}</div>
     </button>
   );
 }
@@ -52,35 +52,35 @@ export function Lists() {
   const userLists = lists.filter((l) => l.kind !== "TOP10");
 
   return (
-    <div className="min-h-screen px-4 md:px-8 py-6 max-w-4xl mx-auto space-y-8">
-      <button className="min-h-11 text-sm text-white/80 hover:text-white" onClick={() => nav(-1)}>
+    <div className="mx-auto max-w-4xl space-y-9 px-5 py-7 md:px-10 md:py-10">
+      <button className="min-h-11 text-sm text-[var(--tx2)] hover:text-[var(--tx)]" onClick={() => nav(-1)}>
         ← Back
       </button>
 
       <section aria-labelledby="top10-heading">
-        <h1 id="top10-heading" className="text-2xl font-semibold">Favourites</h1>
+        <h1 id="top10-heading" className="font-display text-3xl font-medium">Favourites</h1>
         <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
           {TOP10_TYPES.map((t) => <Top10Card key={t.type} {...t} />)}
         </div>
       </section>
 
       <section aria-labelledby="lists-heading">
-        <h2 id="lists-heading" className="text-xl font-semibold">Lists</h2>
+        <h2 id="lists-heading" className="font-display text-xl font-medium">Lists</h2>
         <form
-          className="mt-3 glass rounded-2xl p-4 flex gap-2"
+          className="surface-card mt-3 flex gap-2 rounded-[var(--radius-panel)] p-4"
           onSubmit={(e) => {
             e.preventDefault();
             if (name.trim()) mut.mutate();
           }}
         >
           <input
-            className="flex-1 min-h-11 rounded-xl bg-black/30 border border-white/15 px-3 text-sm"
+            className="min-h-11 flex-1 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-sm text-[var(--tx)]"
             placeholder="New list name"
             aria-label="New list name"
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
-          <button type="submit" className="min-h-11 rounded-xl px-4 bg-white/10 hover:bg-white/15" disabled={!name.trim()}>
+          <button type="submit" className="min-h-11 rounded-xl bg-[var(--accbg)] px-4 text-sm font-semibold text-[var(--acc-ink)] disabled:opacity-50" disabled={!name.trim()}>
             Create
           </button>
         </form>
@@ -88,33 +88,33 @@ export function Lists() {
           {userLists.map((l) => (
             <button key={l.id} className={card} onClick={() => nav(`/lists/${l.id}`)}>
               <div className="font-semibold">{l.name}</div>
-              <div className="text-sm text-white/75 mt-1">
+              <div className="mt-1 text-sm text-[var(--tx3)]">
                 {l.items.length} item{l.items.length === 1 ? "" : "s"}
                 {l.isRanked ? " · ranked" : ""}
               </div>
             </button>
           ))}
-          {userLists.length === 0 ? <p className="text-sm text-white/75">No lists yet.</p> : null}
+          {userLists.length === 0 ? <p className="text-sm text-[var(--tx3)]">No lists yet.</p> : null}
         </div>
       </section>
 
       <section aria-labelledby="tiers-heading">
-        <h2 id="tiers-heading" className="text-xl font-semibold">Tier lists</h2>
+        <h2 id="tiers-heading" className="font-display text-xl font-medium">Tier lists</h2>
         <form
-          className="mt-3 glass rounded-2xl p-4 flex gap-2"
+          className="surface-card mt-3 flex gap-2 rounded-[var(--radius-panel)] p-4"
           onSubmit={(e) => {
             e.preventDefault();
             if (tierName.trim()) tierMut.mutate();
           }}
         >
           <input
-            className="flex-1 min-h-11 rounded-xl bg-black/30 border border-white/15 px-3 text-sm"
+            className="min-h-11 flex-1 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-sm text-[var(--tx)]"
             placeholder="New tier list (e.g. Shounen anime)"
             aria-label="New tier list name"
             value={tierName}
             onChange={(e) => setTierName(e.target.value)}
           />
-          <button type="submit" className="min-h-11 rounded-xl px-4 bg-white/10 hover:bg-white/15" disabled={!tierName.trim()}>
+          <button type="submit" className="min-h-11 rounded-xl bg-[var(--accbg)] px-4 text-sm font-semibold text-[var(--acc-ink)] disabled:opacity-50" disabled={!tierName.trim()}>
             Create
           </button>
         </form>
@@ -122,7 +122,7 @@ export function Lists() {
           {tierLists.map((t) => (
             <button key={t.id} className={card} onClick={() => nav(`/tier-lists/${t.id}`)}>
               <div className="font-semibold">{t.name}</div>
-              <div className="text-sm text-white/75 mt-1">{t.entries.length} placed</div>
+              <div className="mt-1 text-sm text-[var(--tx3)]">{t.entries.length} placed</div>
             </button>
           ))}
         </div>

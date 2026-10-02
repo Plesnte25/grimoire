@@ -5,10 +5,8 @@ import { fetchDiary } from "../app/api";
 import type { DiaryLog } from "../types";
 import { formatScore } from "../lib/ratings";
 
-// Ordinal lavender ramp: 1, 2, 3, 4+ finished that day. Validated with the
-// dataviz palette checker against both #0b0b10 and the glass card (#1a1a1f).
-const STEPS = ["#56499e", "#7566cf", "#9d8eeb", "#d4c9ff"];
-const EMPTY = "rgba(255,255,255,0.07)";
+const STEPS = ["var(--heat-1)", "var(--heat-2)", "var(--heat-3)", "var(--heat-4)"];
+const EMPTY = "color-mix(in srgb, var(--tx) 7%, transparent)";
 const TYPE_LABEL = { MOVIE: "Movie", TV: "TV", ANIME: "Anime", BOOK: "Book" } as const;
 
 function dayKey(d: Date) {
@@ -146,8 +144,8 @@ export function Diary() {
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Diary</h1>
-          <p className="text-sm text-white/75 mt-1">
+          <h1 className="font-display text-3xl font-medium">Diary</h1>
+          <p className="mt-1 text-sm text-[var(--tx3)]">
             <span className="text-3xl font-semibold text-white tabular-nums">{logs.length}</span> finished in {year}
           </p>
         </div>
@@ -165,7 +163,7 @@ export function Diary() {
         </div>
       </div>
 
-      <div className="glass rounded-2xl p-4">
+      <div className="surface-card rounded-[var(--radius-panel)] p-4">
         <Heatmap year={year} byDay={byDay} selected={selected} onSelect={setSelected} />
       </div>
 
@@ -181,7 +179,7 @@ export function Diary() {
         {isLoading ? <p className="text-sm text-white/75">Loading…</p> : null}
         {!isLoading && days.length === 0 ? (
           <p className="text-sm text-white/75">
-            Nothing finished {selected ? "that day" : `in ${year}`} yet. Marking something Completed adds it here.
+            Nothing finished {selected ? "that day" : `in ${year}`} yet. Marking something completed adds it here.
           </p>
         ) : null}
         {days.map((day) => (
@@ -191,7 +189,7 @@ export function Diary() {
               {byDay.get(day)!.map((log) => (
                 <li key={log.id}>
                   <button
-                    className="flex w-full items-center gap-3 rounded-xl bg-white/5 p-2 text-left hover:bg-white/10"
+                    className="surface-card flex w-full items-center gap-3 rounded-[var(--radius-card)] p-2 text-left transition-colors hover:bg-[var(--s2)]"
                     onClick={() => nav(`/media/${log.media.id}`)}
                   >
                     <span className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-white/5">
