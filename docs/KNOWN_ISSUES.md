@@ -4,6 +4,15 @@ The project's backlog: bugs, rough edges and polish work, logged here instead of
 progress doesn't stall. Each entry says where it came from, its severity, how we plan to fix it, and gets ✅ with the
 commit once done. Issues are discussed and fixed one at a time.
 
+## Status (2026-10-02)
+
+- **Done:** Phases 0–3 deployed (see Build order). 2026-10-02: Tailscale removed, app-level auth hardened (#111),
+  VM cleaned to Grimoire-only and renamed `grimoire` (#112).
+- **Open, outside the phases:** home-network DNS (#1), trusted-device revoke (#113, lands with Phase 5's
+  Settings), uptime check (#114), Tailscale leftovers on the user's side (#115), Berserk grouping (#78),
+  Jikan outages (#82, retried by the Phase 6 daily job).
+- **Next:** Phase 4, design foundation (steps 12–15), waiting for the go-ahead.
+
 ## Open — needs a fix
 
 ### Found by the status check (2026-10-01)
@@ -43,10 +52,10 @@ commit once done. Issues are discussed and fixed one at a time.
 
 ### Found while locking the app to a private Tailscale network (2026-10-01)
 
-Tailscale was removed on 2026-10-02 (app-level auth only, hardened — see #8), so #6 and #7 were reverted back to
+Tailscale was removed on 2026-10-02 (app-level auth only, hardened — see #111), so #109 and #110 were reverted back to
 Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for them to break.
 
-6. ↩️ **Reverted** (fixed in `b6cc66b`, reverted with Tailscale's removal) — **Helmet's `upgrade-insecure-requests` CSP directive broke plain-HTTP-only access** (medium). The VM was
+109. ↩️ **Reverted** (was #6) (fixed in `b6cc66b`, reverted with Tailscale's removal) — **Helmet's `upgrade-insecure-requests` CSP directive broke plain-HTTP-only access** (medium). The VM was
    joined to a private Tailscale network so the app could be reached without a public DNS record, serving plain HTTP
    on an internal address/port (no TLS cert there). Helmet's default CSP sends `upgrade-insecure-requests`, so the
    browser's first request succeeded (200) but every following request was silently retried over HTTPS on the same
@@ -55,8 +64,8 @@ Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for th
    **Fix:** set `"upgrade-insecure-requests": null` in the CSP directives (`backend/src/index.ts`). Harmless on the
    public domain, which is already HTTPS end-to-end via Caddy.
 
-7. ↩️ **Reverted** (fixed in `2c63309`, reverted with Tailscale's removal) — **Helmet's HSTS header would have permanently broken the same private address** (medium-high — not yet
-   triggered, caught before a device loaded the page over the bad config). Same setup as #6: Helmet sends
+110. ↩️ **Reverted** (was #7) (fixed in `2c63309`, reverted with Tailscale's removal) — **Helmet's HSTS header would have permanently broken the same private address** (medium-high — not yet
+   triggered, caught before a device loaded the page over the bad config). Same setup as #109: Helmet sends
    `Strict-Transport-Security` unconditionally. Unlike CSP's `upgrade-insecure-requests` (a per-request, server-side
    behavior), HSTS is cached by the browser for the full `max-age` (180 days) per hostname — so the first plain-HTTP
    load of the Tailscale MagicDNS hostname would have made the browser force HTTPS on that hostname for months,
@@ -65,7 +74,7 @@ Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for th
    manually, only when `req.secure` is true (`backend/src/index.ts`). Relies on `trust proxy` + Caddy's
    `X-Forwarded-Proto` already being correct for the public HTTPS path.
 
-8. ✅ **Fixed** (`0510535`) — **Auth hardening after dropping Tailscale** (medium, security). The public site relies on
+111. ✅ **Fixed** (`0510535`, was #8) — **Auth hardening after dropping Tailscale** (medium, security). The public site relies on
    app-level auth alone, so a review (2026-10-02) found:
    - the backend listened on every interface (`*:5050`); only the GCP firewall kept it off the internet, and the
      Tailscale interface reached it directly. **Fix:** listen on `127.0.0.1` by default (`HOST` env to override) so
@@ -74,8 +83,47 @@ Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for th
      in" alert (time, IP, browser) when a device is first trusted on an existing account.
    - `POST /auth/pin` had no rate limit and left other sessions alive. **Fix:** same limiter as `/unlock`; a PIN
      change now ends every other session (`backend/src/routes/auth.ts`).
-   - VM/infra: Tailscale uninstalled (node logged out, package + apt repo removed); unused `default-allow-rdp`
-     (tcp:3389) GCP firewall rule deleted. Public ports are now 22, 80, 443 only.
+   - Caddy's upstream changed from `localhost:5050` to `127.0.0.1:5050` (`localhost` can resolve to `::1`, which
+     the app no longer listens on).
+
+
+### Server clean-up and what's left (2026-10-02)
+
+112. ✅ **Done** (server only, no repo change) — **The VM still carried retired AzubiWeg and Media Vault services**
+     (medium: public stale code + RAM on a 1 GB box). Removed, in this order:
+     - Stopped first: `rclone-bisync.timer` (two-way sync of the OneDrive German vault every 5 min against a stale
+       copy; stopped before any file was deleted, so nothing propagated to OneDrive), `azubiweg.service`.
+     - AzubiWeg: Postgres container + volume (dumped first to the laptop: `~/Backups/azubiweg-gcp-2026-10-02.dump`),
+       `/opt/azubiweg` (2.9 GB), the `azubiweg` system user, its unit files, and its Caddy blocks, including the
+       public plain-HTTP mirror on the raw IP (old file: `/etc/caddy/Caddyfile.pre-cleanup-2026-10-02`). Production
+       AzubiWeg runs on Oracle and was not touched.
+     - Docker + containerd (only ran that Postgres), rclone, the old `media-vault-tunnel.service` + `cloudflared`,
+       Tailscale.
+     - Google Cloud Ops Agent (147 MB RAM) after deleting the OS policy that kept reinstalling it
+       (`goog-ops-agent-v2-template-1-7-0-us-central1-a`); OS Config agent (`enable-osconfig=FALSE`); snapd + its
+       `google-cloud-cli` snap; `lxd-installer` / `lxd-agent-loader`.
+     - GCP: firewall rules `default-allow-rdp` and `azubiweg-http`, network tag `azubiweg`. VM renamed
+       `instance-20260721-163210` → **`grimoire`** (hostname followed; same static IP). SSH:
+       `gcloud compute ssh grimoire --zone us-central1-a`.
+     Result: clean reboot, no failed units; disk 13 GB → 5.5 GB, RAM in use ~410 MB → ~310 MB; only ports 22, 80
+     and 443 listen publicly. Still running: `grimoire`, `caddy`, `cron` (nightly DB backup), `google-guest-agent`
+     (SSH keys), unattended security upgrades.
+     Won't fix: the GCP project id `azubiweg` and the static IP's name `azubiweg-ip` can't be renamed (labels only).
+
+113. **Trusted devices can't be listed or revoked** (medium, security). A verified device stays trusted for a year
+     (`gr_device`), and nothing in the app shows or removes them. A PIN change (#111) ends other sessions, but a
+     device that kept its `gr_device` cookie only needs the new PIN to get back in. **Fix:** Settings → Devices:
+     list (browser from user-agent, first seen, last seen) with Revoke; the PIN-change form gets "also sign out
+     every other device" (deletes the other `TrustedDevice` rows). Slots into Phase 5 step 18 (Settings).
+
+114. **Nothing watches the server any more** (medium). With the Ops Agent gone there are no GCP dashboards or
+     alerts, and nothing ever watched `/health`. Promotes Polish #7: add a free external check (e.g. UptimeRobot,
+     5-min interval) on `https://grimoire-app.duckdns.org/health`, alerting to the account email. Needs the user to
+     create the monitor account; then a one-line note here with the monitor name.
+
+115. **Left on the user's side after Tailscale's removal** (low). The iPhone still has the Tailscale app and the
+     tailnet (account `Plesnte25`) still exists; the server node is logged out. Delete the app / tailnet if they
+     aren't used for anything else. Not a repo task.
 
 ### Found while shipping Phase 0 (2026-10-01)
 
@@ -604,7 +652,7 @@ Jikan was down, see #82)
 
 6. **Deploy is manual and fiddly**: a fresh `gh auth token` per pull, rebuilding both apps, `npm approve-scripts`
    after installs, restarting the service. A `scripts/deploy.sh` run over SSH would make it one command.
-7. **No uptime monitoring**: `/health` exists (`backend/src/index.ts:54`) but nothing watches it. A free external
+7. **No uptime monitoring** (now tracked as #114, more urgent since the Ops Agent was removed): `/health` exists (`backend/src/index.ts:54`) but nothing watches it. A free external
    check (e.g. UptimeRobot) would flag outages on the 1 GB VM.
 8. ✅ **Fixed** (`9252d3c`) — **Stale `mv_*` names in comments**: `backend/prisma/schema.prisma` still says `mv_device`, `mv_session` and
    `mv_pending_device` after the cookie rename to `gr_*`.
