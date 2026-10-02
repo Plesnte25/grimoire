@@ -111,6 +111,7 @@ model MediaItem {
   TierEntry TierEntry[]
   episodeGuide Episode[]
   episodeGuideCache EpisodeSeasonCache[]
+  reminder Reminder?
 
   @@unique([provider, providerId])
   @@index([collectionId])
@@ -150,6 +151,7 @@ model WatchLog {
   fromEpisode       Int?
   toEpisode         Int?
   label             String?
+  clientMutationId  String?   @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -243,6 +245,7 @@ model CustomList {
   updatedAt   DateTime @updatedAt
 
   items ListItem[]
+  shares CustomListShare[]
 
   @@index([kind, mediaType])
 }
@@ -259,6 +262,15 @@ model ListItem {
   media MediaItem  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
 
   @@unique([listId, mediaId])
+}
+
+model CustomListShare {
+  id        String   @id @default(cuid())
+  listId    String   @unique
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+
+  list CustomList @relation(fields: [listId], references: [id], onDelete: Cascade)
 }
 
 // Tier lists: drag items into S / A / B / C / D rows (KNOWN_ISSUES #67).
@@ -282,6 +294,27 @@ model TierEntry {
   media    MediaItem @relation(fields: [mediaId], references: [id], onDelete: Cascade)
 
   @@unique([tierListId, mediaId])
+}
+
+model Reminder {
+  id        String   @id @default(cuid())
+  mediaId   String   @unique
+  pinned    Boolean  @default(false)
+  untilAt   DateTime?
+  updatedAt DateTime @updatedAt
+
+  media MediaItem @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+}
+
+model AnnualGoal {
+  id        String   @id @default(cuid())
+  year      Int
+  scope     String   @default("ALL") // ALL | MOVIE | TV | ANIME | BOOK
+  target    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([year, scope])
 }
 
 // --- Auth (single-account: PIN unlock on trusted devices, email OTP to trust a new device) ---
