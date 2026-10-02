@@ -5,6 +5,7 @@ set -euo pipefail
 : "${GRIMOIRE_DEPLOY_DIR:?Set GRIMOIRE_DEPLOY_DIR to the absolute repository path on the server}"
 
 branch="${GRIMOIRE_DEPLOY_BRANCH:-main}"
+bundle="${GRIMOIRE_DEPLOY_BUNDLE:-}"
 if [[ "$GRIMOIRE_DEPLOY_DIR" != /* || "$GRIMOIRE_DEPLOY_DIR" == "/" ]]; then
   printf '%s\n' "GRIMOIRE_DEPLOY_DIR must be an absolute non-root path." >&2
   exit 2
@@ -17,12 +18,24 @@ if [[ ! "$branch" =~ ^[A-Za-z0-9._/-]+$ || "$branch" == -* ]]; then
   printf '%s\n' "GRIMOIRE_DEPLOY_BRANCH contains unsupported characters." >&2
   exit 2
 fi
+if [[ -n "$bundle" && ( "$bundle" != /* || "$bundle" == *"'"* ) ]]; then
+  printf '%s\n' "GRIMOIRE_DEPLOY_BUNDLE must be an absolute path without single quotes." >&2
+  exit 2
+fi
 
 printf -v remote_dir '%q' "$GRIMOIRE_DEPLOY_DIR"
 printf -v remote_backup_dir '%q' "$GRIMOIRE_DEPLOY_DIR/backups"
 printf -v remote_branch '%q' "$branch"
+if [[ -n "$bundle" ]]; then
+  printf -v remote_bundle '%q' "$bundle"
+  source_update="git fetch $remote_bundle $remote_branch &&
+    git merge --ff-only FETCH_HEAD &&
+    rm -- $remote_bundle"
+else
+  source_update="git pull --ff-only origin $remote_branch"
+fi
 remote_command="cd $remote_dir &&
-  git pull --ff-only origin $remote_branch &&
+  $source_update &&
   cd backend &&
   npm ci &&
   npx prisma generate &&
