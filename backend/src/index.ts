@@ -20,7 +20,9 @@ import { catalogRouter } from "./routes/catalog.js";
 import { providersRouter } from "./routes/providers.js";
 import suggestionsRouter from "./routes/suggestions.js";
 import { authRouter } from "./routes/auth.js";
+import { homeRouter } from "./routes/home.js";
 import { requireSession } from "./middleware/requireSession.js";
+import { scheduleDailyMetadataRefresh } from "./services/dailyRefresh.js";
 
 const app = express();
 
@@ -59,6 +61,7 @@ app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 
 app.use("/api/auth", authRouter);
 
+app.use("/api/home", requireSession, homeRouter);
 app.use("/api/providers", requireSession, providersRouter);
 app.use("/api/library", requireSession, libraryRouter);
 app.use("/api/lists", requireSession, listsRouter);
@@ -105,3 +108,4 @@ process.on("uncaughtException", (err) => {
 const port = Number(process.env.PORT || 5050);
 const host = process.env.HOST || "127.0.0.1";
 app.listen(port, host, () => console.log(`Backend running on http://${host}:${port}`));
+scheduleDailyMetadataRefresh();

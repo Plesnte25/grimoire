@@ -9,6 +9,8 @@ import {
   fetchItem,
   fetchItemLogs,
   fetchTags,
+  deleteReminder,
+  setReminder,
   setItemTags,
   updateItem,
   updateLog,
@@ -33,6 +35,7 @@ import { REGIONS, REGION_LABEL, countryName } from "../lib/regions";
 import { ManualDetailsEditor } from "../components/ManualDetailsEditor";
 import { CountryFlag } from "../components/CountryFlag";
 import { EpisodeGuide } from "../components/EpisodeGuide";
+import { WhereToWatch } from "../components/WhereToWatch";
 
 const TYPE_LABEL = { MOVIE: "Movie", TV: "TV", ANIME: "Anime", BOOK: "Book" } as const;
 const CREATOR_LABEL = { MOVIE: "Directed by", TV: "Created by", ANIME: "Studio", BOOK: "By" } as const;
@@ -58,6 +61,16 @@ export function MediaDetail() {
   const [posterAccent, setPosterAccent] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"overview" | "episodes">("overview");
   const [descriptionRevealed, setDescriptionRevealed] = useState(false);
+  const reminderMutation = useMutation({
+    mutationFn: () => item?.reminder?.pinned
+      ? deleteReminder(item.id)
+      : setReminder(item!.id, { pinned: true, untilAt: null }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["item", id] });
+      qc.invalidateQueries({ queryKey: ["home"] });
+    },
+    onError: (e: any) => showToast({ message: e?.response?.data?.error ?? "Couldn’t save this reminder", timeoutMs: 6000 }),
+  });
 
   // Sync the notes draft from the loaded item so saving without editing keeps
   // the real value instead of overwriting it.
@@ -296,6 +309,16 @@ export function MediaDetail() {
                   See the whole {item.franchise?.title ?? "franchise"} →
                 </button>
               ) : null}
+              {item.status === "PLANNED" ? (
+                <button
+                  type="button"
+                  disabled={reminderMutation.isPending}
+                  className="min-h-11 rounded-xl border border-[var(--line2)] px-4 text-sm font-semibold text-[var(--tx)] hover:bg-[var(--s2)] disabled:opacity-50"
+                  onClick={() => reminderMutation.mutate()}
+                >
+                  {reminderMutation.isPending ? "Saving…" : item.reminder?.pinned ? "Remove reminder" : "Remind me"}
+                </button>
+              ) : null}
               {item.collectionId && item.collectionSource === "tmdb" ? (
                 <button className="min-h-11 rounded-xl bg-white/10 px-4 text-sm hover:bg-white/15" onClick={() => nav(`/collection/${item.collectionId}`)}>
                   Part of {item.collectionName ?? "a collection"} →
@@ -330,6 +353,8 @@ export function MediaDetail() {
               ))}
             </ul>
           ) : null}
+
+          {preferences ? <WhereToWatch item={item} country={preferences.watchCountry} /> : null}
 
           {item.mediaType === "TV" || item.mediaType === "ANIME" ? (
             <div className="space-y-4">

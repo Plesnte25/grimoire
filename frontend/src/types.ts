@@ -73,6 +73,8 @@ export type MediaItem = {
     nextAirSeason?: number | null;
     nextAirEpisode?: number | null;
     nextAirDate?: string | null;
+    releaseDate?: string | null;
+    digitalReleaseDate?: string | null;
     airedEpisodeCount?: number | null;
     announcedNext?: string | null;
     announcedNextDate?: string | null;
@@ -83,6 +85,7 @@ export type MediaItem = {
     lastAiredSeason?: number | null;
     lastAiredEpisode?: number | null;
     tags?: { tag: Tag }[];
+    reminder?: { pinned: boolean; untilAt: string | null } | null;
     imdbRating?: number | null;
     imdbVotes?: number | null;
     rtCritics?: number | null;
@@ -111,6 +114,12 @@ export type CatalogEntry = {
     libraryId?: string;
     yourStatus?: MediaStatus;
     yourRating?: number | null;
+    airedEpisodeCount?: number | null;
+    progressValue?: number | null;
+    nextAirEpisode?: number | null;
+    nextAirDate?: string | null;
+    announcedNext?: string | null;
+    announcedNextDate?: string | null;
 };
 
 export type Tag = { id: string; name: string; kind: "TAG" | "MOOD"; color?: string | null; count?: number };
@@ -166,6 +175,37 @@ export type TrustedDevice = {
     lastSeenAt: string;
     isCurrent: boolean;
 };
+
+export type HomeTitle = MediaItem & {
+    newEpisodeCount: number;
+    reminder: { pinned: boolean; untilAt: string | null } | null;
+};
+
+export type AnnualGoalProgress = {
+    id: string;
+    year: number;
+    scope: "ALL" | MediaType;
+    target: number;
+    completed: number;
+};
+
+export type HomeSnapshot = {
+    readyToWatch: HomeTitle[];
+    comingSoon: HomeTitle[];
+    continueWatching: HomeTitle[];
+    rewatch: HomeTitle[];
+    goals: AnnualGoalProgress[];
+    top10: CustomList[];
+};
+
+export type WatchProvider = {
+    id: number;
+    name: string;
+    logoUrl: string | null;
+    availability: "flatrate" | "rent" | "buy";
+};
+
+export type Trailer = { id: string; name: string; type: string; url: string };
 
 export type Tier = "S" | "A" | "B" | "C" | "D";
 

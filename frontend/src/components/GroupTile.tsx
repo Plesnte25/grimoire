@@ -35,6 +35,17 @@ export function GroupTile({ items, name, kind }: { items: MediaItem[]; name?: st
   const poster = kind === "franchise" ? first.franchise?.posterUrl ?? first.posterUrl : first.posterUrl;
   const title = name ?? first.title;
   const summary = kind === "franchise" ? roleSummary(items) : `${items.length} films`;
+  const newEpisodes = items
+    .filter((item) => item.status !== "DROPPED")
+    .reduce((count, item) => count + Math.max(0, (item.airedEpisodeCount ?? 0) - (item.progressValue ?? 0)), 0);
+  const announced = items.find((item) => item.announcedNext || item.nextAirDate);
+  const airingSummary = newEpisodes
+    ? `${newEpisodes} new episode${newEpisodes === 1 ? "" : "s"}`
+    : announced?.announcedNext
+      ? announced.announcedNext
+      : announced?.nextAirDate
+        ? `Next · ${new Date(announced.nextAirDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+        : null;
   const href = kind === "franchise" ? `/franchise/${first.franchiseId}` : `/collection/${first.collectionId}`;
   const status = statusLabel(groupStatus(items), first.mediaType);
 
@@ -53,7 +64,7 @@ export function GroupTile({ items, name, kind }: { items: MediaItem[]; name?: st
           {poster ? <img src={poster} alt="" loading="lazy" className="h-full w-full object-cover transition group-hover:scale-[1.03]" /> : null}
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2.5 pt-10">
             <div className="line-clamp-2 text-sm font-semibold">{title}</div>
-            <div className="text-xs text-white/85">{summary}</div>
+            <div className="text-xs text-white/85">{summary}{airingSummary ? ` · ${airingSummary}` : ""}</div>
           </div>
           <div className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[11px]">{status}</div>
         </div>

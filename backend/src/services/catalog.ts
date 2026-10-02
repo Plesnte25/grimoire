@@ -21,6 +21,12 @@ export type CatalogEntry = {
     libraryId?: string;
     yourStatus?: string;
     yourRating?: number | null;
+    airedEpisodeCount?: number | null;
+    progressValue?: number | null;
+    nextAirEpisode?: number | null;
+    nextAirDate?: Date | null;
+    announcedNext?: string | null;
+    announcedNextDate?: Date | null;
 };
 
 const CACHE = new Map<string, { at: number; data: unknown }>();
@@ -41,12 +47,35 @@ async function withLibrary(entries: CatalogEntry[]): Promise<CatalogEntry[]> {
         where: {
             OR: entries.map((e) => ({ provider: e.provider, providerId: e.providerId })),
         },
-        select: { id: true, provider: true, providerId: true, status: true, yourRating: true },
+        select: {
+            id: true,
+            provider: true,
+            providerId: true,
+            status: true,
+            yourRating: true,
+            airedEpisodeCount: true,
+            progressValue: true,
+            nextAirEpisode: true,
+            nextAirDate: true,
+            announcedNext: true,
+            announcedNextDate: true,
+        },
     });
     const byKey = new Map(items.map((i) => [`${i.provider}:${i.providerId}`, i]));
     return entries.map((e) => {
         const it = byKey.get(`${e.provider}:${e.providerId}`);
-        return it ? { ...e, libraryId: it.id, yourStatus: it.status, yourRating: it.yourRating } : e;
+        return it ? {
+            ...e,
+            libraryId: it.id,
+            yourStatus: it.status,
+            yourRating: it.yourRating,
+            airedEpisodeCount: it.airedEpisodeCount,
+            progressValue: it.progressValue,
+            nextAirEpisode: it.nextAirEpisode,
+            nextAirDate: it.nextAirDate,
+            announcedNext: it.announcedNext,
+            announcedNextDate: it.announcedNextDate,
+        } : e;
     });
 }
 
@@ -148,7 +177,25 @@ export async function franchiseView(franchiseId: string) {
     // Library entries the map doesn't know (AniList data shifts) still show up.
     const tracked = await prisma.mediaItem.findMany({
         where: { franchiseId },
-        select: { provider: true, providerId: true, title: true, format: true, franchiseRole: true, year: true, posterUrl: true, releaseDate: true },
+        select: {
+            provider: true,
+            providerId: true,
+            title: true,
+            format: true,
+            franchiseRole: true,
+            year: true,
+            posterUrl: true,
+            releaseDate: true,
+            id: true,
+            status: true,
+            yourRating: true,
+            airedEpisodeCount: true,
+            progressValue: true,
+            nextAirEpisode: true,
+            nextAirDate: true,
+            announcedNext: true,
+            announcedNextDate: true,
+        },
     });
     const known = new Set(entries.map((e) => e.providerId));
     const extra: CatalogEntry[] = tracked
@@ -163,6 +210,15 @@ export async function franchiseView(franchiseId: string) {
             year: t.year,
             date: t.releaseDate?.toISOString() ?? null,
             posterUrl: t.posterUrl,
+            libraryId: t.id,
+            yourStatus: t.status,
+            yourRating: t.yourRating,
+            airedEpisodeCount: t.airedEpisodeCount,
+            progressValue: t.progressValue,
+            nextAirEpisode: t.nextAirEpisode,
+            nextAirDate: t.nextAirDate,
+            announcedNext: t.announcedNext,
+            announcedNextDate: t.announcedNextDate,
         }));
 
     return { franchise, entries: await withLibrary([...entries, ...extra]) };

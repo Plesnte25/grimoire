@@ -17,6 +17,7 @@ export const libraryRouter = Router();
 const ITEM_INCLUDE = {
     franchise: { select: { title: true, posterUrl: true, bannerUrl: true } },
     tags: { select: { tag: { select: { id: true, name: true, kind: true, color: true } } } },
+    reminder: { select: { pinned: true, untilAt: true } },
 } as const;
 
 function normalizeGenresInput(input: unknown): string[] {

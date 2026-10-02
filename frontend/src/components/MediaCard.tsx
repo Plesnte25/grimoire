@@ -39,6 +39,20 @@ function titleMeta(item: MediaItem) {
   return parts.join(" · ");
 }
 
+function airingLabel(item: MediaItem): string | null {
+  if (item.status === "IN_PROGRESS" && item.mediaType !== "MOVIE" && item.mediaType !== "BOOK") {
+    const aired = item.airedEpisodeCount ?? item.episodes ?? 0;
+    const unseen = Math.max(0, aired - (item.progressValue ?? 0));
+    if (unseen) return `${unseen} new episode${unseen === 1 ? "" : "s"}`;
+  }
+  if (item.nextAirDate && new Date(item.nextAirDate) > new Date()) {
+    return `Next episode ${new Date(item.nextAirDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  }
+  if (item.announcedNext) return item.announcedNext;
+  if (item.airStatus === "RETURNING") return "Returning";
+  return null;
+}
+
 export function MediaCard({
   item,
   onOpen,
@@ -77,6 +91,9 @@ export function MediaCard({
               {personalRating(item) != null ? (
                 <span className="rounded bg-[var(--youbg)] px-1.5 py-1 text-[10px] font-semibold leading-none text-[var(--you)]">✦ {formatScore(personalRating(item)!)}</span>
               ) : null}
+              {airingLabel(item) ? (
+                <span className="rounded bg-[var(--accbg)] px-1.5 py-1 text-[10px] font-semibold leading-none text-[var(--acc-ink)]">{airingLabel(item)}</span>
+              ) : null}
             </span>
           </span>
         </div>
@@ -101,6 +118,7 @@ export function MediaCard({
         {item.nativeTitle && item.nativeTitle !== item.title ? <span className="mt-0.5 block truncate text-xs text-[var(--tx3)]" lang={item.originalLanguage ?? undefined} dir={item.originalLanguage === "ur" ? "rtl" : undefined}>{item.nativeTitle}</span> : null}
         <span className="mt-1 block text-xs text-[var(--tx3)]">{titleMeta(item)}{titleMeta(item) ? " · " : ""}{statusLabel(item.status, item.mediaType)}</span>
         {item.progressText ? <span className="mt-1 block text-xs tabular-nums text-[var(--tx2)]">{item.progressText}</span> : null}
+        {airingLabel(item) ? <span className="mt-1 block text-xs font-medium text-[var(--acc)]">{airingLabel(item)}</span> : null}
       </span>
       <span className="max-w-[32%] shrink-0 truncate text-xs tabular-nums">
         {mine != null ? (

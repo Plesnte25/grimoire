@@ -6,8 +6,96 @@ import { regionForCountry } from "../lib/regions.js";
 import { tmdbSearch, tmdbDetails } from "../services/providers/tmdb.js";
 import { anilistSearch, anilistDetails } from "../services/providers/anilist.js";
 import { googleBooksSearch, googleBooksDetails } from "../services/providers/googleBooks.js";
+import { prisma } from "../db.js";
+import { tmdbGet, TMDB_IMAGE_BASE } from "../services/providers/tmdb.js";
 
 export const providersRouter = Router();
+
+const providerResultCache = new Map<string, { expiresAt: number; data: unknown }>();
+
+function fromCache<T>(key: string): T | null {
+    const value = providerResultCache.get(key);
+    if (!value) return null;
+    if (value.expiresAt <= Date.now()) {
+        providerResultCache.delete(key);
+        return null;
+    }
+    return value.data as T;
+}
+
+function toCache(key: string, data: unknown) {
+    if (providerResultCache.size > 500) providerResultCache.clear();
+    providerResultCache.set(key, { expiresAt: Date.now() + 12 * 60 * 60 * 1000, data });
+}
+
+async function linkedTmdb(mediaId: string) {
+    const item = await prisma.mediaItem.findUnique({ where: { id: mediaId } });
+    if (!item) return { item: null, id: null, type: null };
+    const id = item.provider === "tmdb" ? item.providerId : item.tmdbId;
+    const type = item.provider === "tmdb"
+        ? (item.mediaType === "MOVIE" ? "movie" : item.mediaType === "TV" ? "tv" : null)
+        : item.tmdbMediaType === "MOVIE" ? "movie" : item.tmdbMediaType === "TV" ? "tv" : null;
+    return { item, id: id && type ? id : null, type };
+}
+
+providersRouter.get("/media/:mediaId/watch", asyncHandler(async (req, res) => {
+    const { mediaId, country } = parseOrThrow(z.object({
+        mediaId: z.string().min(1),
+        country: z.string().regex(/^[A-Za-z]{2}$/).transform((value) => value.toUpperCase()),
+    }), { ...req.params, ...req.query });
+    const { item, id, type } = await linkedTmdb(mediaId);
+    if (!item) return res.status(404).json({ error: "Title not found" });
+    if (!id || !type) return res.json({ available: false, providers: [], link: null });
+
+    const cacheKey = `watch:${id}:${type}:${country}`;
+    const cached = fromCache<{ available: boolean; providers: unknown[]; link: string | null }>(cacheKey);
+    if (cached) return res.json(cached);
+
+    type Region = {
+        link?: string;
+        flatrate?: { provider_id: number; provider_name: string; logo_path?: string | null }[];
+        rent?: { provider_id: number; provider_name: string; logo_path?: string | null }[];
+        buy?: { provider_id: number; provider_name: string; logo_path?: string | null }[];
+    };
+    const response = await tmdbGet<{ results?: Record<string, Region> }>(
+        `/${type}/${id}/watch/providers`
+    );
+    const region = response?.results?.[country];
+    const providers = [
+        ...(region?.flatrate ?? []).map((provider) => ({ provider, availability: "flatrate" as const })),
+        ...(region?.rent ?? []).map((provider) => ({ provider, availability: "rent" as const })),
+        ...(region?.buy ?? []).map((provider) => ({ provider, availability: "buy" as const })),
+    ].map(({ provider, availability }) => ({
+        id: provider.provider_id,
+        name: provider.provider_name,
+        logoUrl: provider.logo_path ? `${TMDB_IMAGE_BASE}/w92${provider.logo_path}` : null,
+        availability,
+    }));
+    const result = { available: !!region, providers, link: region?.link ?? null };
+    toCache(cacheKey, result);
+    res.json(result);
+}));
+
+providersRouter.get("/media/:mediaId/trailers", asyncHandler(async (req, res) => {
+    const { mediaId } = parseOrThrow(z.object({ mediaId: z.string().min(1) }), req.params);
+    const { item, id, type } = await linkedTmdb(mediaId);
+    if (!item) return res.status(404).json({ error: "Title not found" });
+    if (!id || !type) return res.json({ available: false, trailers: [] });
+
+    const cacheKey = `trailers:${id}:${type}`;
+    const cached = fromCache<{ available: boolean; trailers: unknown[] }>(cacheKey);
+    if (cached) return res.json(cached);
+    const response = await tmdbGet<{ results?: { id: string; name: string; site: string; key: string; type: string }[] }>(
+        `/${type}/${id}/videos`
+    );
+    const trailers = (response?.results ?? [])
+        .filter((video) => video.site === "YouTube" && (video.type === "Trailer" || video.type === "Teaser"))
+        .slice(0, 8)
+        .map((video) => ({ id: video.id, name: video.name, type: video.type, url: `https://www.youtube.com/watch?v=${encodeURIComponent(video.key)}` }));
+    const result = { available: !!response, trailers };
+    toCache(cacheKey, result);
+    res.json(result);
+}));
 
 providersRouter.get("/search", asyncHandler(async (req, res) => {
     const parsed = parseOrThrow(z.object({

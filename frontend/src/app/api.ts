@@ -1,7 +1,7 @@
 import axios from "axios";
 import type {
     AccountPreferences, MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
-    CatalogEntry, Episode, TrustedDevice,
+    CatalogEntry, Episode, TrustedDevice, HomeSnapshot, WatchProvider, Trailer,
 } from "../types";
 
 const API_BASE =
@@ -58,6 +58,28 @@ export async function fetchTrustedDevices(): Promise<TrustedDevice[]> {
 export async function revokeTrustedDevice(id: string): Promise<{ isCurrent: boolean }> {
     const res = await api.delete(`/api/auth/devices/${encodeURIComponent(id)}`);
     return res.data;
+}
+
+export async function fetchHomeSnapshot(): Promise<HomeSnapshot> {
+    const res = await api.get("/api/home");
+    return res.data;
+}
+
+export async function setReminder(
+    mediaId: string,
+    value: { pinned?: boolean; untilAt?: string | null }
+) {
+    const res = await api.put(`/api/home/reminders/${encodeURIComponent(mediaId)}`, value);
+    return res.data.reminder;
+}
+
+export async function deleteReminder(mediaId: string) {
+    await api.delete(`/api/home/reminders/${encodeURIComponent(mediaId)}`);
+}
+
+export async function setAnnualGoal(year: number, scope: "ALL" | MediaType, target: number) {
+    const res = await api.put(`/api/home/goals/${year}/${scope}`, { target });
+    return res.data.goal;
 }
 
 export async function fetchAccountPreferences(): Promise<AccountPreferences> {
@@ -279,6 +301,20 @@ export async function fetchSeasons(mediaId: string): Promise<Season[]> {
 
 export async function fetchEpisodes(mediaId: string, season: number): Promise<{ episodes: Episode[]; available: boolean }> {
     const res = await api.get(`/api/library/${mediaId}/seasons/${season}/episodes`);
+    return res.data;
+}
+
+export async function fetchWatchProviders(mediaId: string, country: string): Promise<{
+    available: boolean;
+    providers: WatchProvider[];
+    link: string | null;
+}> {
+    const res = await api.get(`/api/providers/media/${encodeURIComponent(mediaId)}/watch`, { params: { country } });
+    return res.data;
+}
+
+export async function fetchTrailers(mediaId: string): Promise<{ available: boolean; trailers: Trailer[] }> {
+    const res = await api.get(`/api/providers/media/${encodeURIComponent(mediaId)}/trailers`);
     return res.data;
 }
 

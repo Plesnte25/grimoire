@@ -17,6 +17,16 @@ export function CatalogCard({ entry, subtitle, invalidate }: { entry: CatalogEnt
   const [adding, setAdding] = useState(false);
   const mine = !!entry.libraryId;
   const upcoming = entry.status === "UPCOMING" || entry.status === "NOT_YET_RELEASED";
+  const newEpisodes = mine && entry.yourStatus !== "DROPPED"
+    ? Math.max(0, (entry.airedEpisodeCount ?? 0) - (entry.progressValue ?? 0))
+    : 0;
+  const airLabel = newEpisodes
+    ? `${newEpisodes} new episode${newEpisodes === 1 ? "" : "s"}`
+    : entry.announcedNext
+      ? `${entry.announcedNext}${entry.announcedNextDate ? ` · ${new Date(entry.announcedNextDate).toLocaleDateString(undefined, { month: "short", year: "numeric" })}` : ""}`
+      : entry.nextAirEpisode && entry.nextAirDate
+        ? `Ep ${entry.nextAirEpisode} · ${new Date(entry.nextAirDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+        : null;
 
   const add = async () => {
     setAdding(true);
@@ -47,6 +57,7 @@ export function CatalogCard({ entry, subtitle, invalidate }: { entry: CatalogEnt
       <div className="text-xs text-white/75">
         {[subtitle, entry.year, upcoming ? "Upcoming" : null].filter(Boolean).join(" · ")}
       </div>
+      {airLabel ? <div className="mt-1 text-xs font-medium text-[var(--acc)]">{airLabel}</div> : null}
       <div className="mt-auto pt-2">
         {mine ? (
           <div className="text-xs text-white/90">
