@@ -8,16 +8,16 @@ commit once done. Issues are discussed and fixed one at a time.
 
 - **Done:** Phases 0–3 deployed (see Build order). Ongoing episode totals (#14) are implemented; 2026-10-02:
   Tailscale removed, app-level auth hardened (#111), VM cleaned to Grimoire-only and renamed `grimoire` (#112).
-- **Remaining within delivered phases:** none identified. The category country filter covers anime origin
-  filtering (Phase 3 H); creator cards/search (#18), franchise airing display/refresh (Phase 3 G), manual anime
-  franchise grouping (#78), and higher-resolution book covers (#25) are implemented in this worktree.
+- **Done:** remaining repository-backed backlog work (#18, Phase 3 G/H, #25, #30, #56, #63, #68–74, #78,
+  #91–108, #113) is implemented and deployed to the live app in commit `a9a66ab` (2026-10-02).
 - **Open, outside the phases:** home-network DNS (#1), uptime check (#114), Tailscale leftovers on the user's
-  side (#115), and deployment of the pending worktree changes.
+  side (#115), authenticated visual screenshot review, and Jikan availability (#82; retries are implemented).
 - **Done:** Phase 4 design foundation (2026-10-02): local fonts/icons, bundled common-country flag SVGs with
   Unicode fallback, responsive app shell,
   per-device appearance controls, shared search, focus/reduced-motion baseline, solid surfaces and poster-accent tint.
-- **Implemented in this worktree, not deployed:** Phases 5–7. Backend/frontend builds and Prisma migration parity
-  pass; authenticated screenshot review, production deployment and production migration remain outstanding.
+- **Done and deployed:** Phases 5–7. Backend/frontend builds and Prisma migration parity passed; the live DB was
+  backed up before all four forward migrations were applied (`/opt/grimoire/backups/pre-deploy-20261002T161827Z.db`).
+  The public health endpoint and homepage return successfully. Authenticated visual screenshot review remains pending.
 
 ## Open — needs a fix
 
@@ -117,7 +117,7 @@ Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for th
      The GCP Console display name is now `grimoire`; the immutable project ID remains `azubiweg`, and the static
      IP's resource name remains `azubiweg-ip`.
 
-113. ✅ **Implemented** (2026-10-02; pending deployment) — **Trusted devices can be listed and revoked** (medium, security). Settings lists
+113. ✅ **Deployed** (2026-10-02) — **Trusted devices can be listed and revoked** (medium, security). Settings lists
      verified browsers with first/last seen dates and supports revocation. Changing the PIN can also delete every
      other trusted device, not only its active sessions.
 
@@ -650,35 +650,36 @@ Jikan was down, see #82)
     shielding for incomplete titles (#98, #71). Guide cache expires after seven days.
 
 **Phase 6: Up next**
-20. ✅ **Implemented** (2026-10-02; not deployed): daily airing/release refresh also retries missing MAL scores (#82);
+20. ✅ **Deployed** (2026-10-02): daily airing/release refresh also retries missing MAL scores (#82);
     snoozes (#101), airing badges, and new-episode counts (#103) (#39–43).
-21. ✅ **Implemented** (2026-10-02; not deployed): Home "Up next" (#91) with Ready to watch, Coming soon,
+21. ✅ **Deployed** (2026-10-02): Home "Up next" (#91) with Ready to watch, Coming soon,
     Continue and Favourites shelves.
-22. ✅ **Implemented** (2026-10-02; not deployed): goals (#69), "What should I watch tonight?" (#65), and
+22. ✅ **Deployed** (2026-10-02): goals (#69), "What should I watch tonight?" (#65), and
     rewatch nudges (#72) on Home.
-23. ✅ **Implemented** (2026-10-02; not deployed): country-aware watch providers and trailers (#73, #107);
+23. ✅ **Deployed** (2026-10-02): country-aware watch providers and trailers (#73, #107);
     "Remind me" pins titles to Coming soon (#106).
 
 **Phase 7: reflection, sharing, app**
-24. ✅ **Implemented** (2026-10-02; not deployed): taste-based suggestions (#68), rating-weighted (#57),
+24. ✅ **Deployed** (2026-10-02): taste-based suggestions (#68), rating-weighted (#57),
     region-aware (#36), with cache short-circuiting (#30).
-25. ✅ **Implemented** (2026-10-02; not deployed): yearly stats / "Grimoire Wrapped" (#63), including monthly
+25. ✅ **Deployed** (2026-10-02): yearly stats / "Grimoire Wrapped" (#63), including monthly
     bars, personal/provider rating comparison, rating distribution and country-origin donut.
-26. ✅ **Implemented** (2026-10-02; not deployed): authenticated JSON export and merge import (#56).
-27. ✅ **Implemented** (2026-10-02; not deployed): revocable public list sharing (#74).
-28. ✅ **Implemented** (2026-10-02; not deployed): PWA installability, self-hosted fonts and idempotent offline
+26. ✅ **Deployed** (2026-10-02): authenticated JSON export and merge import (#56).
+27. ✅ **Deployed** (2026-10-02): revocable public list sharing (#74).
+28. ✅ **Deployed** (2026-10-02): PWA installability, self-hosted fonts and idempotent offline
     log queue (#104). Queued logs are stored in browser localStorage and are not encrypted.
-29. **Partially implemented:** SSH deploy script (#6) added but not run; low-resolution book covers (#25) remain
-    unimplemented. Uptime check (#114; formerly Polish #7) needs the user's external monitoring account.
+29. ✅ **Deployed** (2026-10-02): SSH deploy script (#6) ran successfully with a production DB snapshot before
+    migrations. Higher-resolution book covers (#25) are deployed. Uptime check (#114; formerly Polish #7) still
+    needs the user's external monitoring account.
 
 ## Polish / optimization
 
-6. **Deploy is manual and fiddly**: a `scripts/deploy.sh` now automates the build, migrations and service restart
-   over SSH using explicit host/path settings. It has not been run; deployment and production migration still need
-   an authorized operator.
+6. ✅ **Implemented** (2026-10-02): `scripts/deploy.sh` targets Compute Engine instance `grimoire` in
+   `us-central1-a` / project ID `azubiweg`; it bundles the local commit, snapshots SQLite before migrations,
+   rebuilds both apps, and verifies service health.
 7. **No uptime monitoring** (tracked as #114, more urgent since the Ops Agent was removed): `/health` exists (`backend/src/index.ts:54`) but nothing watches it. A free external
    check (e.g. UptimeRobot) would flag outages on the 1 GB VM.
 8. ✅ **Fixed** (`9252d3c`) — **Stale `mv_*` names in comments**: `backend/prisma/schema.prisma` still says `mv_device`, `mv_session` and
    `mv_pending_device` after the cookie rename to `gr_*`.
-30. ✅ **Implemented** (2026-10-02; pending deployment) — **Suggestions cache short-circuits**: non-refresh
+30. ✅ **Deployed** (2026-10-02) — **Suggestions cache short-circuits**: non-refresh
     requests now return the cached "because you like" block before provider discovery calls.
