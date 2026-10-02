@@ -114,7 +114,8 @@ Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for th
      Result: clean reboot, no failed units; disk 13 GB → 5.5 GB, RAM in use ~410 MB → ~310 MB; only ports 22, 80
      and 443 listen publicly. Still running: `grimoire`, `caddy`, `cron` (nightly DB backup), `google-guest-agent`
      (SSH keys), unattended security upgrades.
-     Won't fix: the GCP project id `azubiweg` and the static IP's name `azubiweg-ip` can't be renamed (labels only).
+     The GCP Console display name is now `grimoire`; the immutable project ID remains `azubiweg`, and the static
+     IP's resource name remains `azubiweg-ip`.
 
 113. ✅ **Implemented** (2026-10-02; pending deployment) — **Trusted devices can be listed and revoked** (medium, security). Settings lists
      verified browsers with first/last seen dates and supports revocation. Changing the PIN can also delete every

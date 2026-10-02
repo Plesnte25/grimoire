@@ -1,41 +1,49 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${GRIMOIRE_DEPLOY_HOST:?Set GRIMOIRE_DEPLOY_HOST to the SSH host or alias}"
 : "${GRIMOIRE_DEPLOY_DIR:?Set GRIMOIRE_DEPLOY_DIR to the absolute repository path on the server}"
 
 branch="${GRIMOIRE_DEPLOY_BRANCH:-main}"
-bundle="${GRIMOIRE_DEPLOY_BUNDLE:-}"
-if [[ "$GRIMOIRE_DEPLOY_DIR" != /* || "$GRIMOIRE_DEPLOY_DIR" == "/" ]]; then
-  printf '%s\n' "GRIMOIRE_DEPLOY_DIR must be an absolute non-root path." >&2
-  exit 2
-fi
-if [[ "$GRIMOIRE_DEPLOY_DIR" == *"'"* ]]; then
-  printf '%s\n' "GRIMOIRE_DEPLOY_DIR must not contain single quotes." >&2
+instance="${GRIMOIRE_DEPLOY_INSTANCE:-grimoire}"
+zone="${GRIMOIRE_DEPLOY_ZONE:-us-central1-a}"
+project="${GRIMOIRE_DEPLOY_PROJECT:-azubiweg}"
+
+if [[ "$GRIMOIRE_DEPLOY_DIR" != /* || "$GRIMOIRE_DEPLOY_DIR" == "/" || "$GRIMOIRE_DEPLOY_DIR" == *"'"* ]]; then
+  printf '%s\n' "GRIMOIRE_DEPLOY_DIR must be an absolute non-root path without single quotes." >&2
   exit 2
 fi
 if [[ ! "$branch" =~ ^[A-Za-z0-9._/-]+$ || "$branch" == -* ]]; then
   printf '%s\n' "GRIMOIRE_DEPLOY_BRANCH contains unsupported characters." >&2
   exit 2
 fi
-if [[ -n "$bundle" && ( "$bundle" != /* || "$bundle" == *"'"* ) ]]; then
-  printf '%s\n' "GRIMOIRE_DEPLOY_BUNDLE must be an absolute path without single quotes." >&2
+if [[ ! "$instance" =~ ^[a-z]([-a-z0-9]*[a-z0-9])?$ || ! "$zone" =~ ^[a-z]+-[a-z]+[0-9]+-[a-z]+$ || ! "$project" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]$ ]]; then
+  printf '%s\n' "Set a valid Compute Engine instance name, zone, and project ID." >&2
   exit 2
 fi
 
+commit="$(git rev-parse --verify "$branch^{commit}")"
+bundle_dir="$(mktemp -d /tmp/grimoire-deploy.XXXXXX)"
+bundle_file="$bundle_dir/commit.bundle"
+remote_bundle="/tmp/grimoire-deploy-${commit:0:12}.bundle"
 printf -v remote_dir '%q' "$GRIMOIRE_DEPLOY_DIR"
 printf -v remote_backup_dir '%q' "$GRIMOIRE_DEPLOY_DIR/backups"
+printf -v remote_bundle_arg '%q' "$remote_bundle"
 printf -v remote_branch '%q' "$branch"
-if [[ -n "$bundle" ]]; then
-  printf -v remote_bundle '%q' "$bundle"
-  source_update="git fetch $remote_bundle $remote_branch &&
-    git merge --ff-only FETCH_HEAD &&
-    rm -- $remote_bundle"
-else
-  source_update="git pull --ff-only origin $remote_branch"
-fi
+
+cleanup() {
+  rm -f -- "$bundle_file"
+  rmdir -- "$bundle_dir"
+}
+trap cleanup EXIT
+
+git bundle create "$bundle_file" "$branch"
+gcloud compute ssh "$instance" --zone "$zone" --project "$project" --command "test ! -e '$remote_bundle'"
+gcloud compute scp --zone "$zone" --project "$project" "$bundle_file" "$instance:$remote_bundle"
+
 remote_command="cd $remote_dir &&
-  $source_update &&
+  git fetch $remote_bundle_arg $remote_branch &&
+  git merge --ff-only FETCH_HEAD &&
+  rm -- $remote_bundle_arg &&
   cd backend &&
   npm ci &&
   npx prisma generate &&
@@ -53,4 +61,4 @@ remote_command="cd $remote_dir &&
   sudo systemctl is-active --quiet grimoire &&
   curl --fail --silent --show-error http://127.0.0.1:5050/health"
 
-ssh -- "$GRIMOIRE_DEPLOY_HOST" "$remote_command"
+gcloud compute ssh "$instance" --zone "$zone" --project "$project" --command "$remote_command"
