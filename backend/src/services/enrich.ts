@@ -85,6 +85,56 @@ function slug(s: string) {
         .replace(/^-|-$/g, "");
 }
 
+function normalizedMatchTitle(value: unknown): string {
+    return String(value ?? "")
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+}
+
+async function matchAnimeTmdb(m: any): Promise<Prisma.MediaItemUncheckedUpdateInput> {
+    if (!process.env.TMDB_API_KEY || !m.countryOfOrigin) return {};
+    const searchType = m.format === "MOVIE" ? "movie" : "tv";
+    const endpoint = searchType === "movie" ? "/search/movie" : "/search/tv";
+    const year = m.startDate?.year;
+    const titles = [...new Set([m.title?.english, m.title?.romaji, m.title?.native].filter(Boolean))];
+    const expectedTitles = new Set(titles.map(normalizedMatchTitle));
+    for (const title of titles.slice(0, 3)) {
+        const results = await tmdbGet<{ results?: any[] }>(endpoint, {
+            query: title,
+            ...(year ? { [searchType === "movie" ? "year" : "first_air_date_year"]: year } : {}),
+        });
+        const candidates = (results?.results ?? []).filter((result) => {
+            const resultTitles = [result.title, result.original_title, result.name, result.original_name]
+                .map(normalizedMatchTitle);
+            const exactTitle = resultTitles.some((name) => name && expectedTitles.has(name));
+            const resultYear = Number(String(result.release_date ?? result.first_air_date ?? "").slice(0, 4));
+            const compatibleYear = !year || !resultYear || Math.abs(year - resultYear) <= 1;
+            const animation = (result.genre_ids ?? []).includes(16);
+            return exactTitle && compatibleYear && animation;
+        });
+        for (const candidate of candidates.slice(0, 5)) {
+            const details = await tmdbGet<any>(
+                `/${searchType}/${candidate.id}`,
+                { append_to_response: "external_ids" }
+            );
+            const isAnimation = (details?.genres ?? []).some((genre: any) => genre.id === 16);
+            if (!details || !isAnimation) continue;
+            const origin = searchType === "movie"
+                ? (details.production_countries ?? []).map((country: any) => country.iso_3166_1)
+                : details.origin_country ?? [];
+            if (!origin.includes(m.countryOfOrigin)) continue;
+            return {
+                tmdbId: String(candidate.id),
+                tmdbMediaType: searchType === "movie" ? "MOVIE" : "TV",
+                ...(details.external_ids?.imdb_id ? { imdbId: details.external_ids.imdb_id } : {}),
+            };
+        }
+    }
+    return {};
+}
+
 /* ------------------------------- scores ------------------------------- */
 
 const OMDB_API_KEY = process.env.OMDB_API_KEY;
@@ -328,7 +378,8 @@ const ANIME_QUERY = `
   query ($id: Int) {
     Media(id: $id, type: ANIME) {
       ${ANIME_NODE}
-      idMal episodes duration isAdult genres averageScore
+      idMal episodes duration isAdult genres averageScore popularity
+      stats { scoreDistribution { score amount } }
       description(asHtml: false)
       nextAiringEpisode { episode airingAt }
       studios(isMain: true) { nodes { id name } }
@@ -496,9 +547,24 @@ async function enrichAnilist(item: MediaItem): Promise<Enrichment | null> {
     if (!m) return null;
 
     const root = await resolveFranchiseRoot(m);
+    let tmdbLink: Prisma.MediaItemUncheckedUpdateInput = {};
+    if (!item.tmdbId) {
+        try {
+            tmdbLink = await matchAnimeTmdb(m);
+        } catch (err: any) {
+            console.error(`TMDB anime link lookup failed (${item.title}):`, err?.message ?? err);
+        }
+    }
+    const linkedImdbId = item.imdbId ?? (typeof tmdbLink.imdbId === "string" ? tmdbLink.imdbId : null);
     const next = m.nextAiringEpisode ?? null;
     const sequel = earliest(animeEdges(m, "SEQUEL").filter((e) => e.node.status === "NOT_YET_RELEASED"));
     const studios = m.studios?.nodes ?? [];
+    const anilistPopularity = typeof m.popularity === "number"
+        ? m.popularity
+        : (m.stats?.scoreDistribution ?? []).reduce(
+              (total: number, bucket: { amount?: number }) => total + (bucket.amount ?? 0),
+              0
+          );
 
     let aired: number | null = null;
     if (next?.episode) aired = next.episode - 1;
@@ -526,6 +592,8 @@ async function enrichAnilist(item: MediaItem): Promise<Enrichment | null> {
             globalRating: typeof m.averageScore === "number" ? m.averageScore / 10 : undefined,
             globalRatingText:
                 typeof m.averageScore === "number" ? `AniList (${m.averageScore})` : undefined,
+            anilistPopularity: Number.isInteger(anilistPopularity) ? anilistPopularity : null,
+            ...tmdbLink,
             // Anime grouping moved from collectionId to franchiseId.
             collectionId: null,
             collectionName: null,
@@ -542,6 +610,7 @@ async function enrichAnilist(item: MediaItem): Promise<Enrichment | null> {
             airCheckedAt: new Date(),
             malId: typeof m.idMal === "number" ? m.idMal : null,
             ...(await safeScores(() => jikanScore(typeof m.idMal === "number" ? m.idMal : null), `jikan ${item.title}`)),
+            ...(await safeScores(() => omdbScores(linkedImdbId), `omdb anime ${item.title}`)),
         },
         credits: studios.map((s: any, i: number) => ({
             contributorId: `anilist-studio:${s.id}`,

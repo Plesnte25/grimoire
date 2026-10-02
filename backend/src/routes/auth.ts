@@ -322,3 +322,37 @@ authRouter.post(
         res.json({ ok: true });
     })
 );
+
+authRouter.get(
+    "/preferences",
+    requireSession,
+    asyncHandler(async (_req, res) => {
+        const account = await prisma.accountConfig.findUnique({
+            where: { id: 1 },
+            select: { showAdultContent: true, spoilerShield: true, watchCountry: true },
+        });
+        if (!account) throw httpError(409, "NOT_BOOTSTRAPPED", "Account not set up yet");
+        res.json({ preferences: account });
+    })
+);
+
+authRouter.patch(
+    "/preferences",
+    requireSession,
+    asyncHandler(async (req, res) => {
+        const data = parseOrThrow(
+            z.object({
+                showAdultContent: z.boolean().optional(),
+                spoilerShield: z.boolean().optional(),
+                watchCountry: z.string().regex(/^[A-Za-z]{2}$/).toUpperCase().nullable().optional(),
+            }),
+            req.body
+        );
+        const account = await prisma.accountConfig.update({
+            where: { id: 1 },
+            data,
+            select: { showAdultContent: true, spoilerShield: true, watchCountry: true },
+        });
+        res.json({ preferences: account });
+    })
+);

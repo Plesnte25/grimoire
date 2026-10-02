@@ -30,6 +30,7 @@ model MediaItem {
   // your tracking
   status     String  @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, ON_HOLD, DROPPED
   yourRating Float?
+  yourRatingAt DateTime?
   yourNotes  String?
 
   // progress (generic + type-specific optional fields)
@@ -50,6 +51,9 @@ model MediaItem {
   collectionId     String?
   collectionName   String?
   collectionSource String? // "tmdb" | "anilist"
+  tmdbId           String? // cross-provider TMDB record for AniList anime
+  tmdbMediaType    String? // MOVIE | TV
+  anilistPopularity Int?
 
   // Anime franchise: the original series this entry belongs under.
   franchiseId    String?
@@ -110,6 +114,7 @@ model MediaItem {
   @@index([collectionId])
   @@index([franchiseId])
   @@index([mediaType, region])
+  @@index([tmdbId, tmdbMediaType])
 }
 
 // One anime franchise, keyed by the AniList id of its original series. Holds
@@ -140,6 +145,9 @@ model WatchLog {
   watchedOn         String? // where: "Cinema", "Netflix", "YouTube"…
   watchMode         String? // SUB | DUB | ORIGINAL
   watchedWith       String?
+  fromEpisode       Int?
+  toEpisode         Int?
+  label             String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -255,6 +263,9 @@ model AccountConfig {
   pinHashHex        String
   failedPinAttempts Int       @default(0)
   lockedUntil       DateTime?
+  showAdultContent  Boolean   @default(false)
+  spoilerShield     Boolean   @default(false)
+  watchCountry      String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 }

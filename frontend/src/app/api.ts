@@ -1,6 +1,6 @@
 import axios from "axios";
 import type {
-    MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
+    AccountPreferences, MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
     CatalogEntry,
 } from "../types";
 
@@ -48,6 +48,18 @@ export async function lock() {
 
 export async function setAccountPin(currentPin: string, newPin: string) {
     await api.post("/api/auth/pin", { currentPin, newPin });
+}
+
+export async function fetchAccountPreferences(): Promise<AccountPreferences> {
+    const res = await api.get("/api/auth/preferences");
+    return res.data.preferences;
+}
+
+export async function updateAccountPreferences(
+    patch: Partial<AccountPreferences>
+): Promise<AccountPreferences> {
+    const res = await api.patch("/api/auth/preferences", patch);
+    return res.data.preferences;
 }
 
 // --- Providers ---
@@ -131,6 +143,15 @@ export async function updateItem(id: string, patch: ItemPatch): Promise<MediaIte
     return res.data.item;
 }
 
+export async function linkAnimeTmdbRecord(
+    id: string,
+    tmdbId: string,
+    tmdbMediaType: "MOVIE" | "TV"
+): Promise<MediaItem> {
+    const res = await api.post(`/api/library/${id}/tmdb-link`, { tmdbId, tmdbMediaType });
+    return res.data.item;
+}
+
 export async function deleteLibraryItem(id: string) {
     const res = await api.delete(`/api/library/${id}`);
     return res.data;
@@ -211,6 +232,9 @@ export type LogInput = Partial<
         | "watchedOn"
         | "watchMode"
         | "watchedWith"
+        | "fromEpisode"
+        | "toEpisode"
+        | "label"
     >
 >;
 

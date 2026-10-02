@@ -39,12 +39,21 @@ export const logSchema = z.object({
     watchedOn: text,
     watchMode: z.enum(["SUB", "DUB", "ORIGINAL"]).nullable().optional(),
     watchedWith: text,
-});
+    fromEpisode: z.number().int().positive().nullable().optional(),
+    toEpisode: z.number().int().positive().nullable().optional(),
+    label: text,
+}).refine(
+    (data) => data.fromEpisode == null || data.toEpisode == null || data.fromEpisode <= data.toEpisode,
+    { message: "Episode range must start at or before it ends", path: ["toEpisode"] }
+);
 
 /** A rating given in a log is also your current rating for the item. */
 async function syncItemRating(mediaId: string, rating: number | null | undefined) {
     if (rating === undefined) return;
-    await prisma.mediaItem.update({ where: { id: mediaId }, data: { yourRating: rating } });
+    await prisma.mediaItem.update({
+        where: { id: mediaId },
+        data: { yourRating: rating, yourRatingAt: rating == null ? null : new Date() },
+    });
 }
 
 logsRouter.patch(

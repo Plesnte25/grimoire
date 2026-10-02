@@ -14,18 +14,27 @@ export const MIN_VOTES = 20;
 
 export type OnlineRating = { value: number; source: string; votes?: number; lowConfidence: boolean };
 
-type RatingFields = Pick<MediaItem, "provider" | "globalRating" | "globalRatingText">;
+type RatingFields = Pick<MediaItem, "provider" | "globalRating" | "globalRatingText" | "anilistPopularity">;
 
 export function onlineRating(item: RatingFields): OnlineRating | null {
   if (typeof item.globalRating !== "number") return null;
   const provider = (item.provider ?? "").toLowerCase();
   const source = SOURCE_LABEL[provider] ?? item.provider;
   // TMDB stores "TMDB (6793 votes)" and Google "Google Books (33 ratings)";
-  // AniList's parenthesised number is its own score, not a vote count.
+  // AniList exposes popularity separately from its average score.
   const m =
     provider === "anilist" ? null : /\((\d+)(?:\s+\w+)?\)/.exec(item.globalRatingText ?? "");
-  const votes = m ? Number(m[1]) : undefined;
-  return { value: item.globalRating, source, votes, lowConfidence: votes != null && votes < MIN_VOTES };
+  const votes = provider === "anilist"
+    ? item.anilistPopularity ?? undefined
+    : m
+      ? Number(m[1])
+      : undefined;
+  return {
+    value: item.globalRating,
+    source,
+    votes,
+    lowConfidence: provider !== "anilist" && votes != null && votes < MIN_VOTES,
+  };
 }
 
 export function personalRating(item: Pick<MediaItem, "yourRating">): number | null {
@@ -47,8 +56,11 @@ export function formatVotes(n: number): string {
 
 export function onlineRatingText(r: OnlineRating): string {
   if (r.lowConfidence) return `${r.source}: not enough ratings (${r.votes})`;
-  const votes = r.votes != null ? ` · ${formatVotes(r.votes)} votes` : "";
-  return `${r.source} ${formatScore(r.value)}${votes}`;
+  const count = r.votes != null
+    ? ` · ${formatVotes(r.votes)} ${r.source === "AniList" ? "users" : "votes"}`
+    : "";
+  const value = r.source === "AniList" ? `${Math.round(r.value * 10)}%` : formatScore(r.value);
+  return `${r.source} ${value}${count}`;
 }
 
 export type ScoreChip = { source: string; text: string; label: string };
@@ -60,21 +72,25 @@ export type ScoreChip = { source: string; text: string; label: string };
 export function scoreGroups(item: MediaItem): { audience: ScoreChip[]; critics: ScoreChip[] } {
   const audience: ScoreChip[] = [];
   const critics: ScoreChip[] = [];
-  const votes = (n?: number | null) => (n ? ` · ${formatVotes(n)} votes` : "");
+  const countText = (n?: number | null, noun = "votes") => (n ? ` · ${formatVotes(n)} ${noun}` : "");
 
   const primary = onlineRating(item);
   if (primary && !primary.lowConfidence) {
     audience.push({
       source: primary.source,
-      text: `${formatScore(primary.value)}${votes(primary.votes)}`,
-      label: `${primary.source} ${formatScore(primary.value)} out of 10`,
+      text: primary.source === "AniList"
+        ? `${Math.round(primary.value * 10)}%${countText(primary.votes, "users")}`
+        : `${formatScore(primary.value)}${countText(primary.votes)}`,
+      label: primary.source === "AniList"
+        ? `AniList ${Math.round(primary.value * 10)} percent${primary.votes ? `, ${formatVotes(primary.votes)} users` : ""}`
+        : `${primary.source} ${formatScore(primary.value)} out of 10`,
     });
   }
   if (item.imdbRating != null && (item.imdbVotes ?? 0) >= MIN_VOTES) {
-    audience.push({ source: "IMDb", text: `${formatScore(item.imdbRating)}${votes(item.imdbVotes)}`, label: `IMDb ${formatScore(item.imdbRating)} out of 10` });
+    audience.push({ source: "IMDb", text: `${formatScore(item.imdbRating)}${countText(item.imdbVotes)}`, label: `IMDb ${formatScore(item.imdbRating)} out of 10` });
   }
   if (item.malScore != null && (item.malVotes ?? 0) >= MIN_VOTES) {
-    audience.push({ source: "MyAnimeList", text: `${formatScore(item.malScore)}${votes(item.malVotes)}`, label: `MyAnimeList ${formatScore(item.malScore)} out of 10` });
+    audience.push({ source: "MyAnimeList", text: `${formatScore(item.malScore)}${countText(item.malVotes)}`, label: `MyAnimeList ${formatScore(item.malScore)} out of 10` });
   }
   if (item.rtCritics != null) {
     critics.push({ source: "Rotten Tomatoes", text: `${item.rtCritics}%`, label: `Rotten Tomatoes ${item.rtCritics} percent` });

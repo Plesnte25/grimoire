@@ -148,8 +148,13 @@ libraryRouter.get(
     asyncHandler(async (req, res) => {
         const item = await prisma.mediaItem.findUnique({ where: { id: req.params.id } });
         if (!item) return res.status(404).json({ error: "Not found" });
-        if (item.provider !== "tmdb" || item.mediaType !== "TV") return res.json({ seasons: [] });
-        const show = await tmdbGet(`/tv/${item.providerId}`);
+        const tmdbId = item.provider === "tmdb" && item.mediaType === "TV"
+            ? item.providerId
+            : item.mediaType === "ANIME" && item.tmdbMediaType === "TV"
+              ? item.tmdbId
+              : null;
+        if (!tmdbId) return res.json({ seasons: [] });
+        const show = await tmdbGet(`/tv/${tmdbId}`);
         const seasons = (show?.seasons ?? [])
             .filter((s: any) => s.season_number >= 1)
             .map((s: any) => ({
@@ -375,6 +380,9 @@ libraryRouter.patch(
         if (!current) return res.status(404).json({ error: "Not found" });
 
         const updateData: any = { ...data };
+        if (data.yourRating !== undefined) {
+            updateData.yourRatingAt = data.yourRating == null ? null : new Date();
+        }
         if (data.genres !== undefined) {
             updateData.genres = serializeGenres(data.genres);
         }
@@ -447,6 +455,55 @@ libraryRouter.patch(
 
         const [item] = await prisma.$transaction(ops);
         res.json({ item: withParsedGenres(item) });
+    })
+);
+
+libraryRouter.post(
+    "/:id/tmdb-link",
+    asyncHandler(async (req, res) => {
+        const data = parseOrThrow(
+            z.object({ tmdbId: z.string().regex(/^\d+$/), tmdbMediaType: z.enum(["MOVIE", "TV"]) }),
+            req.body
+        );
+        const item = await prisma.mediaItem.findUnique({ where: { id: req.params.id } });
+        if (!item) return res.status(404).json({ error: "Not found" });
+        if (item.mediaType !== "ANIME" || item.provider !== "anilist") {
+            const err: any = new Error("Only AniList anime can be linked to a TMDB record");
+            err.status = 400;
+            err.code = "INVALID_MEDIA_TYPE";
+            throw err;
+        }
+
+        const tmdbType = data.tmdbMediaType === "MOVIE" ? "movie" : "tv";
+        const details = await tmdbGet(
+            `/${tmdbType}/${data.tmdbId}`,
+            { append_to_response: "external_ids" }
+        );
+        if (!details) {
+            const err: any = new Error("TMDB record not found");
+            err.status = 404;
+            err.code = "TMDB_NOT_FOUND";
+            throw err;
+        }
+        const isAnimation = (details.genres ?? []).some(
+            (genre: { id?: number; name?: string }) => genre.id === 16 || genre.name?.toLowerCase() === "animation"
+        );
+        if (!isAnimation) {
+            const err: any = new Error("The selected TMDB record is not categorized as animation");
+            err.status = 422;
+            err.code = "TMDB_NOT_ANIMATION";
+            throw err;
+        }
+
+        const linked = await prisma.mediaItem.update({
+            where: { id: item.id },
+            data: {
+                tmdbId: data.tmdbId,
+                tmdbMediaType: data.tmdbMediaType,
+                imdbId: details.external_ids?.imdb_id ?? item.imdbId,
+            },
+        });
+        res.json({ item: linked });
     })
 );
 

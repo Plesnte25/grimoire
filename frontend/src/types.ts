@@ -13,6 +13,7 @@ export type ProviderSearchResult = {
     genres?: string[];
     globalRating?: number;
     globalRatingText?: string;
+    isAdult?: boolean;
     nativeTitle?: string;
     countryOfOrigin?: string;
     originalLanguage?: string;
@@ -31,9 +32,11 @@ export type MediaItem = {
     backdropUrl?: string | null;
     globalRating?: number | null;
     globalRatingText?: string | null;
+    isAdult?: boolean | null;
 
     status: MediaStatus;
     yourRating?: number | null;
+    yourRatingAt?: string | null;
     yourNotes?: string | null;
     progressText?: string | null;
     progressValue?: number | null;
@@ -46,6 +49,9 @@ export type MediaItem = {
     collectionId?: string | null;
     collectionName?: string | null;
     collectionSource?: string | null;
+    tmdbId?: string | null;
+    tmdbMediaType?: "MOVIE" | "TV" | null;
+    anilistPopularity?: number | null;
 
     // Phase 1 metadata (stored at add time / by the backfill).
     franchiseId?: string | null;
@@ -123,7 +129,16 @@ export type WatchLog = {
     watchedOn?: string | null;
     watchMode?: WatchMode | null;
     watchedWith?: string | null;
+    fromEpisode?: number | null;
+    toEpisode?: number | null;
+    label?: string | null;
     createdAt: string;
+};
+
+export type AccountPreferences = {
+    showAdultContent: boolean;
+    spoilerShield: boolean;
+    watchCountry: string | null;
 };
 
 export type DiaryLog = WatchLog & {
