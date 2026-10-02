@@ -1,7 +1,7 @@
 import axios from "axios";
 import type {
     AccountPreferences, MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
-    CatalogEntry, Episode, TrustedDevice, HomeSnapshot, WatchProvider, Trailer, YearStats,
+    CatalogEntry, Episode, TrustedDevice, HomeSnapshot, WatchProvider, Trailer, YearStats, SharedList,
 } from "../types";
 
 const API_BASE =
@@ -320,6 +320,30 @@ export async function fetchWatchProviders(mediaId: string, country: string): Pro
 
 export async function fetchTrailers(mediaId: string): Promise<{ available: boolean; trailers: Trailer[] }> {
     const res = await api.get(`/api/providers/media/${encodeURIComponent(mediaId)}/trailers`);
+    return res.data;
+}
+
+export async function createListShare(listId: string): Promise<string> {
+    const res = await api.post(`/api/lists/${encodeURIComponent(listId)}/share`);
+    return res.data.token;
+}
+
+export async function revokeListShare(listId: string) {
+    await api.delete(`/api/lists/${encodeURIComponent(listId)}/share`);
+}
+
+export async function fetchSharedList(token: string): Promise<SharedList> {
+    const res = await api.get(`/api/public/lists/${encodeURIComponent(token)}`);
+    return res.data.list;
+}
+
+export async function fetchBackup(): Promise<Blob> {
+    const res = await api.get("/api/backup/export", { responseType: "blob" });
+    return res.data;
+}
+
+export async function importBackup(data: unknown): Promise<{ ok: true; importedItems: number }> {
+    const res = await api.post("/api/backup/import", data, { timeout: 60_000 });
     return res.data;
 }
 

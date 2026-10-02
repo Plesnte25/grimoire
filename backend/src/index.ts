@@ -21,7 +21,9 @@ import { providersRouter } from "./routes/providers.js";
 import suggestionsRouter from "./routes/suggestions.js";
 import { authRouter } from "./routes/auth.js";
 import { homeRouter } from "./routes/home.js";
+import { backupRouter } from "./routes/backup.js";
 import { statsRouter } from "./routes/stats.js";
+import { publicListsRouter } from "./routes/publicLists.js";
 import { requireSession } from "./middleware/requireSession.js";
 import { scheduleDailyMetadataRefresh } from "./services/dailyRefresh.js";
 
@@ -55,12 +57,14 @@ app.use(
     })
 );
 
-app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
+app.use("/api/backup", requireSession, express.json({ limit: "20mb" }), backupRouter);
+app.use(express.json({ limit: "2mb" }));
 
 app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
 
 app.use("/api/auth", authRouter);
+app.use("/api/public", publicListsRouter);
 
 app.use("/api/home", requireSession, homeRouter);
 app.use("/api/stats", requireSession, statsRouter);

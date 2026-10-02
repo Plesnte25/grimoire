@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import {
   authStatus,
   bootstrapAccount,
@@ -21,6 +21,8 @@ function errMessage(e: any, fallback: string) {
 }
 
 export function PasscodeGate() {
+  const location = useLocation();
+  const isPublicShare = location.pathname.startsWith("/shared/");
   const [stage, setStage] = useState<Stage>("loading");
   const [deviceTrusted, setDeviceTrusted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,9 +42,10 @@ export function PasscodeGate() {
   }
 
   useEffect(() => {
+    if (isPublicShare) return;
     refreshStatus().catch(() => setStage("register"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isPublicShare]);
 
   // --- Login (default, once an account exists) ---
 
@@ -145,7 +148,7 @@ export function PasscodeGate() {
     }
   }
 
-  if (stage === "unlocked") return <Outlet />;
+  if (isPublicShare || stage === "unlocked") return <Outlet />;
 
   if (stage === "loading") {
     return (

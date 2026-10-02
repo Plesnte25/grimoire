@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { createHash, randomBytes } from "node:crypto";
 
 export const listsRouter = Router();
 
@@ -45,6 +46,25 @@ listsRouter.post("/", asyncHandler(async (req, res) => {
 
     const list = await prisma.customList.create({ data });
     res.json({ list });
+}));
+
+listsRouter.post("/:id/share", asyncHandler(async (req, res) => {
+    const list = await prisma.customList.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!list) throw httpError(404, "NOT_FOUND", "List not found");
+    const token = randomBytes(32).toString("hex");
+    await prisma.customListShare.upsert({
+        where: { listId: list.id },
+        create: { listId: list.id, tokenHash: createHash("sha256").update(token).digest("hex") },
+        update: { tokenHash: createHash("sha256").update(token).digest("hex"), createdAt: new Date() },
+    });
+    res.json({ token });
+}));
+
+listsRouter.delete("/:id/share", asyncHandler(async (req, res) => {
+    const list = await prisma.customList.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!list) throw httpError(404, "NOT_FOUND", "List not found");
+    await prisma.customListShare.deleteMany({ where: { listId: list.id } });
+    res.json({ ok: true });
 }));
 
 // The Top 10 for a media type, created on first use.

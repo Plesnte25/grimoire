@@ -11,6 +11,7 @@ import {
 } from "../app/api";
 import { useTheme } from "../app/ThemeProvider";
 import type { AccountPreferences } from "../types";
+import { BackupTools } from "../components/BackupTools";
 
 function browserCountry() {
   try {
@@ -283,6 +284,8 @@ export function Settings() {
           </ul>
         ) : !devicesLoading && !devicesError ? <p className="mt-4 text-sm text-[var(--tx3)]">No trusted devices found.</p> : null}
       </section>
+
+      <BackupTools />
 
       <div className="surface-card mt-4 rounded-[var(--radius-panel)] p-4 md:p-5">
         <div className="font-semibold">This device</div>

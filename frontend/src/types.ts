@@ -219,6 +219,19 @@ export type YearStats = {
     mediaTypes: { mediaType: MediaType; count: number }[];
 };
 
+export type SharedList = {
+    name: string;
+    description: string | null;
+    coverColor: string | null;
+    kind: "LIST" | "TOP10";
+    mediaType: MediaType | null;
+    isRanked: boolean;
+    items: {
+        order: number;
+        media: Pick<MediaItem, "title" | "mediaType" | "year" | "posterUrl" | "globalRating">;
+    }[];
+};
+
 export type Tier = "S" | "A" | "B" | "C" | "D";
 
 export type TierList = {

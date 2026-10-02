@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { deleteList, fetchList, removeListItem, reorderList, setListItemNote, updateList } from "../app/api";
+import { createListShare, deleteList, fetchList, removeListItem, reorderList, revokeListShare, setListItemNote, updateList } from "../app/api";
 import type { CustomList } from "../types";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { showToast } from "../lib/toast";
@@ -59,6 +59,10 @@ export function ListDetail() {
   const [name, setName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
+  const [confirmRevokeShare, setConfirmRevokeShare] = useState(false);
 
   useEffect(() => {
     if (list) {
@@ -143,9 +147,50 @@ export function ListDetail() {
             <button className="min-h-11 rounded-xl px-4 text-sm text-rose-300 hover:bg-rose-500/10" onClick={() => setConfirmDelete(true)}>
               Delete list
             </button>
+            <button
+              type="button"
+              disabled={shareBusy}
+              className="min-h-11 rounded-xl border border-[var(--line2)] px-4 text-sm text-[var(--tx)] hover:bg-[var(--s2)] disabled:opacity-50"
+              onClick={async () => {
+                setShareError(null);
+                setShareBusy(true);
+                try {
+                  const token = await createListShare(list.id);
+                  setShareUrl(new URL(`/shared/${token}`, window.location.origin).toString());
+                } catch (error: any) {
+                  setShareError(error?.response?.data?.error ?? "Could not create a share link");
+                } finally {
+                  setShareBusy(false);
+                }
+              }}
+            >
+              {shareBusy ? "Creating…" : shareUrl ? "Create replacement link" : "Create share link"}
+            </button>
           </div>
         ) : null}
       </div>
+
+      {!isTop10 ? (
+        <section className="surface-raised mt-5 rounded-[var(--radius-card)] p-4" aria-label="Share this list">
+          <p className="text-sm font-medium">Public link</p>
+          <p className="mt-1 text-xs text-[var(--tx3)]">Anyone with the link can view titles and order. Creating a replacement invalidates the previous link.</p>
+          {shareUrl ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <input readOnly aria-label="Public list link" className="min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-sm text-[var(--tx)]" value={shareUrl} />
+              <button type="button" className="min-h-11 rounded-xl bg-[var(--accbg)] px-4 text-sm font-semibold text-[var(--acc-ink)]" onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(shareUrl);
+                  showToast({ message: "Link copied", timeoutMs: 3000 });
+                } catch {
+                  setShareError("Clipboard access is unavailable. Select and copy the link instead.");
+                }
+              }}>Copy</button>
+            </div>
+          ) : null}
+          <button type="button" className="mt-2 min-h-11 text-xs text-[var(--err)] underline underline-offset-2" onClick={() => setConfirmRevokeShare(true)}>Revoke any active link</button>
+          {shareError ? <p role="alert" className="mt-2 text-xs text-[var(--err)]">{shareError}</p> : null}
+        </section>
+      ) : null}
 
       {items.length === 0 ? (
         <p className="mt-6 text-sm text-white/75">
@@ -216,6 +261,24 @@ export function ListDetail() {
           await deleteList(list.id);
           qc.invalidateQueries({ queryKey: ["lists"] });
           nav("/lists");
+        }}
+      />
+      <ConfirmDialog
+        open={confirmRevokeShare}
+        title="Revoke this share link?"
+        body="Anyone using the public link will no longer be able to open this list."
+        confirmLabel="Revoke link"
+        onCancel={() => setConfirmRevokeShare(false)}
+        onConfirm={async () => {
+          setConfirmRevokeShare(false);
+          try {
+            await revokeListShare(list.id);
+            setShareUrl("");
+            setShareError(null);
+            showToast({ message: "Share link revoked", timeoutMs: 3000 });
+          } catch (error: any) {
+            setShareError(error?.response?.data?.error ?? "Could not revoke this link");
+          }
         }}
       />
     </div>

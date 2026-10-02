@@ -13,6 +13,7 @@ import { ContributorPage } from "./pages/ContributorPage";
 import { Library } from "./pages/Library";
 import { You } from "./pages/You";
 import { Stats } from "./pages/Stats";
+import { SharedListPage } from "./pages/SharedList";
 import { AppShell } from "./components/AppShell";
 import { PasscodeGate } from "./components/PasscodeGate";
 
@@ -42,4 +43,5 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  { path: "/shared/:token", element: <SharedListPage /> },
 ]);
