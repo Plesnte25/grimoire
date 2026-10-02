@@ -1,14 +1,16 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import type { MediaType } from "../types";
-import { REGION_LABEL, countryFlag, countryName, type Region } from "../lib/regions";
+import { REGION_LABEL, countryName, type Region } from "../lib/regions";
 import { onlineRating, onlineRatingText } from "../lib/ratings";
 import { ManualAddForm } from "./ManualAddForm";
+import { CountryFlag } from "./CountryFlag";
 
 const TYPE_LABEL: Record<string, string> = { MOVIE: "Movie", TV: "TV show", ANIME: "Anime", BOOK: "Book" };
 import {
   addToLibrary,
+  fetchAccountPreferences,
   providerDetails,
   providerSearch,
   updateLibrary,
@@ -22,6 +24,7 @@ type ProviderSearchResult = {
   nativeTitle?: string;
   countryOfOrigin?: string;
   originalLanguage?: string;
+  isAdult?: boolean;
   isDub?: boolean;
   year?: string;
   posterUrl?: string;
@@ -61,8 +64,6 @@ function normalizeGenresForStorage(genres: unknown): string | undefined {
   return undefined;
 }
 
-const EASE = [0.22, 1, 0.36, 1] as const;
-
 export function SearchModal({
   open,
   onClose,
@@ -80,6 +81,10 @@ export function SearchModal({
   const [rawResults, setRawResults] = useState<ProviderSearchResult[]>([]);
   const [debounced, setDebounced] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
+  const { data: preferences } = useQuery({
+    queryKey: ["account-preferences"],
+    queryFn: fetchAccountPreferences,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -141,9 +146,11 @@ export function SearchModal({
   }, [debounced, open]);
 
   const results = useMemo(() => {
-    if (!mediaTypeFilter) return rawResults;
-    return rawResults.filter((r) => r.mediaType === mediaTypeFilter);
-  }, [rawResults, mediaTypeFilter]);
+    return rawResults.filter((r) =>
+      (!mediaTypeFilter || r.mediaType === mediaTypeFilter) &&
+      (!r.isAdult || preferences?.showAdultContent)
+    );
+  }, [rawResults, mediaTypeFilter, preferences?.showAdultContent]);
 
   async function add(item: ProviderSearchResult) {
     try {
@@ -202,21 +209,18 @@ export function SearchModal({
   }
 
   return (
-    <AnimatePresence>
+    <>
       {open && (
-        <motion.div
-          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim)] p-4"
+          role="presentation"
           onMouseDown={onClose}
         >
-          <motion.div
-            className="w-full max-w-3xl rounded-3xl overflow-hidden border border-white/10 bg-black/40 backdrop-blur-xl"
-            initial={{ y: 18, opacity: 0, scale: 0.98 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 18, opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.22, ease: EASE }}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={mediaTypeFilter ? `Add ${mediaTypeFilter}` : "Add to Grimoire"}
+            className="surface-card w-full max-w-3xl overflow-hidden rounded-[var(--radius-dialog)]"
             onMouseDown={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -233,7 +237,7 @@ export function SearchModal({
               </div>
 
               <button
-                className="text-sm opacity-70 hover:opacity-100 px-3 py-2 rounded-xl hover:bg-white/10 transition"
+                className="min-h-11 rounded-xl px-3 text-sm text-[var(--tx2)] transition-colors hover:bg-[var(--s2)] hover:text-[var(--tx)]"
                 onClick={onClose}
               >
                 Close
@@ -247,7 +251,7 @@ export function SearchModal({
                   autoFocus
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  className="flex-1 rounded-2xl bg-black/35 border border-white/10 px-5 py-4 outline-none focus:border-white/20 transition"
+                  className="min-h-11 flex-1 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-4 py-3 text-[var(--tx)] transition-colors focus-visible:border-[var(--acc)]"
                   placeholder={placeholder}
                 />
                 <div className="text-xs opacity-60 min-w-[92px] text-right">
@@ -277,11 +281,11 @@ export function SearchModal({
                 {results.map((r) => (
                   <button
                     key={`${r.provider}:${r.providerId}`}
-                    className="w-full text-left rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 hover:shadow-lg hover:shadow-black/30 hover:-translate-y-0.5 transition-all overflow-hidden"
+                    className="surface-card w-full overflow-hidden rounded-[var(--radius-card)] text-left transition-colors hover:bg-[var(--s2)]"
                     onClick={() => add(r)}
                   >
                     <div className="flex gap-4 p-3">
-                      <div className="w-14 h-20 rounded-xl overflow-hidden bg-white/5 flex-shrink-0 shadow-md shadow-black/40">
+                      <div className="h-20 w-14 flex-shrink-0 overflow-hidden rounded-[var(--radius-poster)] bg-[var(--s2)]">
                         {r.posterUrl ? (
                           <img
                             src={r.posterUrl}
@@ -294,14 +298,14 @@ export function SearchModal({
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold truncate">{r.title}</div>
                         {r.nativeTitle ? (
-                          <div className="text-sm text-white/80 truncate" lang={r.originalLanguage}>{r.nativeTitle}</div>
+                          <div className="text-sm text-white/80 truncate" lang={r.originalLanguage} dir={r.originalLanguage === "ur" ? "rtl" : undefined}>{r.nativeTitle}</div>
                         ) : null}
                         <div className="text-xs text-white/80 mt-1 flex flex-wrap items-center gap-x-1.5">
                           <span>{TYPE_LABEL[r.mediaType] ?? r.mediaType}</span>
                           {r.year ? <span>· {r.year}</span> : null}
                           {r.countryOfOrigin ? (
                             <span>
-                              · <span aria-hidden="true">{countryFlag(r.countryOfOrigin)}</span> {countryName(r.countryOfOrigin)}
+                              · <CountryFlag code={r.countryOfOrigin} /> {countryName(r.countryOfOrigin)}
                             </span>
                           ) : null}
                           {(() => {
@@ -309,7 +313,7 @@ export function SearchModal({
                             return online && !online.lowConfidence ? <span>· {onlineRatingText(online)}</span> : null;
                           })()}
                           {r.isDub ? (
-                            <span className="ml-1 rounded-full border border-amber-300/60 px-2 py-0.5 text-[11px] text-amber-200">
+                            <span className="ml-1 rounded-full border border-[var(--warn)] px-2 py-0.5 text-[11px] text-[var(--warn)]">
                               Dub
                             </span>
                           ) : null}
@@ -354,9 +358,9 @@ export function SearchModal({
                 )}
               </div>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 }

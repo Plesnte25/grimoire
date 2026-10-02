@@ -206,14 +206,14 @@ export function SuggestionsCarousel({
         ) : (
           <div className="relative group/rail">
             <button
-              className="hidden sm:flex absolute left-1 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/60 hover:bg-black/80 border border-white/15 backdrop-blur-sm items-center justify-center opacity-0 group-hover/rail:opacity-100 transition"
+              className="hidden sm:flex absolute left-1 top-1/2 -translate-y-1/2 z-20 h-11 w-11 rounded-full bg-black/60 hover:bg-black/80 border border-white/15 items-center justify-center opacity-0 group-hover/rail:opacity-100 transition focus-visible:opacity-100"
               onClick={() => scrollBy(-1)}
               aria-label="Scroll left"
             >
               ‹
             </button>
             <button
-              className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 z-20 h-9 w-9 rounded-full bg-black/60 hover:bg-black/80 border border-white/15 backdrop-blur-sm items-center justify-center opacity-0 group-hover/rail:opacity-100 transition"
+              className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 z-20 h-11 w-11 rounded-full bg-black/60 hover:bg-black/80 border border-white/15 items-center justify-center opacity-0 group-hover/rail:opacity-100 transition focus-visible:opacity-100"
               onClick={() => scrollBy(1)}
               aria-label="Scroll right"
             >
@@ -272,7 +272,7 @@ export function SuggestionsCarousel({
                       </div>
 
                       <button
-                        className="absolute top-2 right-2 px-2 py-1 rounded-lg text-xs bg-white/10 hover:bg-white/25 border border-white/10 backdrop-blur-sm transition"
+                        className="absolute top-2 right-2 min-h-11 min-w-11 px-2 rounded-lg text-xs bg-white/10 hover:bg-white/25 border border-white/10 transition"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleQuickAdd(s);

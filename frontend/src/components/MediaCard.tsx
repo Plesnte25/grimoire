@@ -1,79 +1,42 @@
 import type { MediaItem } from "../types";
-import { formatScore, onlineRating, personalRating } from "../lib/ratings";
+import { formatScore, onlineRating, onlineRatingText, personalRating } from "../lib/ratings";
 import { statusLabel } from "../lib/status";
-import { plainText } from "../lib/text";
-import { countryFlag, countryName } from "../lib/regions";
+import { countryName } from "../lib/regions";
+import { CountryFlag } from "./CountryFlag";
 
 type Variant = "tile" | "row";
 
-export function safeParseGenres(genres: any): string[] {
-  if (!genres) return [];
-
+export function safeParseGenres(genres: unknown): string[] {
   if (Array.isArray(genres)) {
-    return genres
-      .map((g) => {
-        if (!g) return null;
-        if (typeof g === "string") return g;
-        if (typeof g === "object" && "name" in g)
-          return String((g as any).name);
-        return String(g);
-      })
-      .map((s) => (s ?? "").trim())
-      .filter(Boolean);
+    return genres.map((genre) => {
+      if (typeof genre === "string") return genre;
+      if (genre && typeof genre === "object" && "name" in genre) return String(genre.name);
+      return String(genre ?? "");
+    }).map((genre) => genre.trim()).filter(Boolean);
   }
-
-  if (typeof genres === "string") {
-    const s = genres.trim();
-    if (!s) return [];
-    try {
-      const parsed = JSON.parse(s);
-      if (Array.isArray(parsed)) return safeParseGenres(parsed);
-    } catch {
-      // fallthrough
-    }
-    if (s.includes(",")) {
-      return s
-        .split(",")
-        .map((x) => x.trim())
-        .filter(Boolean);
-    }
-    return [s];
+  if (typeof genres !== "string" || !genres.trim()) return [];
+  try {
+    const parsed: unknown = JSON.parse(genres);
+    if (Array.isArray(parsed)) return safeParseGenres(parsed);
+  } catch {
+    return genres.split(",").map((genre) => genre.trim()).filter(Boolean);
   }
-
-  return [];
+  return [genres.trim()];
 }
 
-// Personal and online scores are always labelled separately: "You 8.5 · TMDB 7.9".
 function ratingText(item: MediaItem) {
   const mine = personalRating(item);
   const online = onlineRating(item);
   const parts: string[] = [];
-  if (mine != null) parts.push(`You ${formatScore(mine)}`);
-  if (online && !online.lowConfidence) parts.push(`${online.source} ${formatScore(online.value)}`);
-  return parts.length ? parts.join(" · ") : null;
+  if (mine != null) parts.push(`✦ ${formatScore(mine)}`);
+  if (online && !online.lowConfidence) parts.push(onlineRatingText(online));
+  return parts.join(" · ");
 }
 
-function durationText(item: any) {
-  const t =
-    (item as any)?.durationText ??
-    (item as any)?.runtimeText ??
-    (item as any)?.runtime ??
-    null;
-
-  if (typeof t === "string" && t.trim()) return t.trim();
-
-  const mins =
-    (item as any)?.runtimeMinutes ?? (item as any)?.runtimeMins ?? null;
-  if (typeof mins === "number" && mins > 0) {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  }
-
-  const p = (item as any)?.progressText;
-  if (typeof p === "string" && p.trim()) return p.trim();
-
-  return null;
+function titleMeta(item: MediaItem) {
+  const parts = [item.year ? String(item.year) : null, item.countryOfOrigin ? countryName(item.countryOfOrigin) : null]
+    .filter(Boolean);
+  return parts.join(" · ");
 }
 
 export function MediaCard({
@@ -88,172 +51,69 @@ export function MediaCard({
   onToggleWatched?: (item: MediaItem) => void;
   onToggleLike?: (item: MediaItem) => void;
 }) {
-  const genres = safeParseGenres((item as any).genres);
-  const year = (item as any).year ?? "";
-  const status = (item as any).status ?? "";
-  const dur = durationText(item);
-  const rating = ratingText(item);
-
+  const mine = personalRating(item);
+  const online = onlineRating(item);
   if (variant === "tile") {
-    const metaGenres = genres.slice(0, 3).join(" · ");
-    const metaYear = year ? String(year) : "";
-    const metaRating = ratingText(item);
-
     return (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onOpen}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onOpen?.();
-          }
-        }}
-        className="
-          group relative shrink-0 text-left cursor-pointer
-          w-[120px] sm:w-[140px] md:w-[170px] lg:w-[190px] xl:w-[210px]
-          focus:outline-none
-        "
-        title={item.title}
-        aria-label={item.title}
-      >
-        {/* Whole card scales (not just image) */}
-        <div
-          className="
-            relative rounded-lg overflow-hidden
-            border border-white/10 bg-white/5
-            transform-gpu transition duration-200
-            group-hover:scale-[1.14] group-hover:z-30 group-hover:shadow-2xl
-          "
-        >
-          {/* Poster */}
-          <div className="relative w-full aspect-[2/3] bg-black/30">
-            {item.posterUrl ? (
-              <img
-                src={item.posterUrl}
-                alt={item.title}
-                className="h-full w-full object-cover"
-                loading="lazy"
-                draggable={false}
-              />
-            ) : item.backdropUrl ? (
-              <img
-                src={item.backdropUrl}
-                alt={item.title}
-                className="h-full w-full object-cover"
-                loading="lazy"
-                draggable={false}
-              />
-            ) : (
-              <div className="h-full w-full flex items-center justify-center text-xs opacity-60">
-                No image
-              </div>
-            )}
-
-            {/* subtle dark gradient */}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-60" />
-
-            {item.countryOfOrigin ? (
-              <span
-                className="absolute left-2 top-2 rounded-md bg-black/60 px-1.5 py-0.5 text-sm leading-none"
-                role="img"
-                aria-label={countryName(item.countryOfOrigin)}
-                title={countryName(item.countryOfOrigin)}
-              >
-                {countryFlag(item.countryOfOrigin)}
+      <button type="button" onClick={onOpen} className="group min-w-0 text-left focus-visible:outline">
+        <div className="relative aspect-[2/3] overflow-hidden rounded-[var(--radius-poster)] bg-[var(--s2)]">
+          {item.posterUrl ? (
+            <img src={item.posterUrl} alt="" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]" loading="lazy" draggable={false} />
+          ) : item.backdropUrl ? (
+            <img src={item.backdropUrl} alt="" className="h-full w-full object-cover" loading="lazy" draggable={false} />
+          ) : (
+            <div className="grid h-full place-items-center px-2 text-center text-xs text-[var(--tx3)]">No cover</div>
+          )}
+          {item.countryOfOrigin ? (
+            <span className="absolute right-2 top-2 rounded bg-[var(--bg)] px-1.5 py-1 text-sm leading-none" title={countryName(item.countryOfOrigin)}>
+              <CountryFlag code={item.countryOfOrigin} />
+            </span>
+          ) : null}
+          <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-8">
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded bg-[var(--bg)] px-1.5 py-1 text-[10px] font-semibold leading-none text-[var(--tx)]">
+                {statusLabel(item.status, item.mediaType)}
               </span>
-            ) : null}
-          </div>
-
-          {/* Hover info panel */}
-          <div
-            className="
-    absolute left-0 right-0 bottom-0
-    p-2.5
-    opacity-0 translate-y-2
-    transition duration-200
-    group-hover:opacity-100 group-hover:translate-y-0
-  "
-          >
-            {/* ✅ Blur / glass backing so text is always readable */}
-            <div
-              className="
-      absolute inset-0
-      bg-black/10
-      backdrop-blur-md
-      border-t border-white/10
-    "
-            />
-
-            {/* content must be above the blur layer */}
-            <div className="relative">
-              <div className="text-sm font-semibold leading-tight line-clamp-2 drop-shadow">
-                {item.title}
-              </div>
-
-              <div className="mt-1 flex items-center gap-2 text-[11px] opacity-90 drop-shadow">
-                {metaYear ? <span>{metaYear}</span> : null}
-                {metaRating ? (
-                  <span className="opacity-95">{metaRating}</span>
-                ) : null}
-              </div>
-
-              {metaGenres ? (
-                <div className="mt-1 text-[11px] opacity-85 line-clamp-1 drop-shadow">
-                  {metaGenres}
-                </div>
+              {personalRating(item) != null ? (
+                <span className="rounded bg-[var(--youbg)] px-1.5 py-1 text-[10px] font-semibold leading-none text-[var(--you)]">✦ {formatScore(personalRating(item)!)}</span>
               ) : null}
-            </div>
-          </div>
+            </span>
+          </span>
         </div>
-      </div>
+        <span className="mt-2 block line-clamp-2 text-sm font-semibold leading-snug text-[var(--tx)]">{item.title}</span>
+        {item.nativeTitle && item.nativeTitle !== item.title ? (
+          <span className="mt-0.5 block truncate text-xs text-[var(--tx3)]" lang={item.originalLanguage ?? undefined} dir={item.originalLanguage === "ur" ? "rtl" : undefined}>{item.nativeTitle}</span>
+        ) : null}
+        <span className="mt-1 block truncate text-xs text-[var(--tx3)]">
+          {[titleMeta(item), ratingText(item)].filter(Boolean).join(" · ")}
+        </span>
+      </button>
     );
   }
 
   return (
-    <button
-      onClick={onOpen}
-      className="w-full text-left rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition p-4 flex gap-4"
-    >
-      <div className="w-[88px] h-[88px] rounded-xl overflow-hidden border border-white/10 bg-black/20 shrink-0">
-        {item.posterUrl ? (
-          <img
-            src={item.posterUrl}
-            alt={item.title}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center text-xs opacity-60">
-            —
-          </div>
-        )}
+    <button type="button" onClick={onOpen} className="surface-card flex min-h-[6.5rem] w-full items-center gap-3 rounded-[var(--radius-card)] p-3 text-left transition-colors hover:bg-[var(--s2)]">
+      <div className="h-20 w-14 shrink-0 overflow-hidden rounded-md bg-[var(--s2)]">
+        {item.posterUrl ? <img src={item.posterUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
       </div>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-base font-semibold truncate">{item.title}</div>
-          {status ? (
-            <div className="text-xs opacity-70">{statusLabel(status, item.mediaType)}</div>
-          ) : null}
-        </div>
-
-        <div className="text-xs opacity-70 mt-1">
-          {year}
-          {genres.length ? ` · ${genres.slice(0, 3).join(", ")}` : ""}
-        </div>
-
-        {item.description ? (
-          <div className="text-sm opacity-80 mt-2 line-clamp-2">
-            {plainText(item.description)}
-          </div>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-[var(--tx)]">{item.title}</span>
+        {item.nativeTitle && item.nativeTitle !== item.title ? <span className="mt-0.5 block truncate text-xs text-[var(--tx3)]" lang={item.originalLanguage ?? undefined} dir={item.originalLanguage === "ur" ? "rtl" : undefined}>{item.nativeTitle}</span> : null}
+        <span className="mt-1 block text-xs text-[var(--tx3)]">{titleMeta(item)}{titleMeta(item) ? " · " : ""}{statusLabel(item.status, item.mediaType)}</span>
+        {item.progressText ? <span className="mt-1 block text-xs tabular-nums text-[var(--tx2)]">{item.progressText}</span> : null}
+      </span>
+      <span className="max-w-[32%] shrink-0 truncate text-xs tabular-nums">
+        {mine != null ? (
+          <span className="text-[var(--you)]" aria-label={`Your rating ${formatScore(mine)}`}>
+            ✦ {formatScore(mine)}
+          </span>
         ) : null}
-
-        {rating ? (
-          <div className="text-xs opacity-70 mt-2">{rating}</div>
+        {online && !online.lowConfidence ? (
+          <span className="ml-2 text-[var(--tx3)]" aria-label={onlineRatingText(online)}>
+            {onlineRatingText(online)}
+          </span>
         ) : null}
-      </div>
+      </span>
     </button>
   );
 }

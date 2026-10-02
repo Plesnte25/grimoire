@@ -20,7 +20,6 @@
     "axios": "^1.7.7",
     "clsx": "^2.1.1",
     "flag-icons": "^7.5.0",
-    "framer-motion": "^11.3.30",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.1",
