@@ -6,12 +6,18 @@ commit once done. Issues are discussed and fixed one at a time.
 
 ## Status (2026-10-02)
 
-- **Done:** Phases 0–3 deployed (see Build order). 2026-10-02: Tailscale removed, app-level auth hardened (#111),
-  VM cleaned to Grimoire-only and renamed `grimoire` (#112).
-- **Open, outside the phases:** home-network DNS (#1), trusted-device revoke (#113, lands with Phase 5's
-  Settings), uptime check (#114), Tailscale leftovers on the user's side (#115), Berserk grouping (#78),
-  Jikan outages (#82, retried by the Phase 6 daily job).
-- **Next:** Phase 4, design foundation (steps 12–15), waiting for the go-ahead.
+- **Done:** Phases 0–3 deployed (see Build order). Ongoing episode totals (#14) are implemented; 2026-10-02:
+  Tailscale removed, app-level auth hardened (#111), VM cleaned to Grimoire-only and renamed `grimoire` (#112).
+- **Remaining within delivered phases:** none identified. The category country filter covers anime origin
+  filtering (Phase 3 H); creator cards/search (#18), franchise airing display/refresh (Phase 3 G), manual anime
+  franchise grouping (#78), and higher-resolution book covers (#25) are implemented in this worktree.
+- **Open, outside the phases:** home-network DNS (#1), uptime check (#114), Tailscale leftovers on the user's
+  side (#115), and deployment of the pending worktree changes.
+- **Done:** Phase 4 design foundation (2026-10-02): local fonts/icons, bundled common-country flag SVGs with
+  Unicode fallback, responsive app shell,
+  per-device appearance controls, shared search, focus/reduced-motion baseline, solid surfaces and poster-accent tint.
+- **Implemented in this worktree, not deployed:** Phases 5–7. Backend/frontend builds and Prisma migration parity
+  pass; authenticated screenshot review, production deployment and production migration remain outstanding.
 
 ## Open — needs a fix
 
@@ -110,11 +116,9 @@ Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for th
      (SSH keys), unattended security upgrades.
      Won't fix: the GCP project id `azubiweg` and the static IP's name `azubiweg-ip` can't be renamed (labels only).
 
-113. **Trusted devices can't be listed or revoked** (medium, security). A verified device stays trusted for a year
-     (`gr_device`), and nothing in the app shows or removes them. A PIN change (#111) ends other sessions, but a
-     device that kept its `gr_device` cookie only needs the new PIN to get back in. **Fix:** Settings → Devices:
-     list (browser from user-agent, first seen, last seen) with Revoke; the PIN-change form gets "also sign out
-     every other device" (deletes the other `TrustedDevice` rows). Slots into Phase 5 step 18 (Settings).
+113. ✅ **Implemented** (2026-10-02; pending deployment) — **Trusted devices can be listed and revoked** (medium, security). Settings lists
+     verified browsers with first/last seen dates and supports revocation. Changing the PIN can also delete every
+     other trusted device, not only its active sessions.
 
 114. **Nothing watches the server any more** (medium). With the Ops Agent gone there are no GCP dashboards or
      alerts, and nothing ever watched `/health`. Promotes Polish #7: add a free external check (e.g. UptimeRobot,
@@ -140,10 +144,10 @@ Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for th
     calls with `chain = chain.then(task)`; after a rejection the chain stayed rejected, so all following AniList
     requests failed until the server restarted. Now each task runs regardless of the previous result, with a
     700 ms gap between requests.
-78. **Berserk 2 sits under "Berserk: The Golden Age Arc – Memorial Edition"** (low). AniList links the 2016 series'
-    prequel chain to the 2022 Memorial Edition TV rather than the 1997 series (an ALTERNATIVE). Correct per the
-    "follow AniList links" decision; a manual franchise override (detail page, like region "Move to…") would let
-    the user regroup it.
+78. ✅ **Implemented** (2026-10-02; not deployed) — **Berserk 2 sits under "Berserk: The Golden Age Arc – Memorial Edition"**
+    (low). AniList links the 2016 series' prequel chain to the 2022 Memorial Edition TV rather than the 1997
+    series (an ALTERNATIVE). The detail page now offers a manual "Move to franchise" override that survives
+    provider refreshes.
 79. ✅ **Covered** (`96b07a0`: "Show this under") — **Co-productions can land in the wrong region** (low). *The Transporter* (English-language, French production
     company) gets `origin_country: FR` → European. Covered by `regionOverride` ("Move to…", #37).
 
@@ -154,7 +158,7 @@ Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for th
     `genres`, which the API already returns as an array, so it always fell back to none.
 
 82. **Jikan (MyAnimeList) is intermittently down** (low). Jikan often answers 504 "failed to connect to
-    MyAnimeList"; scores for those anime stay unset (`scoresCheckedAt` null). Retries are in place; the Phase 4
+    MyAnimeList"; scores for those anime stay unset (`scoresCheckedAt` null). Retries are in place; the Phase 6
     daily job should also retry items with a MAL id but no score.
 
 ### Anime pipeline review (2026-10-01)
@@ -177,24 +181,25 @@ Findings below are from the local DB (78 anime) and live AniList queries. Decisi
     not `collectionId`/`collectionName`; the suggestions add doesn't fetch details at all. Only the one-off
     backfill script ever set anime collections. `GET /library` enriches anime on the fly but never persists it.
 13. ✅ **Fixed** (`de565e8`) — **~50 of 78 anime have no `format` stored** (medium) → wrong tab: *Mugen Train* (MOVIE) shows under Series.
-14. **Ongoing series have no episode total** (medium). ONE PIECE has `episodes: null` (1181 aired), so progress
-    initialises as `0/null`. AniList's `nextAiringEpisode` gives the aired count.
+14. ✅ **Fixed** (`4be2080`) — **Ongoing series have no episode total** (medium). AniList's
+    `nextAiringEpisode` and TMDB's last-aired data now populate `airedEpisodeCount`; progress uses that as the
+    total for ongoing series and labels it "aired".
 15. ✅ **Fixed** (`de565e8`) — **Donghua / Korean anime are mostly ONA** (medium). Grouping accepts only TV/TV_SHORT as mainline, so CN/KR
     series (e.g. *Lord of Mysteries*, CN ONA) can't chain their seasons.
 16. ✅ **Fixed** (`4be2080`) — **Dead `pages/Anime.tsx` + `/anime` route** (low). Nothing links to it; it never renders library items. The
     real anime page is `pages/Category.tsx`.
 
 **Fix plan (in order, one commit each, verified against the real library):**
-- **A. Schema:** new `Franchise` table (`id` = AniList id of the OG series, title, posterUrl, bannerUrl,
-  countryOfOrigin, status, airedEpisodes). `MediaItem` gains `franchiseId`, `franchiseRole`
+- ✅ **A. Schema** (`9252d3c`): new `Franchise` table (`id` = AniList id of the OG series, title, posterUrl, bannerUrl,
+  countryOfOrigin, status). `MediaItem` gains `franchiseId`, `franchiseRole`
   (`MAIN` | `MOVIE` | `OVA` | `ONA` | `SPECIAL`), `franchiseOrder`, `countryOfOrigin`.
-- **B. Root resolver** (replaces `findFranchiseRoot`): side entries step to the main line via
+- ✅ **B. Root resolver** (`de565e8`; replaces `findFranchiseRoot`): side entries step to the main line via
   `PARENT` → `PREQUEL`/`SEQUEL` → `SIDE_STORY`; then walk `PREQUEL` back over mainline formats (TV, TV_SHORT, and
   ONA when the entry is ONA-led, for donghua) with a visited set, ~40-hop safety cap. Never follow `ALTERNATIVE` /
   `SPIN_OFF` (keeps FMA vs Brotherhood, HxH 1999 vs 2011 apart). Results persisted, not recomputed per request.
-- **C. Write path:** `POST /library` resolves franchise + format server-side for `anilist` items, so every add path
+- ✅ **C. Write path** (`de565e8`): `POST /library` resolves franchise + format server-side for `anilist` items, so every add path
   (search, suggestions) is covered; `GET` stops doing per-request enrichment.
-- **D. Backfill:** rewrite `scripts/backfillCollections.ts` for anime — all 78 rows, ~1 req/s for AniList limits.
+- ✅ **D. Backfill** (`de565e8`): rewrite `scripts/backfillCollections.ts` for anime — all 78 rows, ~1 req/s for AniList limits.
 - ✅ (`109c6dd`) **E. Series tab:** one tile per franchise (OG poster even if only a movie is tracked), badge like
   "3 movies · 1 special"; replaces `CardStack` for anime. Movies tab keeps listing every anime movie.
 - ✅ (`109c6dd`) **F. Franchise page** `/franchise/:id`: banner, then Seasons (in order), Movies, OVAs & ONAs, Specials; tracked
@@ -215,9 +220,9 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
     also doesn't follow status: *Friends* is COMPLETED with progress `0/228`.
     **Fix:** typed progress per type: episode counter (anime, TV with season/episode), pages (books), rewatch count
     (movies). Marking COMPLETED fills progress to the total.
-18. **No creator field** (medium). Books store no author, music packs the artist into the title/description, movies
-    have no director. **Fix:** one `creator` column (author / artist / director) filled by every provider, shown on
-    cards and searchable.
+18. ✅ **Implemented** (2026-10-02; not deployed) — **Creator metadata isn't surfaced consistently or searchable**
+    (medium). Creator names now appear on library cards and category searches match creator names. Music is
+    excluded after #45.
 19. ✅ **Fixed** (`de565e8`) — **Library loads call providers per request** (medium, perf). `GET /library` re-fetches AniList details for
     anime missing `format`, and TMDB details for every movie without a collection. The 39 movies that genuinely have
     no collection are re-fetched on **every** Movies page load because "no collection" is never stored.
@@ -248,8 +253,8 @@ Same method: code read + local DB (100 movies, 9 TV, 3 books, 2 songs).
 24. ✅ **Fixed** (`de565e8`, `5d93428`; live 2026-10-01: Canterville Ghost 1887, Alchemist 1988, Kite Runner 2003) — **Edition data instead of the book** (medium). Google Books returns editions: *The Alchemist* shows 2015,
     *The Kite Runner* 2020. No author or page count is stored. **Fix:** store `authors`, `pageCount`, ISBN; take the
     original year from Open Library (`/search.json?isbn=` → `first_publish_year`, free, no key).
-25. **Low-res `http://` covers** (low). All 3 covers are `http://books.google.com/...&zoom=1` thumbnails. **Fix:**
-    rewrite to `https://`, request `zoom=0`/larger, fall back to Open Library covers by ISBN.
+25. ✅ **Implemented** (2026-10-02; not deployed) — **Low-res `http://` covers** (low). Google Books cover URLs
+    now prefer larger image variants and request `zoom=0`; missing covers fall back to Open Library's ISBN cover.
 26. ✅ **Fixed** (key "API key 1" from the azubiweg GCP project in the VM `.env`; 429 backoff in `de565e8`) — **No API key** (low). Requests share Google's anonymous quota and can 429. **Fix:** add `GOOGLE_BOOKS_API_KEY`
     (free) to `.env`.
 
@@ -612,50 +617,67 @@ Each step: one commit per item, verified against the real library, then deployed
 **Phase 3: catalogue structure** ✅ deployed 2026-10-01 (`f1c5209`; OMDb key on the VM; re-enrichment run
 for scores: 193/193 ok; IMDb 112, RT 98, Metacritic 100, MAL ids 77 but MAL scores only 3 because
 Jikan was down, see #82)
-9. Anime franchise tile + page (E–I), then reuse for movie collections (#21); cast/crew/studio pages (#52).
+9. Anime franchise tile + page (E, F and I delivered; G franchise-level airing display/refresh and H origin filter
+   are implemented in this worktree), then reuse for movie collections (#21); cast/crew/studio pages (#52).
 10. International: regional categories + flags (#37), manual add (#38), romanization retry (#33), vote
     threshold (#34), dub badges (#35).
 11. Critic vs audience scores: OMDb (IMDb / Rotten Tomatoes / Metacritic) + Jikan (MAL) (#49).
 
-**Phase 4: design foundation** (from the handoff; everything after builds on it)
-12. Tokens, light/dark/system themes, fonts, icons, bundled SVG flags (#83, #84).
-13. App shell: phone tab bar, desktop sidebar + top bar, Library hub, You page (#85).
-14. Component kit + states + accessibility rules (#86, #87), rating cells (#88), poster-accent (#89).
-15. Remove the old visual layer: glass, tilt, the Home accordion (`BigCategoryCard`), framer-motion where the spec
-    doesn't call for motion.
+**Phase 4: design foundation** (from the handoff; everything after builds on it; started 2026-10-02)
+12. ✅ **Implemented** (2026-10-02): tokens, persisted light/dark/system, text-size and reduced-motion preferences;
+    self-hosted display/interface/script fonts and icons; bundled common-country SVG flags with a Unicode fallback
+    for other ISO codes (#83, #84).
+13. ✅ **Implemented** (2026-10-02): shared phone tab bar and desktop sidebar/search shell; new Library hub and You page
+    (#85). Existing routes now render inside the shared shell.
+14. ✅ **Implemented** (2026-10-02): shared surface/focus tokens, reduced-motion support, appearance controls,
+    labeled rating cells (#88), common disabled/error/focus states, larger touch targets and CORS-safe poster-accent
+    detail tint (#86, #87, #89). Screen-specific polish continues with each Phase 5 redesign.
+15. ✅ **Implemented** (2026-10-02): removed Home's accordion/tilt and the unused motion dependency; replaced glass
+    surfaces with solid tokens and removed non-essential blur / motion from auth and search.
 
 **Phase 5: built screens in the new design + the data they need**
-16. Data: `yourRatingAt` (#96), log episode range/label (#97), settings record (#102), AniList % + count (#100),
-    anime ↔ TMDB/IMDb link (#99).
-17. Category (#92), Detail (#93, without the Episodes tab), Log sheet (#94).
-18. Restyle Franchise, Collection, Person, Lists, Tier list, Diary, Search & add, Settings, Unlock from the kit
-    (#95, #108); screenshots for review.
-19. Episodes tab + spoiler shield (#98, #71).
+16. ✅ **Implemented** (2026-10-02): `yourRatingAt` (#96), log episode range/label and computed rewatch ordinal
+    (#97), account-wide content preferences (#102), AniList percent + popularity count (#100), and conservative
+    anime ↔ TMDB/IMDb matching plus a validated link endpoint (#99).
+17. ✅ **Implemented** (2026-10-02): Category (#92) supports multi-country filters, sort and grid/list views;
+    Detail (#93) shows poster tint and rating date; Log sheet (#94) includes date quick picks, rating history,
+    episode range/label and rewatch ordinal.
+18. ✅ **Implemented** (2026-10-02): restyled Franchise, Collection, Person, Lists, Tier list, Diary, Search & add,
+    Settings and Unlock to use the shared design tokens (#95, #108). Signed-in screenshot review remains pending
+    because this environment has no authenticated browser session.
+19. ✅ **Implemented** (2026-10-02): cached provider episode guides, Episodes tab and account-preference spoiler
+    shielding for incomplete titles (#98, #71). Guide cache expires after seven days.
 
 **Phase 6: Up next**
-20. Airing & release updates: daily job (also retries missing MAL scores, #82), snoozes (#101), badges/banners,
-    "N new" counts (#103) (#39–43).
-21. Home "Up next" (#91): Ready to watch, Coming soon, Continue, Favourites shelf.
-22. Goals (#69), "What should I watch tonight?" (#65), rewatch nudges (#72): all three sit on Home.
-23. Where to watch + trailers (#73; country from Settings, #107), "Remind me" = pin to Coming soon (#106).
+20. ✅ **Implemented** (2026-10-02; not deployed): daily airing/release refresh also retries missing MAL scores (#82);
+    snoozes (#101), airing badges, and new-episode counts (#103) (#39–43).
+21. ✅ **Implemented** (2026-10-02; not deployed): Home "Up next" (#91) with Ready to watch, Coming soon,
+    Continue and Favourites shelves.
+22. ✅ **Implemented** (2026-10-02; not deployed): goals (#69), "What should I watch tonight?" (#65), and
+    rewatch nudges (#72) on Home.
+23. ✅ **Implemented** (2026-10-02; not deployed): country-aware watch providers and trailers (#73, #107);
+    "Remind me" pins titles to Coming soon (#106).
 
 **Phase 7: reflection, sharing, app**
-24. Taste-based suggestions (#68), rating-weighted (#57), region-aware (#36); suggestion caching (#30).
-25. Stats & Year in review / "Grimoire Wrapped" (#63) with the design's charts: bars, rating distribution in pink
-    ("Average ✦ 7.6 vs the crowd's 7.3"), donut by country.
-26. Export / import (#56).
-27. Share a list (#74).
-28. PWA: installable, self-hosted fonts, offline log queue (#104).
-29. Polish: cover images (#25), deploy script (#6), uptime check (#7).
+24. ✅ **Implemented** (2026-10-02; not deployed): taste-based suggestions (#68), rating-weighted (#57),
+    region-aware (#36), with cache short-circuiting (#30).
+25. ✅ **Implemented** (2026-10-02; not deployed): yearly stats / "Grimoire Wrapped" (#63), including monthly
+    bars, personal/provider rating comparison, rating distribution and country-origin donut.
+26. ✅ **Implemented** (2026-10-02; not deployed): authenticated JSON export and merge import (#56).
+27. ✅ **Implemented** (2026-10-02; not deployed): revocable public list sharing (#74).
+28. ✅ **Implemented** (2026-10-02; not deployed): PWA installability, self-hosted fonts and idempotent offline
+    log queue (#104). Queued logs are stored in browser localStorage and are not encrypted.
+29. **Partially implemented:** SSH deploy script (#6) added but not run; low-resolution book covers (#25) remain
+    unimplemented. Uptime check (#114; formerly Polish #7) needs the user's external monitoring account.
 
 ## Polish / optimization
 
-6. **Deploy is manual and fiddly**: a fresh `gh auth token` per pull, rebuilding both apps, `npm approve-scripts`
-   after installs, restarting the service. A `scripts/deploy.sh` run over SSH would make it one command.
-7. **No uptime monitoring** (now tracked as #114, more urgent since the Ops Agent was removed): `/health` exists (`backend/src/index.ts:54`) but nothing watches it. A free external
+6. **Deploy is manual and fiddly**: a `scripts/deploy.sh` now automates the build, migrations and service restart
+   over SSH using explicit host/path settings. It has not been run; deployment and production migration still need
+   an authorized operator.
+7. **No uptime monitoring** (tracked as #114, more urgent since the Ops Agent was removed): `/health` exists (`backend/src/index.ts:54`) but nothing watches it. A free external
    check (e.g. UptimeRobot) would flag outages on the 1 GB VM.
 8. ✅ **Fixed** (`9252d3c`) — **Stale `mv_*` names in comments**: `backend/prisma/schema.prisma` still says `mv_device`, `mv_session` and
    `mv_pending_device` after the cookie rename to `gr_*`.
-30. **Suggestions cache never short-circuits**: `routes/suggestions.ts` writes `SUG_CACHE` but only reads it as a
-    fallback when a provider call fails, so every page load still hits TMDB/AniList/Google/iTunes. Return the cached
-    block when present (non-refresh), as the comments intend.
+30. ✅ **Implemented** (2026-10-02; pending deployment) — **Suggestions cache short-circuits**: non-refresh
+    requests now return the cached "because you like" block before provider discovery calls.
