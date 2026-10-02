@@ -43,7 +43,10 @@ commit once done. Issues are discussed and fixed one at a time.
 
 ### Found while locking the app to a private Tailscale network (2026-10-01)
 
-6. ✅ **Fixed** (`b6cc66b`) — **Helmet's `upgrade-insecure-requests` CSP directive broke plain-HTTP-only access** (medium). The VM was
+Tailscale was removed on 2026-10-02 (app-level auth only, hardened — see #8), so #6 and #7 were reverted back to
+Helmet's defaults: with HTTPS-only access there's no plain-HTTP path left for them to break.
+
+6. ↩️ **Reverted** (fixed in `b6cc66b`, reverted with Tailscale's removal) — **Helmet's `upgrade-insecure-requests` CSP directive broke plain-HTTP-only access** (medium). The VM was
    joined to a private Tailscale network so the app could be reached without a public DNS record, serving plain HTTP
    on an internal address/port (no TLS cert there). Helmet's default CSP sends `upgrade-insecure-requests`, so the
    browser's first request succeeded (200) but every following request was silently retried over HTTPS on the same
@@ -52,7 +55,7 @@ commit once done. Issues are discussed and fixed one at a time.
    **Fix:** set `"upgrade-insecure-requests": null` in the CSP directives (`backend/src/index.ts`). Harmless on the
    public domain, which is already HTTPS end-to-end via Caddy.
 
-7. ✅ **Fixed** (`2c63309`) — **Helmet's HSTS header would have permanently broken the same private address** (medium-high — not yet
+7. ↩️ **Reverted** (fixed in `2c63309`, reverted with Tailscale's removal) — **Helmet's HSTS header would have permanently broken the same private address** (medium-high — not yet
    triggered, caught before a device loaded the page over the bad config). Same setup as #6: Helmet sends
    `Strict-Transport-Security` unconditionally. Unlike CSP's `upgrade-insecure-requests` (a per-request, server-side
    behavior), HSTS is cached by the browser for the full `max-age` (180 days) per hostname — so the first plain-HTTP
@@ -61,6 +64,18 @@ commit once done. Issues are discussed and fixed one at a time.
    **Fix:** `hsts: false` in the Helmet config, then a small middleware that sets `Strict-Transport-Security`
    manually, only when `req.secure` is true (`backend/src/index.ts`). Relies on `trust proxy` + Caddy's
    `X-Forwarded-Proto` already being correct for the public HTTPS path.
+
+8. ✅ **Fixed** (`0510535`) — **Auth hardening after dropping Tailscale** (medium, security). The public site relies on
+   app-level auth alone, so a review (2026-10-02) found:
+   - the backend listened on every interface (`*:5050`); only the GCP firewall kept it off the internet, and the
+     Tailscale interface reached it directly. **Fix:** listen on `127.0.0.1` by default (`HOST` env to override) so
+     Caddy is the only way in (`backend/src/index.ts`).
+   - a new device joining the account was silent. **Fix:** `/otp/verify` emails the account a "new device signed
+     in" alert (time, IP, browser) when a device is first trusted on an existing account.
+   - `POST /auth/pin` had no rate limit and left other sessions alive. **Fix:** same limiter as `/unlock`; a PIN
+     change now ends every other session (`backend/src/routes/auth.ts`).
+   - VM/infra: Tailscale uninstalled (node logged out, package + apt repo removed); unused `default-allow-rdp`
+     (tcp:3389) GCP firewall rule deleted. Public ports are now 22, 80, 443 only.
 
 ### Found while shipping Phase 0 (2026-10-01)
 
