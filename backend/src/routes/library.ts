@@ -537,6 +537,33 @@ libraryRouter.patch(
 );
 
 libraryRouter.post(
+    "/:id/franchise",
+    asyncHandler(async (req, res) => {
+        const { franchiseId } = parseOrThrow(
+            z.object({ franchiseId: z.string().min(1).nullable() }),
+            req.body
+        );
+        const item = await prisma.mediaItem.findUnique({ where: { id: req.params.id } });
+        if (!item) return res.status(404).json({ error: "Not found" });
+        if (item.mediaType !== "ANIME" || item.provider !== "anilist") {
+            const err: any = new Error("Only AniList anime can be moved between franchises");
+            err.status = 400;
+            throw err;
+        }
+        if (franchiseId && !await prisma.franchise.findUnique({ where: { id: franchiseId }, select: { id: true } })) {
+            const err: any = new Error("The selected franchise was not found");
+            err.status = 404;
+            throw err;
+        }
+        const updated = await prisma.mediaItem.update({
+            where: { id: item.id },
+            data: { franchiseId, franchiseOverride: true },
+        });
+        res.json({ item: updated });
+    })
+);
+
+libraryRouter.post(
     "/:id/tmdb-link",
     asyncHandler(async (req, res) => {
         const data = parseOrThrow(

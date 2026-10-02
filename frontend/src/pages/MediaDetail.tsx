@@ -8,9 +8,11 @@ import {
   fetchAccountPreferences,
   fetchItem,
   fetchItemLogs,
+  fetchLibrary,
   fetchTags,
   deleteReminder,
   setReminder,
+  setManualFranchise,
   setItemTags,
   updateItem,
   updateLog,
@@ -55,6 +57,16 @@ export function MediaDetail() {
   });
   const { data: logs = [] } = useQuery({ queryKey: ["logs", id], queryFn: () => fetchItemLogs(id!), enabled: !!id });
   const { data: allTags = [] } = useQuery({ queryKey: ["tags"], queryFn: fetchTags });
+  const { data: animeLibrary = [] } = useQuery({
+    queryKey: ["library", "ANIME"],
+    queryFn: () => fetchLibrary("ANIME"),
+    enabled: item?.mediaType === "ANIME",
+  });
+  const franchiseOptions = [...new Map(
+    animeLibrary
+      .filter((entry) => entry.franchiseId && entry.franchise?.title)
+      .map((entry) => [entry.franchiseId!, { id: entry.franchiseId!, title: entry.franchise!.title }])
+  ).values()].sort((a, b) => a.title.localeCompare(b.title));
 
   const [notes, setNotes] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -314,6 +326,35 @@ export function MediaDetail() {
                 <button className="min-h-11 rounded-xl bg-white/10 px-4 text-sm hover:bg-white/15" onClick={() => nav(`/franchise/${item.franchiseId}`)}>
                   See the whole {item.franchise?.title ?? "franchise"} →
                 </button>
+              ) : null}
+              {item.mediaType === "ANIME" ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex min-h-11 items-center gap-2 text-sm text-[var(--tx2)]">
+                    Move to franchise
+                    <select
+                      aria-label="Move anime to franchise"
+                      value={item.franchiseId ?? ""}
+                      className="min-h-11 max-w-[min(16rem,65vw)] rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-[var(--tx)]"
+                      onChange={async (event) => {
+                        try {
+                          await setManualFranchise(item.id, event.target.value || null);
+                          await Promise.all([
+                            qc.invalidateQueries({ queryKey: ["item", id] }),
+                            qc.invalidateQueries({ queryKey: ["library"] }),
+                            qc.invalidateQueries({ queryKey: ["franchise"] }),
+                          ]);
+                          showToast({ message: "Franchise grouping updated", timeoutMs: 4000 });
+                        } catch (error: any) {
+                          showToast({ message: error?.response?.data?.error ?? "Couldn’t update franchise grouping", timeoutMs: 6000 });
+                        }
+                      }}
+                    >
+                      <option value="">No franchise</option>
+                      {franchiseOptions.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
+                    </select>
+                  </label>
+                  {item.franchiseOverride ? <span className="text-xs text-[var(--tx3)]">Manual grouping; provider refresh won’t replace it.</span> : null}
+                </div>
               ) : null}
               {item.status === "PLANNED" ? (
                 <button

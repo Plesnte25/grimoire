@@ -181,6 +181,11 @@ export async function updateItem(id: string, patch: ItemPatch): Promise<MediaIte
     return res.data.item;
 }
 
+export async function setManualFranchise(id: string, franchiseId: string | null): Promise<MediaItem> {
+    const res = await api.post(`/api/library/${id}/franchise`, { franchiseId });
+    return res.data.item;
+}
+
 export async function linkAnimeTmdbRecord(
     id: string,
     tmdbId: string,

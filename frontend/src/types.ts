@@ -55,6 +55,7 @@ export type MediaItem = {
 
     // Phase 1 metadata (stored at add time / by the backfill).
     franchiseId?: string | null;
+    franchiseOverride?: boolean;
     franchiseRole?: "MAIN" | "MOVIE" | "OVA" | "ONA" | "SPECIAL" | null;
     franchiseOrder?: number | null;
     franchise?: { title: string; posterUrl?: string | null; bannerUrl?: string | null } | null;

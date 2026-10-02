@@ -57,6 +57,7 @@ model MediaItem {
 
   // Anime franchise: the original series this entry belongs under.
   franchiseId    String?
+  franchiseOverride Boolean @default(false)
   franchiseRole  String? // MAIN | MOVIE | OVA | ONA | SPECIAL
   franchiseOrder Int? // position within the franchise (airing order)
 
