@@ -23,6 +23,8 @@ export type CatalogEntry = {
     yourRating?: number | null;
     airedEpisodeCount?: number | null;
     progressValue?: number | null;
+    progressSeason?: number | null;
+    progressEpisode?: number | null;
     nextAirEpisode?: number | null;
     nextAirDate?: Date | null;
     announcedNext?: string | null;
@@ -55,6 +57,8 @@ async function withLibrary(entries: CatalogEntry[]): Promise<CatalogEntry[]> {
             yourRating: true,
             airedEpisodeCount: true,
             progressValue: true,
+            progressSeason: true,
+            progressEpisode: true,
             nextAirEpisode: true,
             nextAirDate: true,
             announcedNext: true,
@@ -71,6 +75,8 @@ async function withLibrary(entries: CatalogEntry[]): Promise<CatalogEntry[]> {
             yourRating: it.yourRating,
             airedEpisodeCount: it.airedEpisodeCount,
             progressValue: it.progressValue,
+            progressSeason: it.progressSeason,
+            progressEpisode: it.progressEpisode,
             nextAirEpisode: it.nextAirEpisode,
             nextAirDate: it.nextAirDate,
             announcedNext: it.announcedNext,
@@ -191,6 +197,8 @@ export async function franchiseView(franchiseId: string) {
             yourRating: true,
             airedEpisodeCount: true,
             progressValue: true,
+            progressSeason: true,
+            progressEpisode: true,
             nextAirEpisode: true,
             nextAirDate: true,
             announcedNext: true,
@@ -215,6 +223,8 @@ export async function franchiseView(franchiseId: string) {
             yourRating: t.yourRating,
             airedEpisodeCount: t.airedEpisodeCount,
             progressValue: t.progressValue,
+            progressSeason: t.progressSeason,
+            progressEpisode: t.progressEpisode,
             nextAirEpisode: t.nextAirEpisode,
             nextAirDate: t.nextAirDate,
             announcedNext: t.announcedNext,

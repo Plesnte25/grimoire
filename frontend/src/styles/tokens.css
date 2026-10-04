@@ -1,38 +1,37 @@
 :root {
   color-scheme: dark;
-  --bg: oklch(15.21% 0.0107 285.1);
-  --s1: oklch(18.96% 0.0202 293.5);
-  --s2: oklch(23.71% 0.0473 291.6);
-  --s3: oklch(28.43% 0.0595 290.5);
-  --line: oklch(96.45% 0.0189 295.9 / 11%);
-  --line2: oklch(96.45% 0.0189 295.9 / 22%);
-  --tx: oklch(96.45% 0.0189 295.9);
-  --tx2: oklch(81.45% 0.0491 293.1);
-  --tx3: oklch(69.46% 0.0643 291.9);
-  --acc: oklch(74.27% 0.12 290.3);
-  --accbg: oklch(39.36% 0.1048 288.5);
-  --acc-ink: oklch(100% 0 0);
-  --you: oklch(81.64% 0.1081 336.6);
-  --youbg: oklch(81.64% 0.1081 336.6 / 13%);
-  --ok: oklch(82.55% 0.1035 160.9);
-  --warn: oklch(84.33% 0.1178 81.9);
-  --err: oklch(79.03% 0.1213 20.1);
-  --scrim: oklch(12% 0.015 290 / 72%);
-  --heat-1: oklch(39% 0.085 286);
-  --heat-2: oklch(51% 0.105 286);
-  --heat-3: oklch(65% 0.12 286);
-  --heat-4: oklch(83% 0.095 286);
-  --tier-s: oklch(78% 0.13 350);
-  --tier-a: oklch(79% 0.11 300);
-  --tier-b: oklch(68% 0.13 285);
-  --tier-c: oklch(49% 0.09 285);
-  --tier-d: oklch(34% 0.06 285);
-  --tier-ink: oklch(15.21% 0.0107 285.1);
+  --bg: #17110d;
+  --s1: #2b1f17;
+  --s2: #3d2c20;
+  --s3: #513a29;
+  --line: rgb(239 224 191 / 11%);
+  --line2: rgb(239 224 191 / 22%);
+  --tx: #efe0bf;
+  --tx2: #d7c3a0;
+  --tx3: #b29a74;
+  --acc: #f6b73c;
+  --accbg: #f6b73c;
+  --acc-ink: #17110d;
+  --you: #c4492c;
+  --youbg: rgb(196 73 44 / 16%);
+  --ok: #9dc987;
+  --warn: #f0c56d;
+  --err: #e5795a;
+  --scrim: rgb(12 8 6 / 76%);
+  --heat-1: #704925;
+  --heat-2: #a76b2c;
+  --heat-3: #d29035;
+  --heat-4: #f6b73c;
+  --tier-s: #c4492c;
+  --tier-a: #e78238;
+  --tier-b: #f6b73c;
+  --tier-c: #a76b2c;
+  --tier-d: #704925;
+  --tier-ink: #17110d;
 
   --font-display: "Newsreader Variable", Georgia, serif;
   --font-body: "Hanken Grotesk Variable", "Noto Sans JP Variable", "Noto Sans KR Variable",
     "Noto Sans SC Variable", "Noto Nastaliq Urdu", system-ui, sans-serif;
-  --font-icons: "Material Symbols Rounded";
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -57,38 +56,6 @@
   --dur-fast: 120ms;
   --dur-short: 220ms;
   --dur-dialog: 280ms;
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
-  --bg: oklch(97.07% 0.0095 299.2);
-  --s1: oklch(100% 0 0);
-  --s2: oklch(93.88% 0.0218 297.4);
-  --s3: oklch(89.18% 0.0359 296.2);
-  --line: oklch(18.96% 0.0202 293.5 / 12%);
-  --line2: oklch(18.96% 0.0202 293.5 / 24%);
-  --tx: oklch(15.21% 0.0107 285.1);
-  --tx2: oklch(34% 0.04 291);
-  --tx3: oklch(48% 0.05 291);
-  --acc: oklch(39.36% 0.1048 288.5);
-  --accbg: oklch(39.36% 0.1048 288.5);
-  --acc-ink: oklch(100% 0 0);
-  --you: oklch(50.83% 0.1668 345);
-  --youbg: oklch(50.83% 0.1668 345 / 12%);
-  --ok: oklch(46% 0.11 160.9);
-  --warn: oklch(48% 0.11 81.9);
-  --err: oklch(50% 0.16 25);
-  --scrim: oklch(12% 0.015 290 / 50%);
-  --heat-1: oklch(88% 0.04 290);
-  --heat-2: oklch(76% 0.085 290);
-  --heat-3: oklch(62% 0.12 290);
-  --heat-4: oklch(45% 0.13 290);
-  --tier-s: oklch(76% 0.12 350);
-  --tier-a: oklch(73% 0.095 300);
-  --tier-b: oklch(62% 0.12 285);
-  --tier-c: oklch(48% 0.10 285);
-  --tier-d: oklch(35% 0.07 285);
-  --tier-ink: oklch(100% 0 0);
 }
 
 html,
@@ -168,23 +135,6 @@ select:focus-visible {
 
 [lang="ur"] {
   font-family: "Noto Nastaliq Urdu", var(--font-body);
-}
-
-.material-symbols-rounded {
-  font-family: var(--font-icons);
-  font-weight: normal;
-  font-style: normal;
-  font-size: 24px;
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  font-feature-settings: "liga";
-  -webkit-font-feature-settings: "liga";
-  -webkit-font-smoothing: antialiased;
 }
 
 .tabular-nums {

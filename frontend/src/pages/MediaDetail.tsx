@@ -3,29 +3,20 @@ import type { CSSProperties } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  createLog,
-  deleteLog,
+  changeRewatchCount,
   fetchAccountPreferences,
   fetchItem,
-  fetchItemLogs,
   fetchLibrary,
   fetchTags,
-  deleteReminder,
-  setReminder,
   setManualFranchise,
   setItemTags,
   updateItem,
-  updateLog,
-  isOfflineLogQueuedError,
   type ItemPatch,
-  type LogInput,
 } from "../app/api";
-import type { MediaStatus, Tag, WatchLog } from "../types";
+import type { MediaStatus, Tag } from "../types";
 import { RatingInput } from "../components/RatingInput";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ProgressEditor } from "../components/ProgressEditor";
-import { LogDialog } from "../components/LogDialog";
-import { HistorySection } from "../components/HistorySection";
 import { TagEditor } from "../components/TagEditor";
 import { ListsPanel } from "../components/ListsPanel";
 import { safeParseGenres } from "../components/MediaCard";
@@ -43,7 +34,20 @@ import { WhereToWatch } from "../components/WhereToWatch";
 const TYPE_LABEL = { MOVIE: "Movie", TV: "TV", ANIME: "Anime", BOOK: "Book" } as const;
 const CREATOR_LABEL = { MOVIE: "Directed by", TV: "Created by", ANIME: "Studio", BOOK: "By" } as const;
 
-type LogEditor = { log: WatchLog | null; title: string } | null;
+// Script stylesheets are only fetched when a title in that language is opened.
+const loadedScripts = new Set<string>();
+function loadScriptFont(language?: string | null) {
+  const code = language?.toLowerCase().split("-")[0];
+  const loader =
+    code === "ja" ? () => import("@fontsource-variable/noto-sans-jp/wght.css")
+    : code === "ko" ? () => import("@fontsource-variable/noto-sans-kr/wght.css")
+    : code === "zh" ? () => import("@fontsource-variable/noto-sans-sc/wght.css")
+    : code === "ur" ? () => import("@fontsource/noto-nastaliq-urdu/400.css")
+    : null;
+  if (!code || !loader || loadedScripts.has(code)) return;
+  loadedScripts.add(code);
+  loader().catch(() => loadedScripts.delete(code));
+}
 
 export function MediaDetail() {
   const { id } = useParams();
@@ -55,7 +59,6 @@ export function MediaDetail() {
     queryKey: ["account-preferences"],
     queryFn: fetchAccountPreferences,
   });
-  const { data: logs = [] } = useQuery({ queryKey: ["logs", id], queryFn: () => fetchItemLogs(id!), enabled: !!id });
   const { data: allTags = [] } = useQuery({ queryKey: ["tags"], queryFn: fetchTags });
   const { data: animeLibrary = [] } = useQuery({
     queryKey: ["library", "ANIME"],
@@ -70,20 +73,9 @@ export function MediaDetail() {
 
   const [notes, setNotes] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [logEditor, setLogEditor] = useState<LogEditor>(null);
   const [posterAccent, setPosterAccent] = useState<string | null>(null);
-  const [detailTab, setDetailTab] = useState<"overview" | "episodes">("overview");
   const [descriptionRevealed, setDescriptionRevealed] = useState(false);
-  const reminderMutation = useMutation({
-    mutationFn: () => item?.reminder?.pinned
-      ? deleteReminder(item.id)
-      : setReminder(item!.id, { pinned: true, untilAt: null }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["item", id] });
-      qc.invalidateQueries({ queryKey: ["home"] });
-    },
-    onError: (e: any) => showToast({ message: e?.response?.data?.error ?? "Couldn’t save this reminder", timeoutMs: 6000 }),
-  });
+  const [episodesOpen, setEpisodesOpen] = useState(false);
 
   // Sync the notes draft from the loaded item so saving without editing keeps
   // the real value instead of overwriting it.
@@ -92,9 +84,13 @@ export function MediaDetail() {
   }, [item?.id, item?.yourNotes]);
 
   useEffect(() => {
-    setDetailTab("overview");
     setDescriptionRevealed(false);
+    setEpisodesOpen(false);
   }, [item?.id]);
+
+  useEffect(() => {
+    loadScriptFont(item?.originalLanguage);
+  }, [item?.originalLanguage]);
 
   useEffect(() => {
     setPosterAccent(null);
@@ -143,54 +139,36 @@ export function MediaDetail() {
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["item", id] });
-    qc.invalidateQueries({ queryKey: ["logs", id] });
     qc.invalidateQueries({ queryKey: ["library"] });
     qc.invalidateQueries({ queryKey: ["suggestions"] });
   };
 
   const mut = useMutation({
     mutationFn: (patch: ItemPatch) => updateItem(id!, patch),
-    onSuccess: async (updated, patch) => {
+    onSuccess: (updated, patch) => {
       refresh();
-      // Completing something (directly, or by reaching the last episode) records a
-      // history entry; offer to add the date, rating and review right away.
-      if (updated.status === "COMPLETED" && item?.status !== "COMPLETED") {
-        const fresh = await qc.fetchQuery({ queryKey: ["logs", id], queryFn: () => fetchItemLogs(id!) });
-        setLogEditor({ log: fresh.find((l) => l.finishedAt) ?? null, title: "Finished. Anything to add?" });
-        if (patch.status === undefined) showToast({ message: `Marked ${statusLabel("COMPLETED", updated.mediaType)}`, timeoutMs: 4000 });
+      if (updated.status === "COMPLETED" && item?.status !== "COMPLETED" && patch.status === undefined) {
+        showToast({ message: `Marked ${statusLabel("COMPLETED", updated.mediaType)}`, timeoutMs: 4000 });
       }
     },
     onError: (err: any) => showToast({ message: err?.response?.data?.error ?? "Couldn't save", timeoutMs: 6000 }),
   });
 
-  const saveLog = async (input: LogInput) => {
-    try {
-      if (logEditor?.log) await updateLog(logEditor.log.id, input);
-      else await createLog(id!, input);
-      setLogEditor(null);
-      refresh();
-    } catch (err: any) {
-      if (isOfflineLogQueuedError(err)) {
-        setLogEditor(null);
-        showToast({ message: "Saved on this device. It will sync when you’re online.", timeoutMs: 6000 });
-        return;
-      }
-      showToast({ message: err?.response?.data?.error ?? "Couldn't save this entry", timeoutMs: 6000 });
-    }
-  };
-
-  const removeLog = async () => {
-    if (!logEditor?.log) return;
-    await deleteLog(logEditor.log.id);
-    setLogEditor(null);
-    refresh();
-  };
+  const rewatchMut = useMutation({
+    mutationFn: (delta: -1 | 1) => changeRewatchCount(id!, delta),
+    onSuccess: refresh,
+    onError: (err: any) => showToast({ message: err?.response?.data?.error ?? "Couldn't update the rewatch count", timeoutMs: 6000 }),
+  });
 
   const saveTags = async (names: string[], kind: Tag["kind"]) => {
-    await setItemTags(id!, names, kind);
-    qc.invalidateQueries({ queryKey: ["item", id] });
-    qc.invalidateQueries({ queryKey: ["tags"] });
-    qc.invalidateQueries({ queryKey: ["library"] });
+    try {
+      await setItemTags(id!, names, kind);
+      qc.invalidateQueries({ queryKey: ["item", id] });
+      qc.invalidateQueries({ queryKey: ["tags"] });
+      qc.invalidateQueries({ queryKey: ["library"] });
+    } catch (err: any) {
+      showToast({ message: err?.response?.data?.error ?? "Couldn't save tags", timeoutMs: 6000 });
+    }
   };
 
   if (!item) return <div className="min-h-screen p-6">Loading…</div>;
@@ -230,35 +208,43 @@ export function MediaDetail() {
     item.mediaType === "BOOK" && item.pageCount ? `${item.pageCount} pages` : null,
     item.duration ? `${item.duration} min${item.mediaType === "MOVIE" ? "" : " / ep"}` : null,
   ].filter(Boolean);
+  const releaseDate = item.releaseDate ? new Date(item.releaseDate) : null;
+  const releaseText = releaseDate && !Number.isNaN(releaseDate.getTime())
+    ? releaseDate.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
+    : null;
+  const shielded = (item.mediaType === "TV" || item.mediaType === "ANIME")
+    && preferences?.spoilerShield !== false && item.status !== "COMPLETED" && !descriptionRevealed;
+  const rewatches = item.rewatchCount ?? 0;
+  const rewatchWord = item.mediaType === "BOOK" ? "Rereads" : "Rewatches";
+  const stepButton = "min-h-11 min-w-11 rounded-xl bg-white/10 text-base hover:bg-white/20 disabled:opacity-40";
 
   return (
-    <div className="min-h-screen px-4 md:px-8 py-6 max-w-4xl mx-auto">
-      <button className="min-h-11 text-sm text-white/80 hover:text-white" onClick={() => nav(-1)}>
-        ← Back
-      </button>
-
-      <div className="surface-card mt-2 overflow-hidden rounded-[var(--radius-panel)]">
-        <div
-          className="detail-hero relative"
-          style={{ "--poster-accent": posterAccent ?? "transparent" } as CSSProperties}
-        >
-          {item.backdropUrl ? (
-            <img src={item.backdropUrl} alt="" className="relative z-0 h-52 w-full object-cover opacity-80" />
-          ) : (
-            <div className="relative z-0 h-52 w-full bg-white/5" />
-          )}
-          <div className="detail-hero-shade absolute inset-0 z-0" />
-          <div className="absolute bottom-0 left-0 z-10 flex gap-4 p-4">
-            <div className="w-20 h-28 shrink-0 rounded-xl overflow-hidden bg-white/5">
-              {item.posterUrl ? <img src={item.posterUrl} alt="" className="w-full h-full object-cover" /> : null}
+    <div className="min-h-screen pb-10">
+      <div
+        className="detail-hero relative isolate overflow-hidden"
+        style={{ "--poster-accent": posterAccent ?? "transparent" } as CSSProperties}
+      >
+        {item.backdropUrl ? (
+          <img src={item.backdropUrl} alt="" className="absolute inset-0 -z-10 h-full w-full object-cover opacity-70" />
+        ) : (
+          <div className="absolute inset-0 -z-10 bg-white/5" />
+        )}
+        <div className="detail-hero-shade absolute inset-0 -z-10" />
+        <div className="mx-auto max-w-4xl px-4 pb-6 pt-4 md:px-8">
+          <button className="min-h-11 text-sm text-white/80 hover:text-white" onClick={() => nav(-1)}>
+            ← Back
+          </button>
+          <div className="mt-16 flex gap-4">
+            <div className="h-36 w-24 shrink-0 overflow-hidden rounded-xl bg-white/5 md:h-48 md:w-32">
+              {item.posterUrl ? <img src={item.posterUrl} alt="" className="h-full w-full object-cover" /> : null}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 self-end">
               {item.franchise && item.franchiseRole && item.franchiseRole !== "MAIN" ? (
                 <button className="text-xs text-white/85 underline underline-offset-2" onClick={() => nav(`/franchise/${item.franchiseId}`)}>
                   {item.franchise.title} ›
                 </button>
               ) : null}
-              <h1 className="text-xl md:text-2xl font-semibold">{item.title}</h1>
+              <h1 className="text-xl font-semibold md:text-3xl">{item.title}</h1>
               {item.nativeTitle && item.nativeTitle !== item.title ? (
                 <div className="text-sm text-white/80" lang={item.originalLanguage ?? undefined} dir={item.originalLanguage === "ur" ? "rtl" : undefined}>
                   {item.nativeTitle}
@@ -274,6 +260,7 @@ export function MediaDetail() {
                 {item.countryOfOrigin && facts.length ? <span aria-hidden="true">·</span> : null}
                 <span>{facts.join(" · ")}</span>
               </div>
+              {releaseText ? <div className="text-sm text-white/80">Released {releaseText}</div> : null}
               <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
                 <div className="flex gap-1.5">
                   <dt className="text-white/75">You</dt>
@@ -298,36 +285,127 @@ export function MediaDetail() {
               </dl>
             </div>
           </div>
-        </div>
 
-        <div className="p-4 md:p-6 space-y-6">
-          {creators.length ? (
-            <p className="text-sm">
-              <span className="text-white/75">{CREATOR_LABEL[item.mediaType]} </span>
-              {creators.map((c, i) => (
-                <span key={c.contributor.id}>
-                  {i > 0 ? ", " : ""}
-                  <button className="underline underline-offset-2 hover:text-white" onClick={() => nav(`/people/${encodeURIComponent(c.contributor.id)}`)}>
-                    {c.contributor.name}
-                  </button>
-                </span>
+          <section className="mt-5 space-y-4 rounded-[var(--radius-panel)] bg-black/40 p-4 backdrop-blur" aria-label="Track">
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Status">
+              {STATUSES.map((s: MediaStatus) => (
+                <button
+                  key={s}
+                  className={`min-h-11 rounded-full px-4 text-sm transition ${
+                    item.status === s ? "bg-white/25 font-semibold" : "bg-white/10 hover:bg-white/15"
+                  }`}
+                  aria-pressed={item.status === s}
+                  disabled={mut.isPending}
+                  onClick={() => mut.mutate({ status: s })}
+                >
+                  {statusLabel(s, item.mediaType)}
+                </button>
               ))}
-            </p>
-          ) : item.creator ? (
-            <p className="text-sm">
-              <span className="text-white/75">{CREATOR_LABEL[item.mediaType]} </span>
-              {item.creator}
-            </p>
-          ) : null}
+            </div>
+            <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+              <div>
+                <div className="text-xs text-white/75">Your rating</div>
+                <div className="mt-1">
+                  <RatingInput value={mine} onChange={(v) => mut.mutate({ yourRating: v })} />
+                </div>
+                {item.yourRatingAt && mine != null ? (
+                  <p className="mt-1 text-xs text-white/70">Rated {new Date(item.yourRatingAt).toLocaleDateString()}</p>
+                ) : null}
+              </div>
+              {item.mediaType !== "MOVIE" ? (
+                <div>
+                  <div className="mb-2 text-xs text-white/75">Progress</div>
+                  <ProgressEditor item={item} onPatch={(p) => mut.mutate(p)} />
+                </div>
+              ) : null}
+              {item.status === "COMPLETED" ? (
+                <div>
+                  <div className="text-xs text-white/75">{rewatchWord}</div>
+                  <div className="mt-1 flex items-center gap-2" role="group" aria-label={rewatchWord}>
+                    <button
+                      type="button"
+                      className={stepButton}
+                      aria-label={`Decrease ${rewatchWord.toLowerCase()}`}
+                      disabled={rewatches <= 0 || rewatchMut.isPending}
+                      onClick={() => rewatchMut.mutate(-1)}
+                    >
+                      −
+                    </button>
+                    <span className="min-w-8 text-center font-semibold tabular-nums" aria-live="polite">{rewatches}</span>
+                    <button
+                      type="button"
+                      className={stepButton}
+                      aria-label={`Increase ${rewatchWord.toLowerCase()}`}
+                      disabled={rewatchMut.isPending}
+                      onClick={() => rewatchMut.mutate(1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      </div>
 
-          {item.franchiseId || item.collectionId ? (
-            <div className="flex flex-wrap gap-2">
-              {item.franchiseId ? (
-                <button className="min-h-11 rounded-xl bg-white/10 px-4 text-sm hover:bg-white/15" onClick={() => nav(`/franchise/${item.franchiseId}`)}>
-                  See the whole {item.franchise?.title ?? "franchise"} →
+      <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 md:px-8">
+        {genres.length ? (
+          <ul className="flex flex-wrap gap-2" aria-label="Genres">
+            {genres.slice(0, 8).map((g) => (
+              <li key={g} className="rounded-full bg-white/10 px-2.5 py-1 text-xs">{g}</li>
+            ))}
+          </ul>
+        ) : null}
+
+        <section aria-labelledby="synopsis-heading">
+          <h2 id="synopsis-heading" className="text-sm font-semibold">Synopsis</h2>
+          {item.description ? (
+            <>
+              <p className={`mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--tx2)] ${shielded ? "select-none blur-sm" : ""}`}>
+                {plainText(item.description)}
+              </p>
+              {shielded ? (
+                <button type="button" className="mt-2 min-h-11 text-xs font-semibold text-[var(--acc)] underline underline-offset-2" onClick={() => setDescriptionRevealed(true)}>
+                  Reveal description
                 </button>
               ) : null}
-              {item.mediaType === "ANIME" ? (
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-[var(--tx3)]">No description is available.</p>
+          )}
+        </section>
+
+        {preferences ? <WhereToWatch item={item} country={preferences.watchCountry} /> : null}
+
+        {item.mediaType === "TV" || item.mediaType === "ANIME" ? (
+          <details
+            className="surface-card rounded-[var(--radius-panel)] p-4"
+            open={episodesOpen}
+            onToggle={(e) => setEpisodesOpen(e.currentTarget.open)}
+          >
+            <summary className="min-h-11 cursor-pointer text-sm font-semibold">Episode guide</summary>
+            {episodesOpen ? (
+              <div className="mt-3">
+                <EpisodeGuide item={item} shieldSpoilers={preferences?.spoilerShield ?? true} />
+              </div>
+            ) : null}
+          </details>
+        ) : null}
+
+        {item.franchiseId || item.collectionId || item.mediaType === "ANIME" ? (
+          <div className="flex flex-wrap gap-2">
+            {item.franchiseId ? (
+              <button className="min-h-11 rounded-xl bg-white/10 px-4 text-sm hover:bg-white/15" onClick={() => nav(`/franchise/${item.franchiseId}`)}>
+                See the whole {item.franchise?.title ?? "franchise"} →
+              </button>
+            ) : null}
+            {item.collectionId && item.collectionSource === "tmdb" ? (
+              <button className="min-h-11 rounded-xl bg-white/10 px-4 text-sm hover:bg-white/15" onClick={() => nav(`/collection/${item.collectionId}`)}>
+                Part of {item.collectionName ?? "a collection"} →
+              </button>
+            ) : null}
+            {item.mediaType === "ANIME" ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="flex min-h-11 items-center gap-2 text-sm text-[var(--tx2)]">
                     Move to franchise
@@ -356,220 +434,118 @@ export function MediaDetail() {
                   {item.franchiseOverride ? <span className="text-xs text-[var(--tx3)]">Manual grouping; provider refresh won’t replace it.</span> : null}
                 </div>
               ) : null}
-              {item.status === "PLANNED" ? (
-                <button
-                  type="button"
-                  disabled={reminderMutation.isPending}
-                  className="min-h-11 rounded-xl border border-[var(--line2)] px-4 text-sm font-semibold text-[var(--tx)] hover:bg-[var(--s2)] disabled:opacity-50"
-                  onClick={() => reminderMutation.mutate()}
-                >
-                  {reminderMutation.isPending ? "Saving…" : item.reminder?.pinned ? "Remove reminder" : "Remind me"}
-                </button>
-              ) : null}
-              {item.collectionId && item.collectionSource === "tmdb" ? (
-                <button className="min-h-11 rounded-xl bg-white/10 px-4 text-sm hover:bg-white/15" onClick={() => nav(`/collection/${item.collectionId}`)}>
-                  Part of {item.collectionName ?? "a collection"} →
-                </button>
-              ) : null}
-            </div>
-          ) : null}
+          </div>
+        ) : null}
 
-          {cast.length ? (
-            <section aria-labelledby="cast-heading">
-              <h2 id="cast-heading" className="text-sm font-semibold">Cast</h2>
-              <ul className="mt-2 flex gap-3 overflow-x-auto pb-2">
-                {cast.map((c) => (
-                  <li key={c.contributor.id} className="w-24 shrink-0">
-                    <button className="w-full text-left" onClick={() => nav(`/people/${encodeURIComponent(c.contributor.id)}`)}>
-                      <div className="h-24 w-24 overflow-hidden rounded-full bg-white/10">
-                        {c.contributor.imageUrl ? <img src={c.contributor.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" /> : null}
-                      </div>
-                      <div className="mt-1 line-clamp-2 text-xs font-semibold">{c.contributor.name}</div>
-                      {c.character ? <div className="line-clamp-1 text-xs text-white/75">{c.character}</div> : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+        {creators.length ? (
+          <p className="text-sm">
+            <span className="text-white/75">{CREATOR_LABEL[item.mediaType]} </span>
+            {creators.map((c, i) => (
+              <span key={c.contributor.id}>
+                {i > 0 ? ", " : ""}
+                <button className="underline underline-offset-2 hover:text-white" onClick={() => nav(`/people/${encodeURIComponent(c.contributor.id)}`)}>
+                  {c.contributor.name}
+                </button>
+              </span>
+            ))}
+          </p>
+        ) : item.creator ? (
+          <p className="text-sm">
+            <span className="text-white/75">{CREATOR_LABEL[item.mediaType]} </span>
+            {item.creator}
+          </p>
+        ) : null}
 
-          {genres.length ? (
-            <ul className="flex flex-wrap gap-2" aria-label="Genres">
-              {genres.slice(0, 8).map((g) => (
-                <li key={g} className="text-xs px-2.5 py-1 rounded-full bg-white/10">{g}</li>
+        {cast.length ? (
+          <section aria-labelledby="cast-heading">
+            <h2 id="cast-heading" className="text-sm font-semibold">Cast</h2>
+            <ul className="mt-2 flex gap-3 overflow-x-auto pb-2">
+              {cast.map((c) => (
+                <li key={c.contributor.id} className="w-24 shrink-0">
+                  <button className="w-full text-left" onClick={() => nav(`/people/${encodeURIComponent(c.contributor.id)}`)}>
+                    <div className="h-24 w-24 overflow-hidden rounded-full bg-white/10">
+                      {c.contributor.imageUrl ? <img src={c.contributor.imageUrl} alt="" loading="lazy" className="h-full w-full object-cover" /> : null}
+                    </div>
+                    <div className="mt-1 line-clamp-2 text-xs font-semibold">{c.contributor.name}</div>
+                    {c.character ? <div className="line-clamp-1 text-xs text-white/75">{c.character}</div> : null}
+                  </button>
+                </li>
               ))}
             </ul>
-          ) : null}
+          </section>
+        ) : null}
 
-          {preferences ? <WhereToWatch item={item} country={preferences.watchCountry} /> : null}
-
-          {item.mediaType === "TV" || item.mediaType === "ANIME" ? (
-            <div className="space-y-4">
-              <div className="flex gap-2 border-b border-[var(--line)]" role="tablist" aria-label="Title details">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={detailTab === "overview"}
-                  className={`min-h-11 border-b-2 px-3 text-sm ${detailTab === "overview" ? "border-[var(--acc)] text-[var(--tx)]" : "border-transparent text-[var(--tx3)]"}`}
-                  onClick={() => setDetailTab("overview")}
-                >
-                  Overview
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={detailTab === "episodes"}
-                  className={`min-h-11 border-b-2 px-3 text-sm ${detailTab === "episodes" ? "border-[var(--acc)] text-[var(--tx)]" : "border-transparent text-[var(--tx3)]"}`}
-                  onClick={() => setDetailTab("episodes")}
-                >
-                  Episodes
-                </button>
-              </div>
-              {detailTab === "episodes" ? (
-                <EpisodeGuide item={item} shieldSpoilers={preferences?.spoilerShield ?? true} />
-              ) : item.description ? (
-                <div>
-                  <h2 className="text-sm font-semibold">Description</h2>
-                  <p className={`mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--tx2)] ${preferences?.spoilerShield !== false && item.status !== "COMPLETED" && !descriptionRevealed ? "select-none blur-sm" : ""}`}>
-                    {plainText(item.description)}
-                  </p>
-                  {preferences?.spoilerShield !== false && item.status !== "COMPLETED" && !descriptionRevealed ? (
-                    <button type="button" className="mt-2 min-h-11 text-xs font-semibold text-[var(--acc)] underline underline-offset-2" onClick={() => setDescriptionRevealed(true)}>
-                      Reveal description
-                    </button>
-                  ) : null}
-                </div>
-              ) : <p className="text-sm text-[var(--tx3)]">No description is available.</p>}
-            </div>
-          ) : item.description ? (
-            <div>
-              <h2 className="text-sm font-semibold">Description</h2>
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[var(--tx2)]">{plainText(item.description)}</p>
-            </div>
-          ) : null}
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <section className="surface-card space-y-5 rounded-[var(--radius-panel)] p-4" aria-labelledby="track-heading">
-              <h2 id="track-heading" className="text-sm font-semibold">Track</h2>
-              <div className="flex flex-wrap gap-2" role="group" aria-label="Status">
-                {STATUSES.map((s: MediaStatus) => (
-                  <button
-                    key={s}
-                    className={`min-h-11 text-sm px-4 rounded-full transition ${
-                      item.status === s ? "bg-white/25 font-semibold" : "bg-white/10 hover:bg-white/15"
-                    }`}
-                    aria-pressed={item.status === s}
-                    onClick={() => mut.mutate({ status: s })}
-                  >
-                    {statusLabel(s, item.mediaType)}
-                  </button>
-                ))}
-              </div>
-
-              <div>
-                <div className="text-xs text-white/75">Your rating</div>
-                <div className="mt-1">
-                  <RatingInput value={mine} onChange={(v) => mut.mutate({ yourRating: v })} />
-                </div>
-                {item.yourRatingAt && mine != null ? (
-                  <p className="mt-1 text-xs text-[var(--tx3)]">
-                    Rated {new Date(item.yourRatingAt).toLocaleDateString()}
-                  </p>
-                ) : null}
-              </div>
-
-              <div>
-                <div className="text-xs text-white/75 mb-2">Progress</div>
-                <ProgressEditor item={item} onPatch={(p) => mut.mutate(p)} />
-              </div>
-            </section>
-
-            <section className="surface-card space-y-5 rounded-[var(--radius-panel)] p-4" aria-labelledby="lists-heading">
-              <h2 id="lists-heading" className="text-sm font-semibold">Lists</h2>
+        <details className="surface-card rounded-[var(--radius-panel)] p-4">
+          <summary className="min-h-11 cursor-pointer text-sm font-semibold">Organise</summary>
+          <div className="mt-3 space-y-5">
+            <section className="space-y-3" aria-labelledby="lists-heading">
+              <h2 id="lists-heading" className="text-sm font-semibold">Lists &amp; tags</h2>
               <ListsPanel item={item} />
               <TagEditor tags={tags} allTags={allTags} onChange={saveTags} />
             </section>
-          </div>
 
-          <HistorySection
-            logs={logs}
-            mediaType={item.mediaType}
-            onAdd={() => setLogEditor({ log: null, title: item.mediaType === "BOOK" ? "Log a read" : "Log a watch" })}
-            onEdit={(log) => setLogEditor({ log, title: "Edit entry" })}
-          />
-
-          <section aria-labelledby="notes-heading">
-            <h2 id="notes-heading" className="text-sm font-semibold">Private notes</h2>
-            <p className="text-xs text-white/75 mt-1">Only for you. Reviews go in History.</p>
-            <textarea
-              aria-labelledby="notes-heading"
-              className="mt-2 w-full min-h-[90px] rounded-xl bg-black/30 border border-white/15 px-3 py-2 text-sm"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-            <button
-              className="mt-2 min-h-11 rounded-xl px-4 bg-white/10 hover:bg-white/15 transition text-sm"
-              onClick={() => mut.mutate({ yourNotes: notes })}
-            >
-              Save notes
-            </button>
-          </section>
-
-          {item.mediaType === "TV" || item.mediaType === "MOVIE" ? (
-            <section aria-labelledby="category-heading" className="space-y-2">
-              <h2 id="category-heading" className="text-sm font-semibold">Category</h2>
-              <label className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-white/80">Show this under</span>
-                <select
-                  className="min-h-11 rounded-xl bg-black/30 border border-white/15 px-3"
-                  value={item.regionOverride ?? "AUTO"}
-                  onChange={(e) =>
-                    mut.mutate({ regionOverride: e.target.value === "AUTO" ? null : (e.target.value as any) })
-                  }
-                >
-                  <option value="AUTO">
-                    Automatic ({item.region ? REGION_LABEL[item.region] : item.mediaType === "TV" ? "TV" : "Movies"})
-                  </option>
-                  <option value="NONE">{item.mediaType === "TV" ? "TV" : "Movies"} only</option>
-                  {REGIONS.map((r) => (
-                    <option key={r} value={r}>{REGION_LABEL[r]}</option>
-                  ))}
-                </select>
-              </label>
-              <p className="text-xs text-white/70">For co-productions and dubs that land in the wrong place.</p>
+            <section aria-labelledby="notes-heading">
+              <h2 id="notes-heading" className="text-sm font-semibold">Private notes</h2>
+              <p className="mt-1 text-xs text-white/75">Only for you.</p>
+              <textarea
+                aria-labelledby="notes-heading"
+                className="mt-2 min-h-[90px] w-full rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+              <button
+                className="mt-2 min-h-11 rounded-xl bg-white/10 px-4 text-sm transition hover:bg-white/15 disabled:opacity-50"
+                disabled={mut.isPending || notes === (item.yourNotes ?? "")}
+                onClick={() => mut.mutate({ yourNotes: notes })}
+              >
+                Save notes
+              </button>
             </section>
-          ) : null}
 
-          {item.provider === "manual" ? <ManualDetailsEditor item={item} onPatch={(p) => mut.mutate(p as any)} /> : null}
+            {item.mediaType === "TV" || item.mediaType === "MOVIE" ? (
+              <section aria-labelledby="category-heading" className="space-y-2">
+                <h2 id="category-heading" className="text-sm font-semibold">Category</h2>
+                <label className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="text-white/80">Show this under</span>
+                  <select
+                    className="min-h-11 rounded-xl border border-white/15 bg-black/30 px-3"
+                    value={item.regionOverride ?? "AUTO"}
+                    onChange={(e) =>
+                      mut.mutate({ regionOverride: e.target.value === "AUTO" ? null : (e.target.value as any) })
+                    }
+                  >
+                    <option value="AUTO">
+                      Automatic ({item.region ? REGION_LABEL[item.region] : item.mediaType === "TV" ? "TV" : "Movies"})
+                    </option>
+                    <option value="NONE">{item.mediaType === "TV" ? "TV" : "Movies"} only</option>
+                    {REGIONS.map((r) => (
+                      <option key={r} value={r}>{REGION_LABEL[r]}</option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-xs text-white/70">For co-productions and dubs that land in the wrong place.</p>
+              </section>
+            ) : null}
 
-          <div className="border-t border-white/10 pt-4">
-            <button
-              type="button"
-              className="min-h-11 rounded-xl px-4 text-sm text-rose-300 hover:bg-rose-500/10"
-              onClick={() => setConfirmDelete(true)}
-            >
-              Remove from library
-            </button>
+            {item.provider === "manual" ? <ManualDetailsEditor item={item} onPatch={(p) => mut.mutate(p as any)} /> : null}
+
+            <div className="border-t border-white/10 pt-3">
+              <button
+                type="button"
+                className="min-h-11 rounded-xl px-4 text-sm text-rose-300 hover:bg-rose-500/10"
+                onClick={() => setConfirmDelete(true)}
+              >
+                Remove from library
+              </button>
+            </div>
           </div>
-        </div>
+        </details>
       </div>
-
-      <LogDialog
-        open={logEditor != null}
-        title={logEditor?.title ?? ""}
-        mediaType={item.mediaType}
-        log={logEditor?.log}
-        previousRating={logs.find((entry) => entry.id !== logEditor?.log?.id && entry.rating != null) ?? null}
-        rewatchOrdinal={logs.filter((entry) => entry.finishedAt && entry.id !== logEditor?.log?.id).length + 1}
-        onSave={saveLog}
-        onDelete={logEditor?.log ? removeLog : undefined}
-        onClose={() => setLogEditor(null)}
-      />
 
       <ConfirmDialog
         open={confirmDelete}
         title={`Remove "${item.title}"?`}
-        body="Its status, rating, progress, history and notes are removed too. You can undo for 10 seconds."
+        body="Its status, rating, progress and notes are removed too. You can undo for 10 seconds."
         confirmLabel="Remove"
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => {

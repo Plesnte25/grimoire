@@ -19,16 +19,24 @@ commit once done. Issues are discussed and fixed one at a time.
   backed up before all four forward migrations were applied (`/opt/grimoire/backups/pre-deploy-20261002T161827Z.db`).
   The public health endpoint and homepage return successfully. Authenticated visual screenshot review remains pending.
 
-- **Next (agreed 2026-10-04):** the daily-use review below (#116–#136) replaces the Nocturne look and trims
-  features that weren't used. It is built in one go later, in the order under "Daily-use review → Build order".
-  The user's side: fix home DNS (#124 a).
+- **In progress (local worktree; not deployed):** core implementation covers #116–#123, #126–#127, #130–#133,
+  and #135–#136. Frontend build/type-check, backend build, Prisma validation, and `git diff --check` pass. The
+  authenticated route smoke check (#129) passed for 16 routes at desktop and 320/390/430 px widths (64 visits;
+  zero findings); data-backed routes were skipped because the isolated test database had no library entries.
+  Screenshot review remains pending.
+- **Partially implemented:** #125 does not auto-submit on the final PIN digit; #134 has account/device security,
+  preferences, and user backup import/export, but not unlock history, provider health, metadata refresh results,
+  or server-backup status/download.
+- **Still outstanding:** #124(a) requires the user's DNS change; #124(b) is documented but production Caddy was
+  not changed; #124(c) still needs a measured Lighthouse/throttled run and the first-load byte targets verified.
+  Latest build entry chunks are 357 KB JS / 43.1 KB CSS raw (115.1 KB / 10.7 KB gzip); pull-to-refresh/swipe-back
+  behavior and authenticated visual review also remain unverified.
 
-## Open — needs a fix
+## Daily-use review — scope and status (2026-10-04)
 
-### Daily-use review (2026-10-04)
-
-From a few days of daily use of the Phases 4–7 build. Each item was discussed and the solution agreed; nothing is
-built yet. Numbering follows the user's list (1–21 → #116–#136). This round **supersedes** the Claude Design
+From a few days of daily use of the Phases 4–7 build. Each item was discussed and the solution agreed. Numbering
+follows the user's list (1–21 → #116–#136). The implementation is present locally but has not been deployed.
+This round **supersedes** the Claude Design
 "Nocturne" look (#83–90 visuals, `docs/design/` kept for reference only) and removes several Phase 6/7 features:
 yearly goals (#69), "What should I watch tonight?" (#65), rewatch nudges (#72), the diary, watch logs, offline log
 queue (#104) and the light theme.

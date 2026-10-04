@@ -20,7 +20,7 @@ export default defineConfig({
     plugins: [
         react(),
         VitePWA({
-            registerType: "autoUpdate",
+            registerType: "prompt",
             includeAssets: ["favicon.svg"],
             workbox: {
                 globIgnores: ["**/noto-sans-*.woff2"],
@@ -48,8 +48,8 @@ export default defineConfig({
             manifest: {
                 name: "Grimoire",
                 short_name: "Grimoire",
-                theme_color: "#0b0b10",
-                background_color: "#0b0b10",
+                theme_color: "#17110d",
+                background_color: "#17110d",
                 display: "standalone",
                 icons: [
                     { src: "favicon.svg", sizes: "any", type: "image/svg+xml" }

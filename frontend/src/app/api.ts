@@ -1,8 +1,7 @@
 import axios from "axios";
-import { queueOfflineLog } from "../lib/offlineLogQueue";
 import type {
-    AccountPreferences, MediaItem, ProviderSearchResult, MediaType, CustomList, WatchLog, DiaryLog, Season, Tag, TierList, Tier,
-    CatalogEntry, Episode, TrustedDevice, HomeSnapshot, WatchProvider, Trailer, YearStats, SharedList,
+    AccountPreferences, MediaItem, ProviderSearchResult, MediaType, CustomList, Season, Tag, TierList, Tier,
+    CatalogEntry, Episode, TrustedDevice, HomeSnapshot, WatchProvider, Trailer, SharedList, MediaStats, SuggestionsResponse,
 } from "../types";
 
 const API_BASE =
@@ -47,6 +46,10 @@ export async function lock() {
     await api.post("/api/auth/lock");
 }
 
+export async function refreshSession() {
+    await api.post("/api/auth/activity");
+}
+
 export async function setAccountPin(currentPin: string, newPin: string, revokeOtherDevices = false) {
     await api.post("/api/auth/pin", { currentPin, newPin, revokeOtherDevices });
 }
@@ -63,28 +66,6 @@ export async function revokeTrustedDevice(id: string): Promise<{ isCurrent: bool
 
 export async function fetchHomeSnapshot(): Promise<HomeSnapshot> {
     const res = await api.get("/api/home");
-    return res.data;
-}
-
-export async function setReminder(
-    mediaId: string,
-    value: { pinned?: boolean; untilAt?: string | null }
-) {
-    const res = await api.put(`/api/home/reminders/${encodeURIComponent(mediaId)}`, value);
-    return res.data.reminder;
-}
-
-export async function deleteReminder(mediaId: string) {
-    await api.delete(`/api/home/reminders/${encodeURIComponent(mediaId)}`);
-}
-
-export async function setAnnualGoal(year: number, scope: "ALL" | MediaType, target: number) {
-    const res = await api.put(`/api/home/goals/${year}/${scope}`, { target });
-    return res.data.goal;
-}
-
-export async function fetchYearStats(year: number): Promise<YearStats> {
-    const res = await api.get("/api/stats/year", { params: { year } });
     return res.data;
 }
 
@@ -127,13 +108,9 @@ export async function providerDetails(
 // --- Library ---
 
 export async function addToLibrary(
-    payload: ProviderSearchResult &
-        Partial<
-            Pick<
-                MediaItem,
-                "status" | "yourRating" | "yourNotes" | "progressText" | "progressValue"
-            >
-        >
+    payload: Omit<ProviderSearchResult, "genres"> &
+        Partial<Pick<MediaItem, "status" | "yourRating" | "yourNotes" | "progressText" | "progressValue" | "episodes" | "countryOfOrigin">> &
+        { regionOverride?: string | null; genres?: string | string[] }
 ): Promise<MediaItem> {
     const res = await api.post("/api/library", payload);
     return res.data.item;
@@ -178,6 +155,11 @@ export type ItemPatch = Partial<
 
 export async function updateItem(id: string, patch: ItemPatch): Promise<MediaItem> {
     const res = await api.patch(`/api/library/${id}`, patch);
+    return res.data.item;
+}
+
+export async function changeRewatchCount(id: string, delta: -1 | 0 | 1 = 1): Promise<MediaItem> {
+    const res = await api.post(`/api/library/${encodeURIComponent(id)}/rewatch`, { delta });
     return res.data.item;
 }
 
@@ -259,80 +241,6 @@ export async function setListItemNote(listId: string, itemId: string, note: stri
 export async function reorderList(listId: string, itemIds: string[]): Promise<CustomList> {
     const res = await api.put(`/api/lists/${listId}/order`, { itemIds });
     return res.data.list;
-}
-
-// --- Watch log / diary ---
-
-export type LogInput = Partial<
-    Pick<
-        WatchLog,
-        | "startedAt"
-        | "finishedAt"
-        | "rating"
-        | "review"
-        | "reviewHasSpoilers"
-        | "isRewatch"
-        | "watchedOn"
-        | "watchMode"
-        | "watchedWith"
-        | "fromEpisode"
-        | "toEpisode"
-        | "label"
-    >
->;
-
-export async function fetchItemLogs(mediaId: string): Promise<WatchLog[]> {
-    const res = await api.get(`/api/library/${mediaId}/logs`);
-    return res.data.logs;
-}
-
-export class OfflineLogQueuedError extends Error {
-    constructor() {
-        super("This log is saved on this device and will sync when you are online.");
-        this.name = "OfflineLogQueuedError";
-    }
-}
-
-export function isOfflineLogQueuedError(error: unknown): error is OfflineLogQueuedError {
-    return error instanceof OfflineLogQueuedError;
-}
-
-export async function createLog(mediaId: string, input: LogInput): Promise<WatchLog> {
-    const clientMutationId = crypto.randomUUID();
-    const queuedAt = new Date().toISOString();
-    const enqueue = () => queueOfflineLog({ mediaId, input, clientMutationId, queuedAt });
-    if (!navigator.onLine) {
-        enqueue();
-        throw new OfflineLogQueuedError();
-    }
-    try {
-        const res = await api.post(`/api/library/${mediaId}/logs`, { ...input, clientMutationId });
-        return res.data.log;
-    } catch (error) {
-        if (
-            axios.isAxiosError(error) &&
-            !error.response &&
-            (!error.code || ["ERR_NETWORK", "ECONNABORTED"].includes(error.code))
-        ) {
-            enqueue();
-            throw new OfflineLogQueuedError();
-        }
-        throw error;
-    }
-}
-
-export async function updateLog(logId: string, input: LogInput): Promise<WatchLog> {
-    const res = await api.patch(`/api/logs/${logId}`, input);
-    return res.data.log;
-}
-
-export async function deleteLog(logId: string) {
-    await api.delete(`/api/logs/${logId}`);
-}
-
-export async function fetchDiary(year: number): Promise<DiaryLog[]> {
-    const res = await api.get("/api/logs", { params: { year } });
-    return res.data.logs;
 }
 
 export async function fetchSeasons(mediaId: string): Promise<Season[]> {
@@ -435,7 +343,7 @@ export async function fetchSuggestions(
     mediaType: MediaType,
     scope?: string,
     refresh?: number
-) {
+): Promise<SuggestionsResponse> {
     const res = await api.get("/api/suggestions", {
         params: { mediaType, scope, refresh },
         timeout: 20_000,
@@ -443,6 +351,18 @@ export async function fetchSuggestions(
     return res.data;
 }
 
+export async function dismissSuggestion(
+    provider: string,
+    mediaId: string,
+    mediaType: MediaType
+): Promise<void> {
+    await api.post("/api/suggestions/dismiss", { provider, mediaId, mediaType });
+}
+
+export async function fetchMediaStats(): Promise<MediaStats> {
+    const res = await api.get("/api/stats");
+    return res.data;
+}
 
 
 

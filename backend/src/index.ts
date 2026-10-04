@@ -13,7 +13,6 @@ import helmet from "helmet";
 
 import { libraryRouter } from "./routes/library.js";
 import { listsRouter } from "./routes/lists.js";
-import { logsRouter } from "./routes/logs.js";
 import { tierListsRouter } from "./routes/tierLists.js";
 import { tagsRouter } from "./routes/tags.js";
 import { catalogRouter } from "./routes/catalog.js";
@@ -71,7 +70,6 @@ app.use("/api/stats", requireSession, statsRouter);
 app.use("/api/providers", requireSession, providersRouter);
 app.use("/api/library", requireSession, libraryRouter);
 app.use("/api/lists", requireSession, listsRouter);
-app.use("/api/logs", requireSession, logsRouter);
 app.use("/api/tier-lists", requireSession, tierListsRouter);
 app.use("/api/tags", requireSession, tagsRouter);
 app.use("/api/suggestions", requireSession, suggestionsRouter);

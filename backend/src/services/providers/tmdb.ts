@@ -315,3 +315,44 @@ export async function tmdbDiscoverByGenres(params: {
             : [],
     }));
 }
+
+export async function tmdbRecommendations(params: {
+    kind: "movie" | "tv";
+    providerId: string;
+    page?: number;
+}) {
+    if (!API_KEY) return [];
+
+    const page = params.page ?? 1;
+    const endpoint = `/${params.kind}/${params.providerId}/recommendations`;
+    const res = await requestWithRetry(() =>
+        http.get(endpoint, {
+            params: {
+                api_key: API_KEY,
+                include_adult: false,
+                page,
+            },
+        })
+    );
+    const idToName = await getGenreIdToName(params.kind);
+
+    return (res.data?.results ?? []).map((r: any) => ({
+        provider: "tmdb",
+        providerId: String(r.id),
+        mediaType: params.kind === "movie" ? "MOVIE" : "TV",
+        title: r.title ?? r.name ?? "",
+        year:
+            params.kind === "movie"
+                ? Number(String(r.release_date || "").slice(0, 4)) || undefined
+                : Number(String(r.first_air_date || "").slice(0, 4)) || undefined,
+        description: r.overview ?? "",
+        posterUrl: toPoster(r.poster_path),
+        backdropUrl: toBackdrop(r.backdrop_path),
+        globalRating: typeof r.vote_average === "number" ? r.vote_average : undefined,
+        globalRatingText:
+            typeof r.vote_count === "number" ? `TMDB (${r.vote_count} votes)` : undefined,
+        genres: Array.isArray(r.genre_ids)
+            ? r.genre_ids.map((gid: number) => idToName[gid]).filter(Boolean)
+            : [],
+    }));
+}

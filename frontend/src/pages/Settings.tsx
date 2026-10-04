@@ -5,7 +5,6 @@ import {
   fetchAccountPreferences,
   fetchTrustedDevices,
   setAccountPin,
-  lock,
   revokeTrustedDevice,
   updateAccountPreferences,
 } from "../app/api";
@@ -24,7 +23,7 @@ function browserCountry() {
 export function Settings() {
   const nav = useNavigate();
   const queryClient = useQueryClient();
-  const { theme, setTheme, textSize, setTextSize, reduceMotion, setReduceMotion } = useTheme();
+  const { textSize, setTextSize, reduceMotion, setReduceMotion } = useTheme();
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
@@ -99,27 +98,6 @@ export function Settings() {
         <h2 id="appearance-heading" className="text-base font-semibold">Appearance</h2>
         <p className="mt-1 text-sm text-[var(--tx3)]">Choose how Grimoire looks on this device.</p>
 
-        <fieldset className="mt-5">
-          <legend className="mb-2 text-sm font-medium">Theme</legend>
-          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Theme">
-            {(["system", "light", "dark"] as const).map((choice) => (
-              <button
-                key={choice}
-                type="button"
-                aria-pressed={theme === choice}
-                onClick={() => setTheme(choice)}
-                className={`min-h-11 rounded-xl border px-3 text-sm capitalize transition-colors ${
-                  theme === choice
-                    ? "border-[var(--acc)] bg-[var(--s2)] text-[var(--tx)]"
-                    : "border-[var(--line2)] text-[var(--tx2)] hover:bg-[var(--s2)]"
-                }`}
-              >
-                {choice}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label className="grid gap-2 text-sm font-medium">
             Text size
@@ -154,6 +132,20 @@ export function Settings() {
         ) : null}
         {preferences ? (
           <div className="mt-4 space-y-3">
+            <label className="grid gap-2 text-sm font-medium">
+              Default status for new titles
+              <select
+                value={preferences.defaultMediaStatus}
+                disabled={preferencesMutation.isPending}
+                onChange={(event) => preferencesMutation.mutate({ defaultMediaStatus: event.target.value as AccountPreferences["defaultMediaStatus"] })}
+                className="min-h-11 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-sm text-[var(--tx)]"
+              >
+                <option value="PLANNED">Planned</option>
+                <option value="IN_PROGRESS">Watching / reading</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="DROPPED">Dropped</option>
+              </select>
+            </label>
             <label className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-[var(--line)] px-3 text-sm">
               <span>Show 18+ titles</span>
               <input
@@ -287,22 +279,6 @@ export function Settings() {
 
       <BackupTools />
 
-      <div className="surface-card mt-4 rounded-[var(--radius-panel)] p-4 md:p-5">
-        <div className="font-semibold">This device</div>
-        <div className="mt-1 text-sm text-[var(--tx3)]">
-          Lock now to require the PIN again next time — this device stays
-          verified, no email step needed to unlock again.
-        </div>
-        <button
-          className="mt-3 min-h-11 rounded-xl border border-[var(--line2)] px-4 text-sm font-semibold text-[var(--tx)] transition-colors hover:bg-[var(--s2)]"
-          onClick={async () => {
-            await lock();
-            window.location.reload();
-          }}
-        >
-          Lock now
-        </button>
-      </div>
     </div>
   );
 }

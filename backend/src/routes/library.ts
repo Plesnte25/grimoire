@@ -3,9 +3,8 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { enrichWithinBudget } from "../services/enrich.js";
+import { enrichItem, enrichWithinBudget } from "../services/enrich.js";
 import { isFinished, progressTotal } from "../lib/progress.js";
-import { itemLogsRouter } from "./logs.js";
 import { setItemTags } from "./tags.js";
 import { effectiveRegion, regionForItem } from "../lib/regions.js";
 import { randomUUID } from "node:crypto";
@@ -17,7 +16,6 @@ export const libraryRouter = Router();
 const ITEM_INCLUDE = {
     franchise: { select: { title: true, posterUrl: true, bannerUrl: true } },
     tags: { select: { tag: { select: { id: true, name: true, kind: true, color: true } } } },
-    reminder: { select: { pinned: true, untilAt: true } },
 } as const;
 
 function normalizeGenresInput(input: unknown): string[] {
@@ -91,6 +89,22 @@ const nonEmptyString = z
         return s.length ? s : undefined;
     });
 
+const halfStepRatingSchema = z
+    .union([z.number(), z.string(), z.null()])
+    .optional()
+    .transform((v, ctx) => {
+        if (v === undefined || v === null) return v;
+        const n = typeof v === "number" ? v : Number(String(v));
+        if (!Number.isFinite(n)) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Rating must be a number" });
+            return z.NEVER;
+        }
+        return n;
+    })
+    .refine((v) => v == null || (v >= 0.5 && v <= 10 && Number.isInteger(v * 2)), {
+        message: "Rating must be 0.5–10 in half steps",
+    });
+
 const yearSchema = z
     .union([z.number().int(), z.string()])
     .optional()
@@ -140,7 +154,6 @@ libraryRouter.get(
     })
 );
 
-libraryRouter.use("/:id/logs", itemLogsRouter);
 libraryRouter.put("/:id/tags", setItemTags);
 
 // Seasons of a TMDB show, for the season → episode progress picker.
@@ -278,6 +291,8 @@ libraryRouter.post(
             provider: z.string(),
             providerId: z.string(),
             title: z.string().min(1),
+            status: z.enum(["PLANNED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "DROPPED"]).optional(),
+            yourRating: halfStepRatingSchema,
             nativeTitle: nonEmptyString,
             format: nonEmptyString,
             isAdult: z.boolean().optional(),
@@ -318,6 +333,12 @@ libraryRouter.post(
             collectionName: nonEmptyString,
             countryOfOrigin: z.string().length(2).toUpperCase().optional(),
             originalLanguage: nonEmptyString,
+            progressText: clearableText,
+            progressValue: clearableInt,
+            progressSeason: clearableInt,
+            progressEpisode: clearableInt,
+            progressTotalOverride: clearableInt,
+            regionOverride: z.enum(["TR", "PK", "KR", "EU", "NONE"]).nullable().optional(),
         });
 
         const body = { ...req.body };
@@ -341,11 +362,31 @@ libraryRouter.post(
             region: data.countryOfOrigin ? regionForItem(mediaTypeNormalized, data.countryOfOrigin) : undefined,
         };
         const collectionSource = data.collectionId ? provider : undefined;
+        const accountDefaults = data.status === undefined
+            ? await prisma.accountConfig.findUnique({
+                where: { id: 1 },
+                select: { defaultMediaStatus: true },
+            })
+            : null;
+        const status = data.status ?? accountDefaults?.defaultMediaStatus ?? "PLANNED";
+        const shouldStampRating = data.yourRating !== undefined;
+        const ratingTimestamp = shouldStampRating && data.yourRating != null ? new Date() : null;
+
+        const typedProgress = {
+            progressText: data.progressText,
+            progressValue: data.progressValue,
+            progressSeason: data.progressSeason,
+            progressEpisode: data.progressEpisode,
+            progressTotalOverride: data.progressTotalOverride,
+        };
 
         const item = await prisma.mediaItem.upsert({
             where: { provider_providerId: { provider: data.provider, providerId: data.providerId } },
             update: {
                 mediaType: mediaTypeNormalized,
+                status,
+                yourRating: data.yourRating,
+                yourRatingAt: shouldStampRating ? ratingTimestamp : undefined,
                 title: data.title,
                 nativeTitle: data.nativeTitle,
                 format: data.format,
@@ -362,12 +403,17 @@ libraryRouter.post(
                 collectionId: data.collectionId,
                 collectionName: data.collectionName,
                 collectionSource,
+                regionOverride: data.regionOverride ?? undefined,
+                ...typedProgress,
                 ...origin,
             },
             create: {
                 mediaType: mediaTypeNormalized,
                 provider: data.provider,
                 providerId: data.providerId,
+                status,
+                yourRating: data.yourRating,
+                yourRatingAt: shouldStampRating ? ratingTimestamp : null,
                 title: data.title,
                 nativeTitle: data.nativeTitle,
                 format: data.format,
@@ -384,6 +430,8 @@ libraryRouter.post(
                 collectionId: data.collectionId,
                 collectionName: data.collectionName,
                 collectionSource,
+                regionOverride: data.regionOverride ?? undefined,
+                ...typedProgress,
                 ...origin,
                 // Nothing to fetch for manual entries.
                 ...(provider === "manual" ? { metaCheckedAt: new Date() } : {}),
@@ -391,7 +439,13 @@ libraryRouter.post(
         });
 
         if (!item.metaCheckedAt && item.provider !== "manual") {
-            await enrichWithinBudget(item.id);
+            // The client (SearchModal/add sheet) already supplied the title's
+            // core details from providerDetails, so the response doesn't need
+            // to wait on the fuller background enrichment (credits, franchise
+            // grouping) — especially since that can walk a chain of serialized,
+            // rate-limited AniList requests for anime. Let it finish on its own;
+            // the next read of this item picks it up (see GET /:id above).
+            enrichItem(item.id).catch((err) => console.error(`Background enrichment failed for ${item.id}:`, err));
         }
         const fresh = await prisma.mediaItem.findUnique({
             where: { id: item.id },
@@ -411,10 +465,14 @@ const clearableText = z
 const clearableInt = z
     .union([z.number().int().min(0), z.string(), z.null()])
     .optional()
-    .transform((v) => {
+    .transform((v, ctx) => {
         if (v === undefined || v === null) return v;
         const n = typeof v === "number" ? v : Number(String(v));
-        return Number.isInteger(n) && n >= 0 ? n : undefined;
+        if (!Number.isInteger(n) || n < 0) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Value must be a non-negative integer" });
+            return z.NEVER;
+        }
+        return n;
     });
 
 libraryRouter.patch(
@@ -422,18 +480,7 @@ libraryRouter.patch(
     asyncHandler(async (req, res) => {
         const schema = z.object({
             status: z.enum(["PLANNED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "DROPPED"]).optional(),
-            // null clears the rating ("Not rated"); 0.5–10 in half steps otherwise.
-            yourRating: z
-                .union([z.number(), z.string(), z.null()])
-                .optional()
-                .transform((v) => {
-                    if (v === undefined || v === null) return v;
-                    const n = typeof v === "number" ? v : Number(String(v));
-                    return Number.isFinite(n) ? n : undefined;
-                })
-                .refine((v) => v == null || (v >= 0.5 && v <= 10 && Number.isInteger(v * 2)), {
-                    message: "Rating must be 0.5–10 in half steps",
-                }),
+            yourRating: halfStepRatingSchema,
             yourNotes: clearableText,
             progressText: clearableText,
             progressValue: clearableInt,
@@ -502,36 +549,34 @@ libraryRouter.patch(
                 }
             }
         }
+        const item = await prisma.mediaItem.update({ where: { id: current.id }, data: updateData });
+        res.json({ item: withParsedGenres(item) });
+    })
+);
 
-        const ops: any[] = [prisma.mediaItem.update({ where: { id: current.id }, data: updateData })];
-
-        // Keep the watch log in step with status: Watching opens an entry,
-        // Completed closes it (or records one if you never marked it Watching).
-        const openLog = await prisma.watchLog.findFirst({
-            where: { mediaId: current.id, finishedAt: null },
-            orderBy: { createdAt: "desc" },
+libraryRouter.post(
+    "/:id/rewatch",
+    asyncHandler(async (req, res) => {
+        const { delta } = parseOrThrow(
+            z.object({ delta: z.number().int().min(-1).max(1).default(1) }),
+            req.body
+        );
+        const current = await prisma.mediaItem.findUnique({
+            where: { id: req.params.id },
+            select: { id: true, status: true, rewatchCount: true },
         });
-        const now = new Date();
-        if (statusChange === "IN_PROGRESS" && !openLog) {
-            const finishedBefore = await prisma.watchLog.count({
-                where: { mediaId: current.id, finishedAt: { not: null } },
-            });
-            ops.push(
-                prisma.watchLog.create({
-                    data: { mediaId: current.id, startedAt: now, isRewatch: finishedBefore > 0 },
-                })
-            );
+        if (!current) return res.status(404).json({ error: "Not found" });
+        if (delta > 0 && current.status !== "COMPLETED") {
+            const err: any = new Error("A title must be completed before incrementing rewatch count");
+            err.status = 400;
+            err.code = "REWATCH_REQUIRES_COMPLETED";
+            throw err;
         }
-        if (statusChange === "COMPLETED") {
-            const rating = updateData.yourRating ?? current.yourRating ?? null;
-            ops.push(
-                openLog
-                    ? prisma.watchLog.update({ where: { id: openLog.id }, data: { finishedAt: now, rating } })
-                    : prisma.watchLog.create({ data: { mediaId: current.id, finishedAt: now, rating } })
-            );
-        }
-
-        const [item] = await prisma.$transaction(ops);
+        const next = Math.max(0, current.rewatchCount + delta);
+        const item = await prisma.mediaItem.update({
+            where: { id: current.id },
+            data: { rewatchCount: next },
+        });
         res.json({ item: withParsedGenres(item) });
     })
 );

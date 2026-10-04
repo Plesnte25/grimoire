@@ -1,0 +1,2 @@
+ALTER TABLE "AccountConfig"
+ADD COLUMN "defaultMediaStatus" TEXT NOT NULL DEFAULT 'PLANNED';

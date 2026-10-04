@@ -1,137 +1,159 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
 import { fetchAccountPreferences, fetchLibrary } from "../app/api";
-import { REGIONS, REGION_LABEL, type CategoryKey } from "../lib/regions";
-import type { MediaItem, MediaType } from "../types";
-import { statusLabel } from "../lib/status";
+import { effectiveRegion, REGION_LABEL, REGIONS, type Region } from "../lib/regions";
+import type { MediaItem, MediaStatus, MediaType } from "../types";
 
-const TYPES: { key: MediaType; label: string; note: string }[] = [
-  { key: "MOVIE", label: "Movies", note: "Films, gathered" },
-  { key: "TV", label: "TV", note: "Series in progress" },
-  { key: "ANIME", label: "Anime", note: "Series & films" },
-  { key: "BOOK", label: "Books", note: "Read at your pace" },
+const TYPES: { key: MediaType; label: string }[] = [
+  { key: "MOVIE", label: "Movies" },
+  { key: "TV", label: "TV" },
+  { key: "ANIME", label: "Anime" },
+  { key: "BOOK", label: "Books" },
 ];
+const STATUSES: { key: MediaStatus | "ALL"; label: string }[] = [
+  { key: "ALL", label: "All" },
+  { key: "IN_PROGRESS", label: "Watching" },
+  { key: "PLANNED", label: "Planned" },
+  { key: "COMPLETED", label: "Completed" },
+  { key: "DROPPED", label: "Dropped" },
+];
+type SortMode = "updated" | "title" | "year" | "rating";
 
-function href(key: CategoryKey) {
-  return REGIONS.includes(key as (typeof REGIONS)[number]) ? `/region/${key}` : `/category/${key}`;
+function isMediaType(value: string | null): value is MediaType {
+  return TYPES.some((type) => type.key === value);
+}
+function isRegion(value: string | null): value is Region {
+  return REGIONS.some((region) => region === value);
+}
+function activeChip(active: boolean) {
+  return `min-h-11 shrink-0 rounded-full border px-4 text-sm transition-colors ${active ? "border-[var(--acc)] bg-[var(--acc)] text-[var(--bg)]" : "border-[var(--line2)] text-[var(--tx2)] hover:bg-[var(--s2)]"}`;
 }
 
 export function Library() {
-  const { data: items = [], isLoading, isError } = useQuery({
-    queryKey: ["library", "all"],
-    queryFn: () => fetchLibrary(),
-  });
-  const { data: preferences } = useQuery({
-    queryKey: ["account-preferences"],
-    queryFn: fetchAccountPreferences,
-  });
-  const visibleItems = items.filter((item) => !item.isAdult || preferences?.showAdultContent);
-
+  const [params, setParams] = useSearchParams();
+  const typeParam = params.get("type");
+  const type = isMediaType(typeParam) ? typeParam : "MOVIE";
+  const regionParam = params.get("region");
+  const region = isRegion(regionParam) ? regionParam : null;
+  const statusParam = params.get("status");
+  const status = STATUSES.some((item) => item.key === statusParam) ? statusParam! : "ALL";
+  const animeFormatParam = params.get("anime");
+  const animeFormat = animeFormatParam === "MOVIES" ? "MOVIES" : "SERIES";
+  const [search, setSearch] = useState("");
+  const sort = (params.get("sort") as SortMode | null) ?? "updated";
+  const { data: allItems = [], isLoading, isError } = useQuery({ queryKey: ["library", "all"], queryFn: () => fetchLibrary() });
+  const { data: preferences } = useQuery({ queryKey: ["account-preferences"], queryFn: fetchAccountPreferences });
+  const items = allItems.filter((item) => preferences?.showAdultContent || !item.isAdult);
+  const typesForChips = (value: MediaType, selectedRegion: Region | null) => {
+    const next = new URLSearchParams(params);
+    next.set("type", value);
+    if (value !== "TV" && value !== "MOVIE") next.delete("region");
+    else if (selectedRegion) next.set("region", selectedRegion);
+    if (value !== "ANIME") next.delete("anime");
+    setParams(next);
+  };
   const counts = useMemo(() => {
-    const result = new Map<CategoryKey, number>();
-    for (const item of visibleItems as MediaItem[]) {
-      result.set(item.mediaType, (result.get(item.mediaType) ?? 0) + 1);
-      if ((item.mediaType === "TV" || item.mediaType === "MOVIE") && item.region) {
-        result.set(item.region, (result.get(item.region) ?? 0) + 1);
-      }
+    const available: Partial<Record<Region, number>> = {};
+    for (const item of items) {
+      if (item.mediaType !== "TV" && item.mediaType !== "MOVIE") continue;
+      const value = effectiveRegion(item);
+      if (value) available[value] = (available[value] ?? 0) + 1;
     }
-    return result;
-  }, [visibleItems]);
+    return available;
+  }, [items]);
+  const statusCounts = useMemo(() => {
+    const filtered = items.filter((item) => item.mediaType === type && (!region || effectiveRegion(item) === region) &&
+      (type !== "ANIME" || (animeFormat === "MOVIES" ? item.format === "MOVIE" : item.format !== "MOVIE")));
+    return Object.fromEntries(STATUSES.map(({ key }) => [key, key === "ALL" ? filtered.length : filtered.filter((item) => item.status === key).length]));
+  }, [items, type, region, animeFormat]);
+  const visible = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    const filtered = items.filter((item) => {
+      if (item.mediaType !== type || (region && effectiveRegion(item) !== region)) return false;
+      if (type === "ANIME" && (animeFormat === "MOVIES" ? item.format !== "MOVIE" : item.format === "MOVIE")) return false;
+      if (status !== "ALL" && item.status !== status) return false;
+      if (!query) return true;
+      return [item.title, item.nativeTitle, item.creator, item.genres]
+        .some((value) => value?.toLocaleLowerCase().includes(query));
+    });
+    return filtered.sort((a, b) => {
+      if (sort === "title") return a.title.localeCompare(b.title);
+      if (sort === "year") return (b.year ?? 0) - (a.year ?? 0);
+      if (sort === "rating") return (b.yourRating ?? 0) - (a.yourRating ?? 0);
+      return b.updatedAt.localeCompare(a.updatedAt);
+    });
+  }, [items, type, region, animeFormat, status, search, sort]);
 
-  const total = visibleItems.length;
-  const reading = visibleItems.filter((item) => item.status === "IN_PROGRESS").length;
-  const planned = visibleItems.filter((item) => item.status === "PLANNED").length;
-  const completed = visibleItems.filter((item) => item.status === "COMPLETED").length;
+  function setFilter(key: string, value: string | null) {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next);
+  }
 
   return (
-    <div className="mx-auto max-w-[1440px] px-5 py-8 md:px-10 md:py-10">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-sm text-[var(--tx3)]">Your collection</p>
-          <h1 className="font-display mt-1 text-4xl font-medium tracking-tight">Library</h1>
+    <div className="mx-auto max-w-[1440px] px-5 pb-10 pt-20 md:px-10 md:pt-16">
+      <header className="mb-7">
+        <p className="kicker">YOUR COLLECTION</p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="font-display mt-1 text-5xl font-medium tracking-tight">Library</h1>
+          <p className="text-sm text-[var(--tx3)]">{isLoading ? "Loading titles…" : `${visible.length} titles`}</p>
         </div>
-        <p className="text-sm text-[var(--tx2)]">{isLoading ? "Loading your library…" : `${total} titles`}</p>
-      </div>
+      </header>
 
-      {isError ? (
-        <div role="alert" className="surface-raised mt-8 rounded-[var(--radius-panel)] p-5 text-sm">
-          Couldn't load the library. Try refreshing the page.
-        </div>
+      <nav aria-label="Media type" className="hide-scrollbar flex gap-2 overflow-x-auto pb-2">
+        {TYPES.map(({ key, label }) => <button key={key} type="button" className={activeChip(type === key)} aria-pressed={type === key} onClick={() => typesForChips(key, region)}>{label}</button>)}
+      </nav>
+
+      {(type === "TV" || type === "MOVIE") && Object.values(counts).some(Boolean) ? (
+        <nav aria-label="Region" className="hide-scrollbar mt-2 flex gap-2 overflow-x-auto pb-2">
+          <button type="button" className={activeChip(!region)} aria-pressed={!region} onClick={() => setFilter("region", null)}>All regions</button>
+          {REGIONS.filter((key) => (counts[key] ?? 0) > 0).map((key) => (
+            <button key={key} type="button" className={activeChip(region === key)} aria-pressed={region === key} onClick={() => setFilter("region", key)}>{REGION_LABEL[key]}</button>
+          ))}
+        </nav>
       ) : null}
 
-      <section aria-label="Library summary" className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-panel)] border border-[var(--line)] bg-[var(--line)] md:grid-cols-4">
-        {[
-          ["In progress", reading],
-          ["Planned", planned],
-          ["Completed", completed],
-          ["All titles", total],
-        ].map(([label, value]) => (
-          <div key={label} className="bg-[var(--s1)] px-4 py-4 md:px-5">
-            <div className="font-display text-3xl tabular-nums">{isLoading ? "—" : value}</div>
-            <div className="mt-1 text-xs text-[var(--tx3)]">{label}</div>
-          </div>
-        ))}
-      </section>
+      {type === "ANIME" ? (
+        <nav aria-label="Anime format" className="hide-scrollbar mt-2 flex gap-2 overflow-x-auto pb-2">
+          {(["SERIES", "MOVIES"] as const).map((format) => (
+            <button key={format} type="button" className={activeChip(animeFormat === format)} aria-pressed={animeFormat === format} onClick={() => setFilter("anime", format)}>{format === "SERIES" ? "Series" : "Movies"}</button>
+          ))}
+        </nav>
+      ) : null}
 
-      <section className="mt-10" aria-labelledby="media-heading">
-        <h2 id="media-heading" className="font-display text-2xl font-medium">By medium</h2>
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {TYPES.map(({ key, label, note }) => (
-            <Link key={key} to={href(key)} className="surface-card group rounded-[var(--radius-card)] p-5 no-underline transition-colors hover:bg-[var(--s2)]">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-display text-2xl font-medium text-[var(--tx)]">{label}</h3>
-                  <p className="mt-1 text-sm text-[var(--tx3)]">{note}</p>
-                </div>
-                <span className="font-display text-3xl tabular-nums text-[var(--tx)]">{counts.get(key) ?? 0}</span>
+      <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <label className="sr-only" htmlFor="library-search">Search your library</label>
+        <input id="library-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search title, original title, genre or creator" className="min-h-12 min-w-0 rounded-[var(--radius-button)] border border-[var(--line2)] bg-[var(--s1)] px-4 text-sm text-[var(--tx)] placeholder:text-[var(--tx3)]" />
+        <label className="flex min-h-12 items-center gap-2 rounded-[var(--radius-button)] border border-[var(--line2)] px-3 text-sm text-[var(--tx2)]">
+          <span>Sort</span>
+          <select value={sort} onChange={(event) => setFilter("sort", event.target.value)} className="min-h-10 max-w-48 bg-transparent text-[var(--tx)]">
+            <option value="updated">Recently updated</option><option value="title">Title</option><option value="year">Release year</option><option value="rating">Your rating</option>
+          </select>
+        </label>
+      </div>
+
+      <nav aria-label="Status" className="hide-scrollbar mt-4 flex gap-2 overflow-x-auto pb-2">
+        {STATUSES.map(({ key, label }) => <button key={key} type="button" className={activeChip(status === key)} aria-pressed={status === key} onClick={() => setFilter("status", key === "ALL" ? null : key)}>{label}<span className="ml-2 tabular-nums opacity-70">{statusCounts[key]}</span></button>)}
+      </nav>
+
+      {isError ? <div role="alert" className="surface-raised mt-6 rounded-[var(--radius-card)] p-4 text-sm text-[var(--err)]">Couldn't load your library. Try refreshing.</div> : null}
+      {visible.length ? (
+        <div className="poster-grid mt-6">
+          {visible.map((item: MediaItem) => (
+            <Link key={item.id} to={`/media/${item.id}`} className="group min-w-0 no-underline">
+              <div className="relative aspect-[2/3] overflow-hidden rounded-[var(--radius-poster)] bg-[var(--s2)] shadow-lg">
+                {item.posterUrl ? <img src={item.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.04]" /> : <span className="flex h-full items-center justify-center p-3 text-center text-xs text-[var(--tx3)]">{item.title}</span>}
+                <span aria-label={item.status.replace("_", " ")} title={item.status.replace("_", " ")} className={`absolute left-2 top-2 h-2.5 w-2.5 rounded-full ring-2 ring-[var(--bg)] ${item.status === "IN_PROGRESS" ? "bg-[var(--acc)]" : item.status === "COMPLETED" ? "bg-[var(--ok)]" : item.status === "DROPPED" ? "bg-[var(--err)]" : "bg-[var(--tx3)]"}`} />
+                {item.yourRating != null ? <span className="absolute bottom-2 right-2 rounded-full bg-[var(--bg)]/85 px-2 py-1 text-[10px] font-semibold text-[var(--acc)]">★ {item.yourRating}</span> : null}
               </div>
-              <div className="mt-5 flex items-center justify-between border-t border-[var(--line)] pt-3 text-sm text-[var(--tx2)]">
-                <span>Browse collection</span>
-                <span aria-hidden="true" className="text-[var(--acc)]">→</span>
-              </div>
+              <p className="mt-2 line-clamp-2 text-sm font-semibold text-[var(--tx)] group-hover:text-[var(--acc)]">{item.title}</p>
+              <p className="text-xs text-[var(--tx3)]">{item.year ?? "—"}</p>
             </Link>
           ))}
         </div>
-      </section>
-
-      <section className="mt-10" aria-labelledby="region-heading">
-        <h2 id="region-heading" className="font-display text-2xl font-medium">By region</h2>
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {REGIONS.map((region) => (
-            <Link key={region} to={href(region)} className="surface-card flex min-h-16 items-center justify-between gap-4 rounded-[var(--radius-card)] px-4 py-3 no-underline transition-colors hover:bg-[var(--s2)]">
-              <span className="text-sm font-medium text-[var(--tx)]">{REGION_LABEL[region]}</span>
-              <span className="text-sm tabular-nums text-[var(--tx3)]">{counts.get(region) ?? 0}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-10" aria-labelledby="continue-heading">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="text-sm text-[var(--tx3)]">Pick up where you left off</p>
-            <h2 id="continue-heading" className="font-display mt-1 text-2xl font-medium">In progress</h2>
-          </div>
-        </div>
-        <div className="mt-4 divide-y divide-[var(--line)] border-y border-[var(--line)]">
-          {visibleItems.filter((item) => item.status === "IN_PROGRESS").slice(0, 5).map((item) => (
-            <Link key={item.id} to={`/media/${item.id}`} className="flex min-h-[4.5rem] items-center gap-3 py-3 no-underline">
-              <div className="h-14 w-10 shrink-0 overflow-hidden rounded-md bg-[var(--s2)]">
-                {item.posterUrl ? <img src={item.posterUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-[var(--tx)]">{item.title}</div>
-                <div className="mt-1 text-xs text-[var(--tx3)]">{statusLabel(item.status, item.mediaType)}{item.progressText ? ` · ${item.progressText}` : ""}</div>
-              </div>
-              <span aria-hidden="true" className="text-[var(--acc)]">→</span>
-            </Link>
-          ))}
-          {!isLoading && visibleItems.every((item) => item.status !== "IN_PROGRESS") ? (
-            <p className="py-5 text-sm text-[var(--tx3)]">Nothing in progress yet.</p>
-          ) : null}
-        </div>
-      </section>
+      ) : !isLoading ? <p className="surface-card mt-6 rounded-[var(--radius-card)] p-6 text-sm text-[var(--tx3)]">No titles match these filters.</p> : null}
     </div>
   );
 }

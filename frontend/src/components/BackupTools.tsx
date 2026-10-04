@@ -48,7 +48,7 @@ export function BackupTools() {
   return (
     <section className="surface-card mt-4 rounded-[var(--radius-panel)] p-4 md:p-5" aria-labelledby="backup-heading">
       <h2 id="backup-heading" className="font-semibold">Backup & restore</h2>
-      <p className="mt-1 text-sm text-[var(--tx3)]">Export your library, history, lists, tags, goals and reminders. PINs and trusted devices are never included. Import merges the backup without deleting anything.</p>
+      <p className="mt-1 text-sm text-[var(--tx3)]">Export your library, rewatch counts, lists, tags, and settings-independent data. PINs and trusted devices are never included. Import merges the backup without deleting anything.</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" disabled={busy} onClick={download} className="min-h-11 rounded-xl bg-[var(--accbg)] px-4 text-sm font-semibold text-[var(--acc-ink)] disabled:opacity-50">
           {busy ? "Working…" : "Export backup"}
@@ -80,7 +80,7 @@ export function BackupTools() {
               queryClient.invalidateQueries({ queryKey: ["lists"] }),
               queryClient.invalidateQueries({ queryKey: ["tier-lists"] }),
               queryClient.invalidateQueries({ queryKey: ["home"] }),
-              queryClient.invalidateQueries({ queryKey: ["diary"] }),
+              queryClient.invalidateQueries({ queryKey: ["media-stats"] }),
             ]);
           } catch (e: any) {
             setError(e?.response?.data?.error ?? "Could not import this backup.");

@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
@@ -62,6 +61,7 @@ const importedMedia = z.object({
     pageCount: z.number().int().nullable().optional(),
     isbn: z.string().nullable().optional(),
     releaseDate: dateInput,
+    rewatchCount: z.number().int().min(0).optional(),
     watchLogs: z.array(importedLog).max(100000).optional(),
     tags: z.array(z.object({
         tag: z.object({
@@ -98,41 +98,23 @@ const importSchema = z.object({
             order: z.number().int(),
         })).optional(),
     })).max(10000),
-    goals: z.array(z.object({
-        year: z.number().int(),
-        scope: z.enum(["ALL", ...MEDIA_TYPES]),
-        target: z.number().int().positive(),
-    })).optional(),
-    reminders: z.array(z.object({
-        mediaId: z.string().min(1),
-        pinned: z.boolean(),
-        untilAt: dateInput,
-    })).optional(),
+    // Legacy fields from old exports; accepted for backwards compatibility.
+    goals: z.array(z.any()).optional(),
+    reminders: z.array(z.any()).optional(),
 });
 
 function asDate(value?: string | null) {
     return value ? new Date(value) : null;
 }
 
-function stableLogKey(mediaId: string, logId: string, existing?: string | null) {
-    if (existing) return existing;
-    const bytes = createHash("sha256").update(`${mediaId}:${logId}`).digest().subarray(0, 16);
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    const hex = bytes.toString("hex");
-    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
-
 backupRouter.get("/export", asyncHandler(async (_req, res) => {
-    const [items, lists, tierLists, goals, reminders] = await Promise.all([
-        prisma.mediaItem.findMany({ include: { watchLogs: true, tags: { include: { tag: true } } } }),
+    const [items, lists, tierLists] = await Promise.all([
+        prisma.mediaItem.findMany({ include: { tags: { include: { tag: true } } } }),
         prisma.customList.findMany({ include: { items: { select: { mediaId: true, order: true, note: true } } } }),
         prisma.tierList.findMany({ include: { entries: { select: { mediaId: true, tier: true, order: true } } } }),
-        prisma.annualGoal.findMany(),
-        prisma.reminder.findMany(),
     ]);
     res.setHeader("Content-Disposition", `attachment; filename="grimoire-backup-${new Date().toISOString().slice(0, 10)}.json"`);
-    res.json({ version: 1, exportedAt: new Date().toISOString(), items, lists, tierLists, goals, reminders });
+    res.json({ version: 1, exportedAt: new Date().toISOString(), items, lists, tierLists });
 }));
 
 backupRouter.post("/import", asyncHandler(async (req, res) => {
@@ -141,11 +123,25 @@ backupRouter.post("/import", asyncHandler(async (req, res) => {
     await prisma.$transaction(async (tx) => {
         for (const source of backup.items) {
             const { id: sourceId, watchLogs = [], tags = [], ...data } = source;
+            const finishedLogs = watchLogs
+                .filter((entry) => !!entry.finishedAt)
+                .sort((a, b) => {
+                    const aTime = a.finishedAt ? new Date(a.finishedAt).getTime() : 0;
+                    const bTime = b.finishedAt ? new Date(b.finishedAt).getTime() : 0;
+                    return bTime - aTime;
+                });
+            const inferredRewatchCount = Math.max(0, finishedLogs.length - 1);
+            const inferredRating =
+                data.yourRating == null
+                    ? (finishedLogs.find((entry) => entry.rating != null)?.rating ?? null)
+                    : data.yourRating;
             const itemData = {
                 ...data,
                 status: data.status ?? "PLANNED",
-                yourRatingAt: asDate(data.yourRatingAt),
+                yourRating: inferredRating,
+                yourRatingAt: inferredRating == null ? null : asDate(data.yourRatingAt) ?? new Date(),
                 releaseDate: asDate(data.releaseDate),
+                rewatchCount: Math.max(data.rewatchCount ?? inferredRewatchCount, inferredRewatchCount),
             };
             const item = await tx.mediaItem.upsert({
                 where: { provider_providerId: { provider: data.provider, providerId: data.providerId } },
@@ -166,28 +162,6 @@ backupRouter.post("/import", asyncHandler(async (req, res) => {
                     where: { mediaId_tagId: { mediaId: item.id, tagId: tag.id } },
                     create: { mediaId: item.id, tagId: tag.id },
                     update: {},
-                });
-            }
-            for (const log of watchLogs) {
-                const { id: sourceLogId, ...logData } = log;
-                const existing = await tx.watchLog.findUnique({ where: { id: sourceLogId }, select: { mediaId: true } });
-                if (existing) {
-                    if (existing.mediaId !== item.id) {
-                        const err: any = new Error("Backup contains a watch-log identifier already used by another title.");
-                        err.status = 409;
-                        throw err;
-                    }
-                    continue;
-                }
-                await tx.watchLog.create({
-                    data: {
-                        ...logData,
-                        id: sourceLogId,
-                        mediaId: item.id,
-                        clientMutationId: stableLogKey(sourceId, sourceLogId),
-                        startedAt: asDate(logData.startedAt),
-                        finishedAt: asDate(logData.finishedAt),
-                    },
                 });
             }
         }
@@ -235,22 +209,6 @@ backupRouter.post("/import", asyncHandler(async (req, res) => {
             }
         }
 
-        for (const goal of backup.goals ?? []) {
-            await tx.annualGoal.upsert({
-                where: { year_scope: { year: goal.year, scope: goal.scope } },
-                create: goal,
-                update: { target: goal.target },
-            });
-        }
-        for (const reminder of backup.reminders ?? []) {
-            const mediaId = idMap.get(reminder.mediaId);
-            if (!mediaId) continue;
-            await tx.reminder.upsert({
-                where: { mediaId },
-                create: { mediaId, pinned: reminder.pinned, untilAt: asDate(reminder.untilAt) },
-                update: { pinned: reminder.pinned, untilAt: asDate(reminder.untilAt) },
-            });
-        }
     });
 
     res.json({ ok: true, importedItems: idMap.size });

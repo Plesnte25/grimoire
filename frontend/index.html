@@ -4,9 +4,28 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#17110d" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <style>
+      :root { color-scheme: dark; background: #17110d; }
+      html, body, #root { min-height: 100%; margin: 0; background: #17110d; }
+      #boot-splash { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 45%, #3d2c20 0, #17110d 64%); color: #f6b73c; }
+      #boot-splash svg { width: 56px; height: 56px; }
+      @media (prefers-reduced-motion: no-preference) { #boot-splash svg { animation: breathe 2s ease-in-out infinite alternate; } }
+      @keyframes breathe { to { transform: translateY(-4px); filter: drop-shadow(0 0 12px #f6b73c); } }
+    </style>
     <title>Grimoire</title>
   </head>
   <body>
+    <div id="boot-splash" aria-label="Opening Grimoire">
+      <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+        <path d="M7 9.5c6-2 11.7-.8 17 3.5v28c-5.3-4.3-11-5.5-17-3.5v-28Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+        <path d="M41 9.5c-6-2-11.7-.8-17 3.5v28c5.3-4.3 11-5.5 17-3.5v-28Z" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+        <path d="m24 19 1.4 3.6L29 24l-3.6 1.4L24 29l-1.4-3.6L19 24l3.6-1.4L24 19Z" fill="currentColor"/>
+      </svg>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

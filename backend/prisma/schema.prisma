@@ -40,6 +40,7 @@ model MediaItem {
   progressEpisode       Int? // TV: episode within that season
   progressTotalOverride Int? // user-set total (e.g. a dub with a different episode split)
   completedSeasonCount  Int? // seasons that existed when you marked it COMPLETED (airing baseline)
+  rewatchCount          Int    @default(0) // times rewatched/reread after the first completion
 
   genres    String? // JSON string array
   createdAt DateTime @default(now())
@@ -106,13 +107,11 @@ model MediaItem {
 
   franchise Franchise?  @relation(fields: [franchiseId], references: [id])
   listItems ListItem[]
-  watchLogs WatchLog[]
   credits   Credit[]
   tags      MediaTag[]
   TierEntry TierEntry[]
   episodeGuide Episode[]
   episodeGuideCache EpisodeSeasonCache[]
-  reminder Reminder?
 
   @@unique([provider, providerId])
   @@index([collectionId])
@@ -134,32 +133,6 @@ model Franchise {
   updatedAt       DateTime @updatedAt
 
   items MediaItem[]
-}
-
-// One watch/read of an item: dates, rating at the time, review, how/where.
-model WatchLog {
-  id                String    @id @default(cuid())
-  mediaId           String
-  startedAt         DateTime?
-  finishedAt        DateTime?
-  rating            Float? // your rating for this watch (0.5–10)
-  review            String?
-  reviewHasSpoilers Boolean   @default(false)
-  isRewatch         Boolean   @default(false)
-  watchedOn         String? // where: "Cinema", "Netflix", "YouTube"…
-  watchMode         String? // SUB | DUB | ORIGINAL
-  watchedWith       String?
-  fromEpisode       Int?
-  toEpisode         Int?
-  label             String?
-  clientMutationId  String?   @unique
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  media MediaItem @relation(fields: [mediaId], references: [id], onDelete: Cascade)
-
-  @@index([mediaId])
-  @@index([finishedAt])
 }
 
 model Episode {
@@ -297,25 +270,15 @@ model TierEntry {
   @@unique([tierListId, mediaId])
 }
 
-model Reminder {
+model SuggestionDismissal {
   id        String   @id @default(cuid())
-  mediaId   String   @unique
-  pinned    Boolean  @default(false)
-  untilAt   DateTime?
-  updatedAt DateTime @updatedAt
-
-  media MediaItem @relation(fields: [mediaId], references: [id], onDelete: Cascade)
-}
-
-model AnnualGoal {
-  id        String   @id @default(cuid())
-  year      Int
-  scope     String   @default("ALL") // ALL | MOVIE | TV | ANIME | BOOK
-  target    Int
+  provider  String
+  providerId String
+  mediaType String?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  @@unique([year, scope])
+  @@unique([provider, providerId])
+  @@index([mediaType])
 }
 
 // --- Auth (single-account: PIN unlock on trusted devices, email OTP to trust a new device) ---
@@ -330,6 +293,7 @@ model AccountConfig {
   showAdultContent  Boolean   @default(false)
   spoilerShield     Boolean   @default(false)
   watchCountry      String?
+  defaultMediaStatus String   @default("PLANNED")
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 }

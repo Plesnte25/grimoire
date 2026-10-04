@@ -1,41 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#1c1730"/>
-      <stop offset="100%" stop-color="#0b0b10"/>
+    <linearGradient id="leather" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#513a29"/>
+      <stop offset="1" stop-color="#2b1f17"/>
     </linearGradient>
-    <linearGradient id="cover" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#8b7ae0"/>
-      <stop offset="100%" stop-color="#453a7a"/>
-    </linearGradient>
-    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#e3defe"/>
-      <stop offset="100%" stop-color="#f0a8dd"/>
-    </linearGradient>
-    <filter id="blur" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="16"/>
+    <radialGradient id="sigil">
+      <stop stop-color="#fff0a5"/>
+      <stop offset=".45" stop-color="#ffd35a"/>
+      <stop offset="1" stop-color="#f6b73c"/>
+    </radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="18"/>
     </filter>
   </defs>
-
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-
-  <!-- book -->
-  <rect x="132" y="128" width="248" height="280" rx="16" fill="#000000" opacity="0.28"/>
-  <rect x="124" y="120" width="248" height="280" rx="16" fill="url(#cover)"/>
-  <rect x="124" y="120" width="24" height="280" rx="12" fill="#ffffff" opacity="0.14"/>
-  <rect x="360" y="136" width="12" height="248" rx="6" fill="#f4f1ff" opacity="0.5"/>
-
-  <!-- glow behind sparkle -->
-  <circle cx="246" cy="256" r="72" fill="url(#glow)" opacity="0.5" filter="url(#blur)"/>
-
-  <!-- sparkle sigil -->
-  <path
-    d="M246 168
-       C 251 212, 290 251, 334 256
-       C 290 261, 251 300, 246 344
-       C 241 300, 202 261, 158 256
-       C 202 251, 241 212, 246 168
-       Z"
-    fill="url(#glow)"
-  />
+  <rect width="512" height="512" rx="112" fill="#17110d"/>
+  <path d="M139 87h234a20 20 0 0 1 20 20v310H139a24 24 0 0 1-24-24V111a24 24 0 0 1 24-24Z" fill="#120d09" opacity=".55"/>
+  <path d="M127 75h234a20 20 0 0 1 20 20v310H127a24 24 0 0 1-24-24V99a24 24 0 0 1 24-24Z" fill="url(#leather)" stroke="#f6b73c" stroke-width="8"/>
+  <path d="M130 102v272" stroke="#c4492c" stroke-width="12"/>
+  <path d="M343 119h18v43h-18zM343 334h18v43h-18z" fill="#f6b73c"/>
+  <circle cx="246" cy="230" r="77" fill="#ffd35a" opacity=".46" filter="url(#glow)"/>
+  <path d="M246 145c8 48 38 77 86 85-48 8-78 37-86 85-8-48-38-77-86-85 48-8 78-37 86-85Z" fill="url(#sigil)"/>
+  <path d="M247 318v92" stroke="#c4492c" stroke-width="22"/>
 </svg>

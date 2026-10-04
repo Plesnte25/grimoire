@@ -21,13 +21,14 @@ const rateLimit = require("express-rate-limit");
 export const authRouter = Router();
 
 const isProd = process.env.NODE_ENV === "production";
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24h — daily PIN unlock
+const SESSION_TTL_MS = 15 * 60 * 1000;
 const DEVICE_COOKIE_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000; // ~1yr
 const PENDING_DEVICE_COOKIE_MAX_AGE_MS = 15 * 60 * 1000; // covers the 10-min OTP TTL
 const OTP_TTL_MS = 10 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 const PIN_LOCKOUT_THRESHOLD = 5;
 const PIN_LOCKOUT_MS = 15 * 60 * 1000;
+const MEDIA_STATUS = ["PLANNED", "IN_PROGRESS", "COMPLETED", "DROPPED"] as const;
 
 const pinSchema = z.string().regex(/^\d{4,6}$/, "PIN must be 4-6 digits");
 
@@ -297,6 +298,14 @@ authRouter.post(
 );
 
 authRouter.post(
+    "/activity",
+    requireSession,
+    asyncHandler(async (_req, res) => {
+        res.json({ ok: true });
+    })
+);
+
+authRouter.post(
     "/pin",
     unlockLimiter,
     requireSession,
@@ -379,7 +388,12 @@ authRouter.get(
     asyncHandler(async (_req, res) => {
         const account = await prisma.accountConfig.findUnique({
             where: { id: 1 },
-            select: { showAdultContent: true, spoilerShield: true, watchCountry: true },
+            select: {
+                showAdultContent: true,
+                spoilerShield: true,
+                watchCountry: true,
+                defaultMediaStatus: true,
+            },
         });
         if (!account) throw httpError(409, "NOT_BOOTSTRAPPED", "Account not set up yet");
         res.json({ preferences: account });
@@ -395,13 +409,19 @@ authRouter.patch(
                 showAdultContent: z.boolean().optional(),
                 spoilerShield: z.boolean().optional(),
                 watchCountry: z.string().regex(/^[A-Za-z]{2}$/).toUpperCase().nullable().optional(),
+                defaultMediaStatus: z.enum(MEDIA_STATUS).optional(),
             }),
             req.body
         );
         const account = await prisma.accountConfig.update({
             where: { id: 1 },
             data,
-            select: { showAdultContent: true, spoilerShield: true, watchCountry: true },
+            select: {
+                showAdultContent: true,
+                spoilerShield: true,
+                watchCountry: true,
+                defaultMediaStatus: true,
+            },
         });
         res.json({ preferences: account });
     })

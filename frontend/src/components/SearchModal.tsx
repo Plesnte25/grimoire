@@ -1,39 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import type { MediaType } from "../types";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { MediaItem, MediaStatus, MediaType, ProviderSearchResult } from "../types";
 import { REGION_LABEL, countryName, type Region } from "../lib/regions";
 import { onlineRating, onlineRatingText } from "../lib/ratings";
 import { ManualAddForm } from "./ManualAddForm";
 import { CountryFlag } from "./CountryFlag";
+import { RatingInput } from "./RatingInput";
+import { showToast } from "../lib/toast";
+
+type AddPayload = Omit<ProviderSearchResult, "genres"> &
+  Partial<Pick<MediaItem, "status" | "yourRating" | "yourNotes" | "progressText" | "progressValue">> &
+  { regionOverride?: string | null; genres?: string[] | string };
+const PICK_TYPES: MediaType[] = ["MOVIE", "TV", "ANIME", "BOOK"];
 
 const TYPE_LABEL: Record<string, string> = { MOVIE: "Movie", TV: "TV show", ANIME: "Anime", BOOK: "Book" };
 import {
   addToLibrary,
   fetchAccountPreferences,
+  fetchSuggestions,
   providerDetails,
   providerSearch,
-  updateLibrary,
 } from "../app/api";
-
-type ProviderSearchResult = {
-  provider: string;
-  providerId: string;
-  mediaType: MediaType;
-  title: string;
-  nativeTitle?: string;
-  countryOfOrigin?: string;
-  originalLanguage?: string;
-  isAdult?: boolean;
-  isDub?: boolean;
-  year?: string;
-  posterUrl?: string;
-  backdropUrl?: string;
-  description?: string;
-  globalRating?: number;
-  globalRatingText?: string;
-  genres?: string[] | string;
-};
 
 function normalizeGenresForStorage(genres: unknown): string | undefined {
   if (!genres) return undefined;
@@ -69,22 +57,47 @@ export function SearchModal({
   onClose,
   mediaTypeFilter, // undefined on landing page, defined inside category page
   region, // set on a regional category page: shows + films, that region first
+  initialItem,
 }: {
   open: boolean;
   onClose: () => void;
   mediaTypeFilter?: MediaType;
   region?: Region;
+  initialItem?: ProviderSearchResult;
 }) {
   const nav = useNavigate();
+  const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [rawResults, setRawResults] = useState<ProviderSearchResult[]>([]);
   const [debounced, setDebounced] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
+  const [selected, setSelected] = useState<ProviderSearchResult | null>(null);
+  const [status, setStatus] = useState<MediaStatus>("PLANNED");
+  const [rating, setRating] = useState<number | null>(null);
+  const [progress, setProgress] = useState(1);
+  const [regionOverride, setRegionOverride] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const { data: preferences } = useQuery({
     queryKey: ["account-preferences"],
     queryFn: fetchAccountPreferences,
   });
+  const pickQueries = useQueries({
+    queries: PICK_TYPES.map((type) => ({
+      queryKey: ["suggestions", type],
+      queryFn: () => fetchSuggestions(type),
+      enabled: open && !debounced && !selected,
+      staleTime: 5 * 60_000,
+    })),
+  });
+  const quickPicks = pickQueries.flatMap((query) => {
+    if (!query.data) return [];
+    const entries = Object.values(query.data.byType).flatMap((type) => type.quickPicks);
+    return entries
+      .filter((item) => (!item.isAdult || preferences?.showAdultContent) && (!mediaTypeFilter || item.mediaType === mediaTypeFilter))
+      .slice(0, 2);
+  }).slice(0, 6);
 
   useEffect(() => {
     if (!open) return;
@@ -93,7 +106,24 @@ export function SearchModal({
     setRawResults([]);
     setLoading(false);
     setManualOpen(false);
+    setSelected(null);
+    setStatus("PLANNED");
+    setRating(null);
+    setProgress(1);
+    setRegionOverride("");
+    setAddError(null);
   }, [open]);
+
+  useEffect(() => {
+    if (open && !selected) setStatus(preferences?.defaultMediaStatus ?? "PLANNED");
+  }, [open, preferences?.defaultMediaStatus, selected]);
+
+  useEffect(() => {
+    if (!open || !initialItem) return;
+    setSelected(initialItem);
+    setStatus(preferences?.defaultMediaStatus ?? "PLANNED");
+    setAddError(null);
+  }, [open, initialItem]);
 
   // debounce typing
   useEffect(() => {
@@ -152,21 +182,30 @@ export function SearchModal({
     );
   }, [rawResults, mediaTypeFilter, preferences?.showAdultContent]);
 
-  async function add(item: ProviderSearchResult) {
+  async function addSelected() {
+    if (!selected) return;
+    setAdding(true);
+    setAddError(null);
     try {
       const details = await providerDetails(
-        item.provider,
-        item.providerId,
-        item.mediaType
+        selected.provider,
+        selected.providerId,
+        selected.mediaType
       );
 
-      const payload: any = { ...item };
+      const payload: AddPayload = {
+        ...selected,
+        status,
+        yourRating: status === "COMPLETED" ? rating : null,
+        progressValue: status === "IN_PROGRESS" ? progress : status === "COMPLETED" ? (details?.totalEpisodes ?? details?.pageCount ?? 0) : 0,
+        regionOverride: regionOverride || undefined,
+      };
 
       if (details) {
         if (details.genres)
           payload.genres = normalizeGenresForStorage(details.genres);
-        else if (item.genres)
-          payload.genres = normalizeGenresForStorage(item.genres);
+        else if (selected.genres)
+          payload.genres = normalizeGenresForStorage(selected.genres);
 
         if (details.description && !payload.description)
           payload.description = details.description;
@@ -176,35 +215,37 @@ export function SearchModal({
         if (details.globalRatingText)
           payload.globalRatingText = details.globalRatingText;
 
-        // init progress
-        if (details.totalEpisodes || details.runtime) {
-          const total = details.totalEpisodes ?? details.runtime;
-          payload.progressText = `0/${total}`;
-          payload.progressValue = 0;
+        if (details.totalEpisodes || details.pageCount) {
+          const total = details.totalEpisodes ?? details.pageCount;
+          const value = status === "IN_PROGRESS" ? progress : status === "COMPLETED" ? total : 0;
+          payload.progressText = `${value}/${total}`;
+          payload.progressValue = value;
         }
       } else {
-        if (item.genres)
-          payload.genres = normalizeGenresForStorage(item.genres);
+        if (selected.genres)
+          payload.genres = normalizeGenresForStorage(selected.genres);
       }
 
       const created = await addToLibrary(payload);
-
-      // patch progress if create ignores it
-      if (payload.progressText) {
-        try {
-          await updateLibrary(created.id, {
-            progressText: payload.progressText,
-            progressValue: payload.progressValue,
-          });
-        } catch {
-          // ignore
-        }
-      }
-
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["library"] }),
+        queryClient.invalidateQueries({ queryKey: ["home"] }),
+        queryClient.invalidateQueries({ queryKey: ["suggestions"] }),
+        queryClient.invalidateQueries({ queryKey: ["franchise"] }),
+        queryClient.invalidateQueries({ queryKey: ["collection"] }),
+      ]);
       onClose();
-      nav(`/media/${created.id}`);
+      showToast({
+        message: `${created.title} added to your library`,
+        actionLabel: "Open",
+        onAction: () => nav(`/media/${created.id}`),
+        timeoutMs: 6000,
+      });
     } catch (err) {
-      console.error("Failed to add:", err);
+      console.error("Failed to add title:", err);
+      setAddError("Couldn't add this title. Check your connection and try again.");
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -212,7 +253,7 @@ export function SearchModal({
     <>
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--scrim)] p-4"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[var(--scrim)] p-0 sm:items-center sm:p-4"
           role="presentation"
           onMouseDown={onClose}
         >
@@ -220,7 +261,7 @@ export function SearchModal({
             role="dialog"
             aria-modal="true"
             aria-label={mediaTypeFilter ? `Add ${mediaTypeFilter}` : "Add to Grimoire"}
-            className="surface-card w-full max-w-3xl overflow-hidden rounded-[var(--radius-dialog)]"
+            className="surface-card max-h-[92dvh] w-full max-w-3xl overflow-y-auto rounded-t-[var(--radius-dialog)] pb-[env(safe-area-inset-bottom)] sm:rounded-[var(--radius-dialog)]"
             onMouseDown={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -232,7 +273,7 @@ export function SearchModal({
                     : "Add to Grimoire"}
                 </div>
                 <div className="text-xs opacity-60 mt-0.5">
-                  Type to search — click a result to add instantly
+                  Search, then choose how to file it
                 </div>
               </div>
 
@@ -263,6 +304,61 @@ export function SearchModal({
                 </div>
               </div>
 
+              {!debounced && !selected && quickPicks.length ? (
+                <section className="mt-5" aria-label="Quick picks">
+                  <p className="kicker mb-3">QUICK PICKS</p>
+                  <div className="hide-scrollbar flex gap-3 overflow-x-auto pb-2">
+                    {quickPicks.map((pick) => (
+                      <button key={`${pick.provider}:${pick.providerId}`} type="button" onClick={() => { setSelected(pick); setStatus(preferences?.defaultMediaStatus ?? "PLANNED"); }} className="w-24 shrink-0 text-left">
+                        <span className="block aspect-[2/3] overflow-hidden rounded-lg bg-[var(--s2)]">
+                          {pick.posterUrl ? <img src={pick.posterUrl} alt="" className="h-full w-full object-cover" loading="lazy" /> : null}
+                        </span>
+                        <span className="mt-1 block line-clamp-2 text-xs font-semibold">{pick.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {selected ? (
+                <section aria-label="Add title details" className="surface-raised mt-4 rounded-[var(--radius-card)] p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-20 w-14 shrink-0 overflow-hidden rounded-md bg-[var(--s2)]">
+                      {selected.posterUrl ? <img src={selected.posterUrl} alt="" className="h-full w-full object-cover" /> : null}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="kicker">FILE THIS TITLE</p>
+                      <h2 className="truncate font-semibold">{selected.title}</h2>
+                      <p className="text-xs text-[var(--tx3)]">{TYPE_LABEL[selected.mediaType] ?? selected.mediaType}{selected.year ? ` · ${selected.year}` : ""}</p>
+                    </div>
+                    <button type="button" onClick={() => setSelected(null)} className="ml-auto min-h-11 px-2 text-sm text-[var(--tx3)]">Change</button>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-1 text-xs font-semibold text-[var(--tx3)]">Status
+                      <select value={status} onChange={(event) => setStatus(event.target.value as MediaStatus)} className="min-h-11 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-sm text-[var(--tx)]">
+                        <option value="PLANNED">Planned</option><option value="IN_PROGRESS">Watching</option><option value="COMPLETED">Completed</option><option value="DROPPED">Dropped</option>
+                      </select>
+                    </label>
+                    {(selected.mediaType === "TV" || selected.mediaType === "ANIME" || selected.mediaType === "BOOK") && status === "IN_PROGRESS" ? (
+                      <label className="grid gap-1 text-xs font-semibold text-[var(--tx3)]">Up to {selected.mediaType === "BOOK" ? "page" : "episode"}
+                        <input type="number" min="0" value={progress} onChange={(event) => setProgress(Math.max(0, Number(event.target.value)))} className="min-h-11 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-sm text-[var(--tx)]" />
+                      </label>
+                    ) : null}
+                    {(selected.mediaType === "TV" || selected.mediaType === "MOVIE") ? (
+                      <label className="grid gap-1 text-xs font-semibold text-[var(--tx3)]">Where it's filed
+                        <select value={regionOverride} onChange={(event) => setRegionOverride(event.target.value)} className="min-h-11 rounded-xl border border-[var(--line2)] bg-[var(--s1)] px-3 text-sm text-[var(--tx)]">
+                          <option value="">Automatic{selected.countryOfOrigin ? ` · ${countryName(selected.countryOfOrigin)}` : ""}</option><option value="NONE">General</option>
+                          {Object.entries(REGION_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+                  {status === "COMPLETED" ? <div className="mt-4"><p className="mb-1 text-xs font-semibold text-[var(--tx3)]">Your rating</p><RatingInput value={rating} onChange={setRating} /></div> : null}
+                  {addError ? <p role="alert" className="mt-3 text-sm text-[var(--err)]">{addError}</p> : null}
+                  <button type="button" disabled={adding} onClick={addSelected} className="mt-4 min-h-12 w-full rounded-xl bg-[var(--acc)] px-4 font-semibold text-[var(--bg)] disabled:opacity-50">{adding ? "Adding…" : "Add to library"}</button>
+                </section>
+              ) : null}
+
               {/* Results */}
               <div className="mt-4 max-h-[60vh] overflow-auto space-y-2 pr-1">
                 {!loading && debounced && results.length === 0 && (
@@ -282,7 +378,7 @@ export function SearchModal({
                   <button
                     key={`${r.provider}:${r.providerId}`}
                     className="surface-card w-full overflow-hidden rounded-[var(--radius-card)] text-left transition-colors hover:bg-[var(--s2)]"
-                    onClick={() => add(r)}
+                    onClick={() => { setSelected(r); setStatus(preferences?.defaultMediaStatus ?? "PLANNED"); setAddError(null); }}
                   >
                     <div className="flex gap-4 p-3">
                       <div className="h-20 w-14 flex-shrink-0 overflow-hidden rounded-[var(--radius-poster)] bg-[var(--s2)]">
@@ -341,10 +437,21 @@ export function SearchModal({
                     defaultType={mediaTypeFilter ?? (region ? "TV" : "TV")}
                     defaultCountry={region && region !== "EU" ? region : ""}
                     defaultTitle={q.trim()}
+                    defaultStatus={preferences?.defaultMediaStatus ?? "PLANNED"}
                     onCancel={() => setManualOpen(false)}
                     onAdded={(id) => {
+                      void Promise.all([
+                        queryClient.invalidateQueries({ queryKey: ["home"] }),
+                        queryClient.invalidateQueries({ queryKey: ["suggestions"] }),
+                        queryClient.invalidateQueries({ queryKey: ["media-stats"] }),
+                      ]);
                       onClose();
-                      nav(`/media/${id}`);
+                      showToast({
+                        message: "Title added to your library",
+                        actionLabel: "Open",
+                        onAction: () => nav(`/media/${id}`),
+                        timeoutMs: 6000,
+                      });
                     }}
                   />
                 ) : (

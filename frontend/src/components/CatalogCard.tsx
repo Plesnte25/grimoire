@@ -1,20 +1,16 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
-import type { CatalogEntry } from "../types";
-import { addCatalogEntry } from "../app/api";
+import type { CatalogEntry, ProviderSearchResult } from "../types";
 import { formatScore } from "../lib/ratings";
 import { statusLabel } from "../lib/status";
-import { showToast } from "../lib/toast";
+import { useAppSearch } from "./AppShell";
 
 /**
  * One entry on a franchise / collection / person page: yours (status, rating,
  * opens your item) or not yet (dimmed, with + Add).
  */
-export function CatalogCard({ entry, subtitle, invalidate }: { entry: CatalogEntry; subtitle?: string | null; invalidate: unknown[] }) {
+export function CatalogCard({ entry, subtitle }: { entry: CatalogEntry; subtitle?: string | null }) {
   const nav = useNavigate();
-  const qc = useQueryClient();
-  const [adding, setAdding] = useState(false);
+  const { openSearch } = useAppSearch();
   const mine = !!entry.libraryId;
   const upcoming = entry.status === "UPCOMING" || entry.status === "NOT_YET_RELEASED";
   const newEpisodes = mine && entry.yourStatus !== "DROPPED"
@@ -28,28 +24,25 @@ export function CatalogCard({ entry, subtitle, invalidate }: { entry: CatalogEnt
         ? `Ep ${entry.nextAirEpisode} · ${new Date(entry.nextAirDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
         : null;
 
-  const add = async () => {
-    setAdding(true);
-    try {
-      const item = await addCatalogEntry(entry);
-      showToast({ message: `Added "${entry.title}" as Planned`, actionLabel: "Open", onAction: () => nav(`/media/${item.id}`), timeoutMs: 6000 });
-      qc.invalidateQueries({ queryKey: invalidate });
-      qc.invalidateQueries({ queryKey: ["library"] });
-    } catch (err: any) {
-      showToast({ message: err?.response?.data?.error ?? "Couldn't add it", timeoutMs: 6000 });
-    } finally {
-      setAdding(false);
-    }
+  const add = () => {
+    const initialItem: ProviderSearchResult = {
+      provider: entry.provider,
+      providerId: entry.providerId,
+      mediaType: entry.mediaType,
+      title: entry.title,
+      year: entry.year ?? undefined,
+      posterUrl: entry.posterUrl ?? undefined,
+    };
+    openSearch({ initialItem });
   };
 
   return (
-    <li className={`flex flex-col rounded-xl border p-2 ${mine ? "border-[#8b7ae0]/60 bg-[#8b7ae0]/10" : "border-white/10 bg-white/[0.03]"}`}>
+    <li className={`flex flex-col rounded-xl border p-2 ${mine ? "border-[var(--acc)]/60 bg-[var(--acc)]/10" : "border-[var(--line)] bg-[var(--s1)]"}`}>
       <button
         type="button"
-        className={`aspect-[2/3] overflow-hidden rounded-lg bg-white/5 ${mine ? "" : "opacity-60"}`}
+        className={`aspect-[2/3] overflow-hidden rounded-lg bg-[var(--s2)] ${mine ? "" : "opacity-80"}`}
         onClick={() => (mine ? nav(`/media/${entry.libraryId}`) : add())}
         aria-label={mine ? `Open ${entry.title}` : `Add ${entry.title}`}
-        disabled={adding}
       >
         {entry.posterUrl ? <img src={entry.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover" /> : null}
       </button>
@@ -67,11 +60,10 @@ export function CatalogCard({ entry, subtitle, invalidate }: { entry: CatalogEnt
         ) : (
           <button
             type="button"
-            className="min-h-11 w-full rounded-lg bg-white/10 text-sm hover:bg-white/15 disabled:opacity-50"
+            className="min-h-11 w-full rounded-lg bg-[var(--s2)] text-sm hover:bg-[var(--s3)] disabled:opacity-50"
             onClick={add}
-            disabled={adding}
           >
-            {adding ? "Adding…" : "+ Add"}
+            + Add
           </button>
         )}
       </div>
@@ -79,4 +71,4 @@ export function CatalogCard({ entry, subtitle, invalidate }: { entry: CatalogEnt
   );
 }
 
-export const catalogGrid = "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(140px,1fr))]";
+export const catalogGrid = "grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8";

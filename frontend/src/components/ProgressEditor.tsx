@@ -4,9 +4,9 @@ import type { MediaItem } from "../types";
 import { fetchSeasons, type ItemPatch } from "../app/api";
 
 const field =
-  "rounded-xl bg-black/30 border border-white/15 px-3 min-h-11 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-white";
+  "rounded-xl border border-[var(--line2)] bg-[var(--bg)] px-3 min-h-11 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--acc)]";
 const button =
-  "min-h-11 min-w-11 rounded-xl bg-white/10 hover:bg-white/15 text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-white disabled:opacity-40";
+  "min-h-11 min-w-11 rounded-xl bg-[var(--s2)] hover:bg-[var(--s3)] text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--acc)] disabled:opacity-40";
 
 /** Total for the counter: your override, else episodes / aired / pages. */
 export function progressTotal(item: MediaItem): number | null {
@@ -96,7 +96,7 @@ function CounterProgress({ item, onPatch }: { item: MediaItem; onPatch: (p: Item
       </div>
       {total != null && total > 0 ? (
         <div className="h-1.5 w-full max-w-xs rounded-full bg-white/10" aria-hidden="true">
-          <div className="h-full rounded-full bg-[#8b7ae0]" style={{ width: `${Math.min(100, (value / total) * 100)}%` }} />
+          <div className="h-full rounded-full bg-[var(--acc)]" style={{ width: `${Math.min(100, (value / total) * 100)}%` }} />
         </div>
       ) : null}
       <TotalOverride item={item} onPatch={onPatch} />
@@ -164,7 +164,7 @@ function TvProgress({ item, onPatch }: { item: MediaItem; onPatch: (p: ItemPatch
 
 export function ProgressEditor({ item, onPatch }: { item: MediaItem; onPatch: (p: ItemPatch) => void }) {
   if (item.mediaType === "MOVIE") {
-    return <p className="text-sm text-white/75">Watches and rewatches are kept in History below.</p>;
+    return <p className="text-sm text-[var(--tx3)]">Films don’t have episode progress. Use the rewatch counter when you return to one.</p>;
   }
   if (item.mediaType === "TV" && item.provider === "tmdb") return <TvProgress item={item} onPatch={onPatch} />;
   return <CounterProgress item={item} onPatch={onPatch} />;

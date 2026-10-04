@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { withTimeout } from "../utils/withTimeout.js";
 import { regionForCountry } from "../lib/regions.js";
 import { tmdbSearch, tmdbDetails } from "../services/providers/tmdb.js";
 import { anilistSearch, anilistDetails } from "../services/providers/anilist.js";
@@ -10,6 +11,11 @@ import { prisma } from "../db.js";
 import { tmdbGet, TMDB_IMAGE_BASE } from "../services/providers/tmdb.js";
 
 export const providersRouter = Router();
+
+// Interactive search/add calls must return well inside the frontend's axios
+// timeout even if a provider (usually AniList — see the serialized request
+// queue in services/providers/anilist.ts) is slow or backed up.
+const SEARCH_TIMEOUT_MS = 9000;
 
 const providerResultCache = new Map<string, { expiresAt: number; data: unknown }>();
 
@@ -107,23 +113,29 @@ providersRouter.get("/search", asyncHandler(async (req, res) => {
     const q = parsed.q;
     const mediaType = parsed.region ? undefined : parsed.mediaType;
 
+    // Each provider is bounded so a single slow/rate-limited one (most often
+    // AniList, whose requests are serialized behind a shared queue — see
+    // services/providers/anilist.ts) can't stall the whole search past the
+    // frontend's request timeout; a timed-out provider just contributes no
+    // results instead of blocking the others.
+    const bound = (p: Promise<any>, label: string) => withTimeout(p, SEARCH_TIMEOUT_MS, label);
     const services: Promise<any>[] = [];
 
     if (!mediaType) {
         // If no mediaType specified, search both movies and TV
-        services.push(tmdbSearch(q, "movie"));
-        services.push(tmdbSearch(q, "tv"));
+        services.push(bound(tmdbSearch(q, "movie"), "tmdb movie search"));
+        services.push(bound(tmdbSearch(q, "tv"), "tmdb tv search"));
     } else if (mediaType === "MOVIE") {
-        services.push(tmdbSearch(q, "movie"));
+        services.push(bound(tmdbSearch(q, "movie"), "tmdb movie search"));
     } else if (mediaType === "TV") {
-        services.push(tmdbSearch(q, "tv"));
+        services.push(bound(tmdbSearch(q, "tv"), "tmdb tv search"));
     }
 
     if (!parsed.region && (!mediaType || mediaType === "ANIME")) {
-        services.push(anilistSearch(q));
+        services.push(bound(anilistSearch(q), "anilist search"));
     }
     if (!parsed.region && (!mediaType || mediaType === "BOOK")) {
-        services.push(googleBooksSearch(q));
+        services.push(bound(googleBooksSearch(q), "google books search"));
     }
 
     const settled = await Promise.allSettled(services);
@@ -155,11 +167,11 @@ providersRouter.get("/details", asyncHandler(async (req, res) => {
     try {
         let details: any = null;
         if (data.provider === "tmdb" && (data.mediaType === "MOVIE" || data.mediaType === "TV")) {
-            details = await tmdbDetails(data.providerId, data.mediaType === "MOVIE" ? "movie" : "tv");
+            details = await withTimeout(tmdbDetails(data.providerId, data.mediaType === "MOVIE" ? "movie" : "tv"), SEARCH_TIMEOUT_MS, "tmdb details");
         } else if (data.provider === "anilist" && data.mediaType === "ANIME") {
-            details = await anilistDetails(data.providerId);
+            details = await withTimeout(anilistDetails(data.providerId), SEARCH_TIMEOUT_MS, "anilist details");
         } else if (data.provider === "googlebooks" && data.mediaType === "BOOK") {
-            details = await googleBooksDetails(data.providerId);
+            details = await withTimeout(googleBooksDetails(data.providerId), SEARCH_TIMEOUT_MS, "google books details");
         }
 
         res.json({ details });

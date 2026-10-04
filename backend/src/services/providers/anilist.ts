@@ -239,3 +239,35 @@ export async function anilistDiscoverByGenres(opts: {
 
   return (data?.data?.Page?.media ?? []).map(mapMedia);
 }
+
+export async function anilistRecommendations(providerId: string) {
+  const id = Number(providerId);
+  if (!Number.isFinite(id)) return [];
+
+  const query = `
+    query ($id: Int) {
+      Media(id: $id, type: ANIME) {
+        recommendations(sort: RATING_DESC, perPage: 25) {
+          nodes {
+            mediaRecommendation {
+              id format episodes duration isAdult
+              title { romaji english native }
+              description(asHtml: false)
+              averageScore genres
+              coverImage { extraLarge large }
+              bannerImage seasonYear
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const cacheKey = `recs:${id}`;
+  const data = await postAniList<any>({ query, variables: { id } }, cacheKey, 10 * 60 * 1000);
+  const nodes = data?.data?.Media?.recommendations?.nodes ?? [];
+  return nodes
+    .map((node: any) => node?.mediaRecommendation)
+    .filter(Boolean)
+    .map(mapMedia);
+}

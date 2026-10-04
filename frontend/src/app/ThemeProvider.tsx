@@ -1,12 +1,9 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-export type ThemeChoice = "system" | "light" | "dark";
 export type TextSize = "small" | "default" | "large";
 
 type ThemeContextValue = {
-  theme: ThemeChoice;
-  setTheme: (theme: ThemeChoice) => void;
   textSize: TextSize;
   setTextSize: (size: TextSize) => void;
   reduceMotion: boolean;
@@ -26,9 +23,6 @@ function readChoice<T extends string>(key: string, options: readonly T[], fallba
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeChoice>(() =>
-    readChoice("grimoire-theme", ["system", "light", "dark"], "system"),
-  );
   const [textSize, setTextSizeState] = useState<TextSize>(() =>
     readChoice("grimoire-text-size", ["small", "default", "large"], "default"),
   );
@@ -37,17 +31,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    const root = document.documentElement;
-    const system = window.matchMedia("(prefers-color-scheme: light)");
-    const applyTheme = () => {
-      root.dataset.theme = theme === "system" ? (system.matches ? "light" : "dark") : theme;
-    };
-    applyTheme();
-    system.addEventListener("change", applyTheme);
-    return () => system.removeEventListener("change", applyTheme);
-  }, [theme]);
-
-  useEffect(() => {
+    document.documentElement.dataset.theme = "dark";
     document.documentElement.style.setProperty("--text-scale", TEXT_SCALE[textSize]);
   }, [textSize]);
 
@@ -57,11 +41,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ThemeContextValue>(
     () => ({
-      theme,
-      setTheme: (next) => {
-        localStorage.setItem("grimoire-theme", next);
-        setThemeState(next);
-      },
       textSize,
       setTextSize: (next) => {
         localStorage.setItem("grimoire-text-size", next);
@@ -73,7 +52,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setReduceMotionState(next);
       },
     }),
-    [theme, textSize, reduceMotion],
+    [textSize, reduceMotion],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

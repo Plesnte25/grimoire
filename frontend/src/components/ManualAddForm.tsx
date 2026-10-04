@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { MediaType } from "../types";
+import type { AccountPreferences, MediaType } from "../types";
 import { addToLibrary } from "../app/api";
 import { countryFlag, countryName } from "../lib/regions";
 import { showToast } from "../lib/toast";
+import { RatingInput } from "./RatingInput";
 
 // Countries offered first; any other ISO code can be typed.
 const COMMON_COUNTRIES = ["PK", "TR", "KR", "IN", "JP", "CN", "US", "GB", "NO", "DE", "FR", "ES", "IT", "SE", "DK"];
@@ -15,12 +16,14 @@ export function ManualAddForm({
   defaultType,
   defaultCountry,
   defaultTitle,
+  defaultStatus = "PLANNED",
   onCancel,
   onAdded,
 }: {
   defaultType: MediaType;
   defaultCountry: string;
   defaultTitle: string;
+  defaultStatus?: AccountPreferences["defaultMediaStatus"];
   onCancel: () => void;
   onAdded: (id: string) => void;
 }) {
@@ -31,6 +34,10 @@ export function ManualAddForm({
   const [year, setYear] = useState("");
   const [episodes, setEpisodes] = useState("");
   const [posterUrl, setPosterUrl] = useState("");
+  const [status, setStatus] = useState<AccountPreferences["defaultMediaStatus"]>(defaultStatus);
+  const [rating, setRating] = useState<number | null>(null);
+  const [progress, setProgress] = useState(1);
+  const [regionOverride, setRegionOverride] = useState("");
   const [saving, setSaving] = useState(false);
   const series = mediaType === "TV" || mediaType === "ANIME";
 
@@ -47,11 +54,16 @@ export function ManualAddForm({
             providerId: "",
             mediaType,
             title: title.trim(),
+            status,
+            yourRating: status === "COMPLETED" ? rating : null,
+            progressValue: status === "IN_PROGRESS" ? progress : 0,
+            progressText: status === "IN_PROGRESS" ? `${progress}` : undefined,
             year: year ? Number(year) : undefined,
             posterUrl: /^https?:\/\//.test(posterUrl) ? posterUrl : undefined,
             countryOfOrigin: /^[A-Za-z]{2}$/.test(country) ? country.toUpperCase() : undefined,
             episodes: series && episodes ? Number(episodes) : undefined,
-          } as any);
+            regionOverride: regionOverride || undefined,
+          });
           qc.invalidateQueries({ queryKey: ["library"] });
           onAdded(item.id);
         } catch (err: any) {
@@ -68,6 +80,12 @@ export function ManualAddForm({
         <input className={field} value={title} onChange={(e) => setTitle(e.target.value)} required />
       </label>
       <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1 text-sm">
+          <span className="text-white/80">Status</span>
+          <select className={field} value={status} onChange={(event) => setStatus(event.target.value as AccountPreferences["defaultMediaStatus"])}>
+            <option value="PLANNED">Planned</option><option value="IN_PROGRESS">Watching / reading</option><option value="COMPLETED">Completed</option><option value="DROPPED">Dropped</option>
+          </select>
+        </label>
         <label className="space-y-1 text-sm">
           <span className="text-white/80">Type</span>
           <select className={field} value={mediaType} onChange={(e) => setMediaType(e.target.value as MediaType)}>
@@ -96,13 +114,29 @@ export function ManualAddForm({
             <input className={field} inputMode="numeric" value={episodes} onChange={(e) => setEpisodes(e.target.value.replace(/\D/g, ""))} />
           </label>
         ) : null}
+        {status === "IN_PROGRESS" ? (
+          <label className="space-y-1 text-sm">
+            <span className="text-white/80">Up to {mediaType === "BOOK" ? "page" : "episode"}</span>
+            <input className={field} type="number" min="0" value={progress} onChange={(event) => setProgress(Math.max(0, Number(event.target.value)))} />
+          </label>
+        ) : null}
       </div>
+      {(mediaType === "TV" || mediaType === "MOVIE") ? (
+        <label className="block space-y-1 text-sm">
+          <span className="text-white/80">Region</span>
+          <select className={field} value={regionOverride} onChange={(event) => setRegionOverride(event.target.value)}>
+            <option value="">Automatic from country</option><option value="NONE">General</option>
+            <option value="TR">Turkish</option><option value="PK">Pakistani</option><option value="KR">Korean</option><option value="EU">European</option>
+          </select>
+        </label>
+      ) : null}
+      {status === "COMPLETED" ? <div><p className="mb-1 text-sm text-white/80">Your rating</p><RatingInput value={rating} onChange={setRating} /></div> : null}
       <label className="block space-y-1 text-sm">
         <span className="text-white/80">Poster image URL (optional)</span>
         <input className={field} type="url" placeholder="https://…" value={posterUrl} onChange={(e) => setPosterUrl(e.target.value)} />
       </label>
       <div className="flex gap-3">
-        <button type="submit" disabled={saving || !title.trim()} className="min-h-11 rounded-xl px-4 bg-[#8b7ae0] font-semibold text-[#0b0b10] disabled:opacity-50">
+        <button type="submit" disabled={saving || !title.trim()} className="min-h-11 rounded-xl px-4 bg-[var(--acc)] font-semibold text-[var(--bg)] disabled:opacity-50">
           {saving ? "Adding…" : "Add"}
         </button>
         <button type="button" className="min-h-11 rounded-xl px-4 bg-white/10" onClick={onCancel}>Cancel</button>

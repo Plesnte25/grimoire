@@ -36,6 +36,7 @@ export type MediaItem = {
 
     status: MediaStatus;
     yourRating?: number | null;
+    rewatchCount?: number;
     yourRatingAt?: string | null;
     yourNotes?: string | null;
     progressText?: string | null;
@@ -86,7 +87,6 @@ export type MediaItem = {
     lastAiredSeason?: number | null;
     lastAiredEpisode?: number | null;
     tags?: { tag: Tag }[];
-    reminder?: { pinned: boolean; untilAt: string | null } | null;
     imdbRating?: number | null;
     imdbVotes?: number | null;
     rtCritics?: number | null;
@@ -117,6 +117,8 @@ export type CatalogEntry = {
     yourRating?: number | null;
     airedEpisodeCount?: number | null;
     progressValue?: number | null;
+    progressSeason?: number | null;
+    progressEpisode?: number | null;
     nextAirEpisode?: number | null;
     nextAirDate?: string | null;
     announcedNext?: string | null;
@@ -125,34 +127,56 @@ export type CatalogEntry = {
 
 export type Tag = { id: string; name: string; kind: "TAG" | "MOOD"; color?: string | null; count?: number };
 
-export type WatchMode = "SUB" | "DUB" | "ORIGINAL";
-
-export type WatchLog = {
-    id: string;
-    mediaId: string;
-    startedAt?: string | null;
-    finishedAt?: string | null;
-    rating?: number | null;
-    review?: string | null;
-    reviewHasSpoilers: boolean;
-    isRewatch: boolean;
-    watchedOn?: string | null;
-    watchMode?: WatchMode | null;
-    watchedWith?: string | null;
-    fromEpisode?: number | null;
-    toEpisode?: number | null;
-    label?: string | null;
-    createdAt: string;
-};
-
 export type AccountPreferences = {
     showAdultContent: boolean;
     spoilerShield: boolean;
     watchCountry: string | null;
+    defaultMediaStatus: Exclude<MediaStatus, "ON_HOLD">;
 };
 
-export type DiaryLog = WatchLog & {
-    media: Pick<MediaItem, "id" | "title" | "mediaType" | "posterUrl" | "year">;
+export type SuggestionReason =
+    | { type: "SEED_RECOMMENDATION"; seed: { id: string; title: string; mediaType: MediaType } }
+    | { type: "TRENDING_IN_YOUR_TASTE"; genres: string[] };
+
+export type SuggestionItem = ProviderSearchResult & {
+    reason: SuggestionReason;
+};
+
+export type SuggestionGroup = {
+    becauseYouLike: SuggestionItem[];
+    trendingInYourTaste: SuggestionItem[];
+    quickPicks: SuggestionItem[];
+    topGenres: string[];
+};
+
+export type SuggestionsResponse = {
+    seed: number;
+    scope: string;
+    byType: Record<MediaType, SuggestionGroup>;
+};
+
+export type MediaStats = {
+    libraryTotals: {
+        totalTitles: number;
+        byMediaType: { mediaType: MediaType; count: number }[];
+        byStatus: { status: MediaStatus; count: number }[];
+        totalEpisodesTracked: number;
+        totalEpisodesAvailable: number;
+        totalPagesTracked: number;
+        totalPagesAvailable: number;
+    };
+    ratings: {
+        distribution: { rating: number; count: number }[];
+        averagePersonalRating: number | null;
+        averageProviderRating: number | null;
+        highestRatedByType: { mediaType: MediaType; item: { id: string; title: string; posterUrl?: string | null; yourRating: number | null; globalRating: number | null } | null }[];
+    };
+    tasteProfile: {
+        topGenres: { genre: string; count: number }[];
+        countries: { country: string; count: number }[];
+        releaseDecades: { decade: string; count: number }[];
+        topContributors: { role: string; contributorId: string; name: string; kind: string; count: number }[];
+    };
 };
 
 export type Season = { season: number; name: string; episodes: number; airDate: string | null };
@@ -179,24 +203,12 @@ export type TrustedDevice = {
 
 export type HomeTitle = MediaItem & {
     newEpisodeCount: number;
-    reminder: { pinned: boolean; untilAt: string | null } | null;
-};
-
-export type AnnualGoalProgress = {
-    id: string;
-    year: number;
-    scope: "ALL" | MediaType;
-    target: number;
-    completed: number;
 };
 
 export type HomeSnapshot = {
-    readyToWatch: HomeTitle[];
-    comingSoon: HomeTitle[];
     continueWatching: HomeTitle[];
-    rewatch: HomeTitle[];
-    goals: AnnualGoalProgress[];
-    top10: CustomList[];
+    newEpisodes: HomeTitle[];
+    recentlyAdded: HomeTitle[];
 };
 
 export type WatchProvider = {
@@ -207,18 +219,6 @@ export type WatchProvider = {
 };
 
 export type Trailer = { id: string; name: string; type: string; url: string };
-
-export type YearStats = {
-    year: number;
-    finishedLogCount: number;
-    completedTitleCount: number;
-    monthly: number[];
-    ratingDistribution: { rating: number; count: number }[];
-    averagePersonalRating: number | null;
-    averageProviderRating: number | null;
-    countries: { country: string; count: number }[];
-    mediaTypes: { mediaType: MediaType; count: number }[];
-};
 
 export type SharedList = {
     name: string;

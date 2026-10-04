@@ -78,7 +78,7 @@ export function ContributorPage() {
           <h2 id="other-heading" className="font-display text-xl font-medium">More of their work</h2>
           <ul className={`mt-3 ${catalogGrid}`}>
             {otherWork.map((w) => (
-              <CatalogCard key={`${w.mediaType}-${w.providerId}`} entry={w} subtitle={w.role} invalidate={["contributor", id]} />
+              <CatalogCard key={`${w.mediaType}-${w.providerId}`} entry={w} subtitle={w.role} />
             ))}
           </ul>
         </section>
