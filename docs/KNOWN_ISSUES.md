@@ -4,7 +4,7 @@ The project's backlog: bugs, rough edges and polish work, logged here instead of
 progress doesn't stall. Each entry says where it came from, its severity, how we plan to fix it, and gets ✅ with the
 commit once done. Issues are discussed and fixed one at a time.
 
-## Status (2026-10-02)
+## Status (2026-10-04)
 
 - **Done:** Phases 0–3 deployed (see Build order). Ongoing episode totals (#14) are implemented; 2026-10-02:
   Tailscale removed, app-level auth hardened (#111), VM cleaned to Grimoire-only and renamed `grimoire` (#112).
@@ -19,7 +19,142 @@ commit once done. Issues are discussed and fixed one at a time.
   backed up before all four forward migrations were applied (`/opt/grimoire/backups/pre-deploy-20261002T161827Z.db`).
   The public health endpoint and homepage return successfully. Authenticated visual screenshot review remains pending.
 
+- **Next (agreed 2026-10-04):** the daily-use review below (#116–#136) replaces the Nocturne look and trims
+  features that weren't used. It is built in one go later, in the order under "Daily-use review → Build order".
+  The user's side: fix home DNS (#124 a).
+
 ## Open — needs a fix
+
+### Daily-use review (2026-10-04)
+
+From a few days of daily use of the Phases 4–7 build. Each item was discussed and the solution agreed; nothing is
+built yet. Numbering follows the user's list (1–21 → #116–#136). This round **supersedes** the Claude Design
+"Nocturne" look (#83–90 visuals, `docs/design/` kept for reference only) and removes several Phase 6/7 features:
+yearly goals (#69), "What should I watch tonight?" (#65), rewatch nudges (#72), the diary, watch logs, offline log
+queue (#104) and the light theme.
+
+116. **Home is too stat-heavy** (medium). **Fix:** Home = **Continue** (in progress, with quick +1 episode / mark
+     done), a slim **New episodes / releases** strip (only titles being watched; replaces Ready to watch and Coming
+     soon) and **Recently added**. Delete entirely, UI and backend: hero counts, yearly goal (`AnnualGoal`),
+     Tonight, Worth returning to, Favourites shelf, category tiles. Suggestions are not on Home (#117).
+117. **No suggestions corner for quick adds** (medium). **Fix:** a **Discover** tab in the dock (one row per
+     category) plus a short "quick picks" row at the top of the add sheet (#132). Sources: **Because you liked X**
+     (TMDB `/recommendations`, AniList `recommendations`, seeded from top-rated and recent titles; each pick names
+     its seed) and **Trending in your taste** (today's genre/region discover, as a fallback). Anything already in
+     the library is excluded; ✕ dismisses a pick for good. Adding opens the placement sheet (#130). The
+     per-category `SuggestionsCarousel` goes.
+118. **Library categories are split badly and hard to reach** (medium). **Fix:** regions stop being top-level
+     categories. **One Library page** with type chips **Movies · TV · Anime · Books** that switch in place (state in
+     the URL, e.g. `/library?type=TV&region=TR`). Inside TV and Movies, a **second chip row** of the regions you
+     actually have (All · Turkish · Pakistani · Korean · European · Other), from `effectiveRegion`; "Move to…" stays.
+     `/category/:type` and `/region/:key` redirect; the sidebar region links go.
+119. **The media page is dull and its inputs are confusing** (high). **Fix:** **controls on the hero**: full-bleed
+     backdrop with poster, title, release date and scores, and on it the status pill, rating, a progress stepper
+     (− Ep 12/24 +, pages for books) and the rewatch counter (#120). **No tabs**; one scroll below: synopsis
+     (spoiler shield), where to watch + trailer, episodes (collapsible seasons), franchise/collection strip, cast.
+     A compact **Organise** block at the end (lists, tags, private notes) and a **⋯ menu** on the hero for rare
+     edits (region, franchise move, manual details, delete).
+120. **Watch dates aren't wanted** (high). "When I watched it" is useless; only the title's release date matters.
+     **Fix:** remove the log dialog, History section and all watch-log UI (where / with whom / sub-dub, reviews,
+     started/finished dates, episode range/label). A title has status, rating, progress and a **rewatch/re-read
+     counter** ("Watched 2×", + button on completed titles). Show the **release date** prominently. Tags stay.
+     Data: fold each title's finished logs into the counter, then drop `WatchLog`; stats (#122) move to item data;
+     the offline log queue (#104) goes with it.
+121. **Diary isn't needed** (low). **Fix:** remove the Diary page, route, nav entries and diary API.
+122. **"You" should hold all stats** (medium). **Fix:** You becomes the stats page; Stats / Wrapped merges in
+     (`/stats` redirects). Sections: **Library totals** (per type, per status, total episodes and pages),
+     **Ratings** (distribution, your average vs the providers', highest-rated per type), **Taste profile** (top
+     genres, countries donut, release decades, top studios / directors / authors). No time-based charts. The stats
+     API is rewritten on `MediaItem` data.
+123. **The look is dull** (high). **Fix:** a new direction, written up by Claude in `design.md` (tokens, type,
+     components, motion) and built with screenshots for review. **Magazine**: large serif display headlines,
+     kicker labels ("NOW WATCHING"), posters as big image blocks with captions, gold / ribbon-red colour bands.
+     **Live background**: a soft gold/red radial aura that slowly breathes, shifts and drifts toward the cursor
+     (paused when hidden, static with reduced motion). **Rich motion**: parallax heroes, staggered card reveals,
+     animated counters, page transitions, hover lift/tilt, gold focus glow, micro-animations (rating fill, +1 episode
+     tick). **Dark only**: the light theme and theme switch are removed. Palette from the logo (#131).
+124. **Slow first load and glitches** (high; laptop, phone on Wi-Fi and on mobile data; white flash, wrong fonts
+     first). Measured 2026-10-04: HTML 1.3 s over IPv4 but 16 s with default DNS (15 s AAAA timeout, #1); JS
+     494 KB + CSS 330 KB; hashed assets sent with `cache-control: max-age=0`; gzip only. **Fix:**
+     a. **User task:** Private DNS on the phone (`dns.google` / `one.one.one.one`) or change the router's DNS.
+        Fallback if that can't be done: move off DuckDNS to a domain whose DNS answers AAAA queries.
+     b. Caddy: `Cache-Control: public, max-age=31536000, immutable` on `/assets/*`, no-cache on `index.html` and
+        `sw.js`; `encode zstd gzip`, plus precompressed brotli.
+     c. Route-level code splitting (`React.lazy`); drop the full flag-icons CSS (per-flag SVGs only); load the
+        CJK / Urdu fonts only on pages that need them; subset the display and UI fonts. Target: under 150 KB JS
+        and 40 KB CSS on first load.
+     d. No white flash: dark background and an inline logo splash in `index.html`; preload the two main fonts with
+        metric-matched fallbacks so text doesn't jump; the lock screen renders from cached auth state.
+     e. Service worker: never reload mid-session; updates apply on the next open.
+     Verify with Lighthouse (mobile) and a throttled Playwright trace.
+125. **PIN-only unlock on trusted devices** (high). **Fix:** a trusted device gets an **app-style lock screen**:
+     logo, 4–6 PIN dots, a large numeric keypad, auto-submit on the last digit, shake on a wrong PIN, no email (one
+     account). `/auth/status` reports `deviceTrusted`; `/unlock` needs only the device cookie + PIN (lockout kept).
+     A **new device** does email → 6-digit code once → PIN pad. **Auto-lock after 15 minutes idle or in the
+     background**: sliding 15-minute session refreshed by activity, and the client also locks on `visibilitychange`
+     after 15 minutes away. Unlocking within the window needs no PIN; the lock screen appears without a reload. No
+     biometrics.
+126. **Too many vague filters** (medium). **Fix:** a library page keeps only **search** (title, original title,
+     genre, creator), one **status chip row** with counts (All · Watching · Planned · Completed · Dropped) and a
+     **sort** menu (recently updated · title · release year · your rating). Removed: genre chips, tag filter,
+     country chips, grid/list toggle. Region is #118's chip row. **Anime keeps a Series / Movies chip row**; the 18+
+     tab goes (18+ follows the setting).
+127. **Media cards are too big** (medium). **Fix:** a **compact poster grid** everywhere: about 3 per row on a
+     phone, 6–8 on desktop; poster with a status dot, your rating and a new-episode badge; title + year (two
+     lines) below; more on hover / long-press. Franchise tiles use the same size.
+128. **Mobile doesn't feel like an app; layouts break or overflow** (high). **Fix:** no horizontal overflow at
+     320–430 px (checked on every route by #129's script); safe-area insets; sheets instead of dialogs on phones.
+     App feel: page transitions, swipe-back on detail and franchise pages, pull-to-refresh on Home and Library,
+     tap micro-feedback, compact sticky headers, an installable PWA with the new logo icons and splash colour,
+     standalone display.
+129. **Console errors** (medium). **Fix:** a Playwright pass over every route (signed in with seeded
+     Session/TrustedDevice cookies; phone and desktop) that collects console errors, warnings and failed requests;
+     fix each. The script lives in `scripts/` and runs before every deploy; it must report zero errors.
+130. **Adding a title silently sets "Planned"** (high). **Fix:** every add path (search, add sheet, Discover,
+     franchise page) opens a **bottom sheet** with poster and title: **status** (Planned · Watching · Completed ·
+     Dropped; the Settings default preselected), **rating** cells when Completed, **"up to episode/page N"** when
+     Watching, and **where it's filed** ("TV › Turkish", franchise if detected) with a change option. One tap
+     "Add" with the defaults; closes with a toast + "Open". No list picker. `POST /library` accepts status, rating,
+     progress and `regionOverride`.
+131. **The palette should come from the logo** (medium). The spellbook logo (brown leather, gold clasps, glowing
+     gold sigil, cream pages, red ribbon; source image `~/Downloads/image-MeMkbmCp3BbaMqZSGimLsjkYqoqfmO.png`).
+     **Fix:** background near-black warming to brown; surfaces leather brown (~`#2b1f17`, `#3d2c20`); accent
+     glowing gold (~`#f6b73c`, glow `#ffd35a`); text parchment cream (~`#efe0bf`); secondary ribbon red-orange
+     (~`#c4492c`); final values checked for WCAG AA. The logo becomes the favicon and PWA icon set (replacing the
+     purple `favicon.svg`) and appears in the dock.
+132. **No quick-add button** (medium). **Fix:** a **gold + FAB** at the bottom right, floating above the dock, on
+     every signed-in page. It opens the **add sheet**: search on top, quick picks (#117) below; picking a title
+     opens the placement sheet (#130).
+133. **A floating dock instead of the fixed sidebar** (medium). **Fix:** remove the sidebar and the top bar. A
+     **bottom-centre floating pill dock on every screen size**: Home · Library · Discover · Lists · You (gold
+     active state, magnify on hover on desktop, hides on scroll down and returns on scroll up, safe-area aware).
+     Settings is reached from You; search via a small top-right button, `/` and Ctrl/Cmd+K.
+134. **Settings should hold useful information** (medium). **Fix:** four sections. **Account & security**: email
+     on file, change PIN (+ revoke other devices), trusted devices with revoke, recent unlocks and failed PIN
+     attempts, new-device alert toggle. **Data & backups**: export/import, last nightly server backup (time,
+     size), library size, download the latest server backup. **App & server status**: app version/commit, last
+     daily metadata refresh (time, ok/failed counts), provider health (TMDB, AniList, Google Books, OMDb, Jikan),
+     DB size. **Defaults & preferences**: default status for new adds (#130), where-to-watch country, 18+, spoiler
+     shield, text size, reduce motion. Needs small endpoints for backup info, refresh results, provider pings and
+     unlock history.
+135. **"Lock now" isn't needed** (low). **Fix:** remove it from the sidebar and Settings; auto-lock (#125) covers
+     it. `/auth/lock` stays on the server (device revoke uses it).
+136. **The franchise page is vague** (high). **Fix:** a **streaming-style show hub**: big banner, title and overall
+     progress; a primary **"Continue: S3 E5"** (or Start / Rewatch) button; a **season picker** with that season's
+     episodes underneath (from the episode cache); a **Movies & extras** row (films, OVAs/ONAs, specials);
+     untracked entries get one-tap add (→ #130). **TMDB movie collections use the same page** (replaces the
+     Collection page; `/collection/:id` redirects).
+
+**Build order (agreed 2026-10-04; each phase built, screenshot-reviewed and deployed):**
+- **Phase A, daily friction:** #124 performance, #129 console-error smoke script, #125 PIN pad + auto-lock,
+  #135 remove Lock now. User task: #124 a (DNS).
+- **Phase B, data model:** #120 rewatch counter (fold logs in, then drop logs, diary and the offline queue), #121
+  Diary, #116 remove goal/tonight/rewatch/favourites backends, #130 add API (status/rating/progress/region),
+  #122 stats on item data, #117 recommendations API (recs + trending fallback, dismissals).
+- **Phase C, new look and shell:** #123 + #131 design spec and tokens, #133 dock, #132 FAB + add sheet, #130
+  placement sheet, #127 compact cards, #128 mobile app feel.
+- **Phase D, screens:** #116 Home, #118 + #126 Library, #119 media page, #136 franchise hub, #122 You, #134
+  Settings, #117 Discover.
 
 ### Found by the status check (2026-10-01)
 
