@@ -299,3 +299,19 @@ export async function externalIdCollisions() {
     }
     return [...claims.values()].filter((c) => c.items.length > 1);
 }
+
+/**
+ * Deleting a Work cascades to its FranchiseLinks, and FranchiseLink.prerequisiteId is
+ * SetNull, so curated dependents are unlocked rather than blocked. That is
+ * deliberate (a single user removing a title should not be refused), so it is
+ * logged instead: otherwise a dependent suddenly showing as next-up is a mystery.
+ */
+export async function warnOnUnlockedDependents(workId: string) {
+    const dependents = await prisma.franchiseLink.findMany({
+        where: { prerequisite: { workId }, workId: { not: workId } },
+        select: { work: { select: { title: true } }, prerequisite: { select: { work: { select: { title: true } } } } },
+    });
+    for (const d of dependents) {
+        console.warn(`Removing "${d.prerequisite?.work.title}" drops its curated prerequisite link; "${d.work.title}" is no longer gated on it.`);
+    }
+}

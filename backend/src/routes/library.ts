@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { enqueueEnrichment } from "../services/jobs.js";
-import { ensureSeason, syncWorkSafe } from "../services/works.js";
+import { ensureSeason, syncWorkSafe, warnOnUnlockedDependents } from "../services/works.js";
 import { isFinished, progressTotal } from "../lib/progress.js";
 import { setItemTags } from "./tags.js";
 import { effectiveRegion, regionForItem } from "../lib/regions.js";
@@ -665,6 +665,7 @@ libraryRouter.post(
 libraryRouter.delete(
     "/:id",
     asyncHandler(async (req, res) => {
+        await warnOnUnlockedDependents(req.params.id).catch(() => undefined);
         await prisma.$transaction([
             prisma.mediaItem.delete({ where: { id: req.params.id } }),
             prisma.work.deleteMany({ where: { id: req.params.id } }),

@@ -21,6 +21,7 @@ after(async () => {
     rmSync(dir, { recursive: true, force: true });
 });
 
+const statuses = (m: Record<string, string> = {}) => async (ids: string[]) => new Map(ids.filter((i) => m[i]).map((i) => [i, m[i]]));
 const resolve = async (ref: string) => (ref.startsWith("missing") ? null : { id: `w-${ref}`, title: ref });
 const spec = (entries: Spec["entries"]): Spec => ({ name: "T", franchise: "f1", entries });
 const e = (work: string, o: Partial<Spec["entries"][number]> = {}): Spec["entries"][number] => ({
@@ -124,4 +125,66 @@ test("applySpec writes curated links with prerequisites", async () => {
     const a1 = links.find((l) => l.workId === "a1")!;
     const a2 = links.find((l) => l.workId === "a2")!;
     assert.deepEqual([a1.curated, a2.curated, a2.prerequisiteId], [true, true, a1.id]);
+});
+
+test("applySpec removes curated links that are no longer in the spec", async () => {
+    await item("r1");
+    await item("r2");
+    await prisma.$transaction(async (tx) => { await syncWork(tx, "r1"); await syncWork(tx, "r2"); });
+    await prisma.franchise.create({ data: { id: "f3", title: "Three" } });
+    const three = (entries: Spec["entries"]): Spec => ({ name: "T", franchise: "f3", entries });
+    await applySpec(three([e("anilist:r1"), e("anilist:r2", { prerequisite: "anilist:r1" })]));
+    assert.equal(await prisma.franchiseLink.count({ where: { curated: true, franchiseId: "f3" } }), 2);
+
+    await applySpec(three([e("anilist:r1")]));
+    const remaining = await prisma.franchiseLink.findMany({ where: { curated: true, franchiseId: "f3" } });
+    assert.deepEqual(remaining.map((l) => l.workId), ["r1"]);
+    assert.ok(await prisma.work.findUnique({ where: { id: "r2" } }));
+});
+
+test("applySpec leaves uncurated links and other franchises alone", async () => {
+    await item("o1", { franchiseId: "f2", franchiseRole: "MAIN", franchiseOrder: 1 });
+    await item("o2");
+    await prisma.$transaction(async (tx) => { await syncWork(tx, "o1"); await syncWork(tx, "o2"); });
+    await prisma.franchise.create({ data: { id: "f4", title: "Four" } });
+    await applySpec({ name: "T", franchise: "f4", entries: [e("anilist:o2")] });
+    assert.equal(await prisma.franchiseLink.count({ where: { workId: "o1", franchiseId: "f2", curated: false } }), 1);
+});
+
+test("a completed prerequisite is reported as redundant, not as blocking", async () => {
+    const { warnings } = await validateSpec(
+        spec([e("s2", { prerequisite: "ova" }), e("ova", { relation: "ova", isEssential: false })]),
+        resolve,
+        statuses({ "w-ova": "completed" })
+    );
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /already completed/);
+    assert.doesNotMatch(warnings[0], /will not be next-up/);
+});
+
+test("a dropped prerequisite warns that the dependent stays blocked", async () => {
+    const { warnings } = await validateSpec(spec([e("s2", { prerequisite: "s1" }), e("s1")]), resolve, statuses({ "w-s1": "dropped" }));
+    assert.match(warnings.join(), /dropped.*stays blocked/);
+});
+
+test("shared narrativeOrder is flagged", async () => {
+    const { problems, warnings } = await validateSpec(spec([e("a", { narrativeOrder: 2 }), e("b", { narrativeOrder: 2 })]), resolve);
+    assert.deepEqual(problems, []);
+    assert.match(warnings.join(), /narrativeOrder 2 is shared/);
+});
+
+test("removing a work warns about the curated dependents it unlocks", async () => {
+    const { warnOnUnlockedDependents } = await import("./works.js");
+    await item("d1");
+    await item("d2");
+    await prisma.$transaction(async (tx) => { await syncWork(tx, "d1"); await syncWork(tx, "d2"); });
+    await prisma.franchise.create({ data: { id: "f5", title: "Five" } });
+    await applySpec({ name: "T", franchise: "f5", entries: [e("anilist:d1"), e("anilist:d2", { prerequisite: "anilist:d1" })] });
+    const logged: string[] = [];
+    const original = console.warn;
+    console.warn = (m: string) => { logged.push(m); };
+    try { await warnOnUnlockedDependents("d1"); } finally { console.warn = original; }
+    assert.equal(logged.length, 1);
+    assert.match(logged[0], /"d2" is no longer gated/);
+    await warnOnUnlockedDependents("d2"); // nothing depends on d2
 });
