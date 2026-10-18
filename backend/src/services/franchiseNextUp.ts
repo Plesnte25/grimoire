@@ -8,6 +8,7 @@ export type NextUpLink = {
     narrativeOrder: number | null;
     order: number | null;
     prerequisiteId: string | null;
+    curated: boolean; // only curated links form the watch order; derived ones are "also in this franchise"
     status: string | null; // LibraryEntry status, null if the work isn't in the library
 };
 
@@ -35,7 +36,7 @@ export function pickNextUp(links: NextUpLink[]): NextUp | null {
         // Non-essential entries are skipped even when in_progress: this answers
         // "what to watch next in the franchise", not "what am I watching right now"
         // (in-progress side content belongs on the home continue-watching surface).
-        if (!link.isEssential || done(link)) continue;
+        if (!link.curated || !link.isEssential || done(link)) continue;
         if (link.prerequisiteId && !done(byId.get(link.prerequisiteId))) continue;
         return { link, reason: link.status === "in_progress" ? "continue" : "start" };
     }
@@ -55,6 +56,7 @@ export async function computeNextUp(franchiseId: string, accountId = DEFAULT_ACC
             narrativeOrder: r.narrativeOrder,
             order: r.order,
             prerequisiteId: r.prerequisiteId,
+            curated: r.curated,
             status: r.work.libraryEntries[0]?.status ?? null,
         }))
     );

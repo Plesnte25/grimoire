@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { pickNextUp, type NextUpLink } from "./franchiseNextUp.js";
 
 const link = (id: string, o: Partial<NextUpLink> = {}): NextUpLink => ({
-    id, workId: `w-${id}`, isEssential: true, narrativeOrder: null, order: null, prerequisiteId: null, status: null, ...o,
+    id, workId: `w-${id}`, isEssential: true, narrativeOrder: null, order: null, prerequisiteId: null, curated: true, status: null, ...o,
 });
 
 test("empty franchise has nothing next", () => assert.equal(pickNextUp([]), null));
@@ -52,4 +52,13 @@ test("falls back to legacy order, curated entries first", () => {
 
 test("everything done means nothing next", () => {
     assert.equal(pickNextUp([link("a", { status: "completed" }), link("b", { status: "completed" })]), null);
+});
+
+test("uncurated links are never picked as next-up", () => {
+    const next = pickNextUp([
+        link("derived", { narrativeOrder: 1, curated: false }),
+        link("curated", { narrativeOrder: 2, curated: true }),
+    ]);
+    assert.equal(next?.link.id, "curated");
+    assert.equal(pickNextUp([link("d", { curated: false })]), null);
 });
