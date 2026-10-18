@@ -14,7 +14,7 @@ export const prisma = new PrismaClient({
 
 // WAL lets reads proceed during writes. It is stored in the database file, so
 // setting it once at startup is enough.
-prisma
+export const dbReady = prisma
     .$queryRawUnsafe("PRAGMA journal_mode=WAL")
     .then(() => prisma.$queryRawUnsafe("PRAGMA synchronous=NORMAL"))
     .catch((err) => console.error("Could not enable SQLite WAL mode:", err));

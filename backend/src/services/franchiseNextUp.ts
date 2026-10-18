@@ -32,6 +32,9 @@ export function pickNextUp(links: NextUpLink[]): NextUp | null {
         return an - bn || ao - bo || a.id.localeCompare(b.id);
     });
     for (const link of ordered) {
+        // Non-essential entries are skipped even when in_progress: this answers
+        // "what to watch next in the franchise", not "what am I watching right now"
+        // (in-progress side content belongs on the home continue-watching surface).
         if (!link.isEssential || done(link)) continue;
         if (link.prerequisiteId && !done(byId.get(link.prerequisiteId))) continue;
         return { link, reason: link.status === "in_progress" ? "continue" : "start" };

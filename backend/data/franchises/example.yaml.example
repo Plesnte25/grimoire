@@ -1,6 +1,9 @@
 # Copy to <name>.yaml to have it loaded by `node dist/scripts/curateFranchise.js`.
 # `franchise` is the Franchise id (AniList id of the root series). A work is its
-# id or "<provider>:<providerId>"; a prerequisite must be another entry below.
+# id or "<source>:<externalId>" for any ExternalId: anilist:16498, mal:16498,
+# imdb:tt0944947, and TMDB ids are namespaced: tmdb:tv:1429 / tmdb:movie:1429.
+# A prerequisite must be another entry below and always blocks its dependent,
+# even when the prerequisite itself is isEssential: false (the loader warns).
 name: Example Franchise
 franchise: "16498"
 entries:
