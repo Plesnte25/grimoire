@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { enrichItem, enrichWithinBudget } from "../services/enrich.js";
+import { enqueueEnrichment } from "../services/jobs.js";
 import { isFinished, progressTotal } from "../lib/progress.js";
 import { setItemTags } from "./tags.js";
 import { effectiveRegion, regionForItem } from "../lib/regions.js";
@@ -271,11 +271,9 @@ libraryRouter.get(
         let item = await prisma.mediaItem.findUnique({ where: { id: req.params.id }, include });
         if (!item) return res.status(404).json({ error: "Not found" });
 
-        // Items added before Phase 1 (or whose enrichment failed) get it here. A short
-        // budget: opening a page shouldn't wait on a slow or rate-limited provider.
+        // Reads are DB-only; items still missing metadata are queued for the worker.
         if (!item.metaCheckedAt && item.provider !== "manual") {
-            await enrichWithinBudget(item.id, 2500);
-            item = (await prisma.mediaItem.findUnique({ where: { id: item.id }, include })) ?? item;
+            void enqueueEnrichment(item.id).catch((err) => console.error(`Could not queue enrichment for ${item.id}:`, err));
         }
 
         const out = withParsedGenres(item);
@@ -439,13 +437,9 @@ libraryRouter.post(
         });
 
         if (!item.metaCheckedAt && item.provider !== "manual") {
-            // The client (SearchModal/add sheet) already supplied the title's
-            // core details from providerDetails, so the response doesn't need
-            // to wait on the fuller background enrichment (credits, franchise
-            // grouping) — especially since that can walk a chain of serialized,
-            // rate-limited AniList requests for anime. Let it finish on its own;
-            // the next read of this item picks it up (see GET /:id above).
-            enrichItem(item.id).catch((err) => console.error(`Background enrichment failed for ${item.id}:`, err));
+            // The client already supplied the core details, so the response doesn't
+            // wait on fuller enrichment; the job worker fills in the rest.
+            await enqueueEnrichment(item.id);
         }
         const fresh = await prisma.mediaItem.findUnique({
             where: { id: item.id },

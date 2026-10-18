@@ -24,7 +24,9 @@ import { backupRouter } from "./routes/backup.js";
 import { statsRouter } from "./routes/stats.js";
 import { publicListsRouter } from "./routes/publicLists.js";
 import { requireSession } from "./middleware/requireSession.js";
-import { scheduleDailyMetadataRefresh } from "./services/dailyRefresh.js";
+import { prisma } from "./db.js";
+import { startJobWorker } from "./services/jobs.js";
+import { providerHealthSnapshot } from "./services/providerHealth.js";
 
 const app = express();
 
@@ -60,7 +62,17 @@ app.use(cookieParser());
 app.use("/api/backup", requireSession, express.json({ limit: "20mb" }), backupRouter);
 app.use(express.json({ limit: "2mb" }));
 
-app.get("/health", (_req: Request, res: Response) => res.json({ ok: true }));
+app.get("/health", async (_req: Request, res: Response) => {
+    try {
+        await prisma.$queryRaw`SELECT 1`;
+        res.json({ ok: true });
+    } catch (err) {
+        console.error("Health check: database unavailable:", err);
+        res.status(503).json({ ok: false, error: "database unavailable" });
+    }
+});
+
+app.get("/health/providers", requireSession, (_req: Request, res: Response) => res.json(providerHealthSnapshot()));
 
 app.use("/api/auth", authRouter);
 app.use("/api/public", publicListsRouter);
@@ -112,4 +124,4 @@ process.on("uncaughtException", (err) => {
 const port = Number(process.env.PORT || 5050);
 const host = process.env.HOST || "127.0.0.1";
 app.listen(port, host, () => console.log(`Backend running on http://${host}:${port}`));
-scheduleDailyMetadataRefresh();
+startJobWorker();

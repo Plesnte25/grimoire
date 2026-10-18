@@ -1,4 +1,5 @@
 import axios, { AxiosError, AxiosInstance } from "axios";
+import { trackProvider } from "../providerHealth.js";
 
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const TMDB_IMAGE = "https://image.tmdb.org/t/p";
@@ -54,7 +55,9 @@ const http = createClient();
 /** Raw TMDB GET with the shared retry policy (used by the enrichment service). */
 export async function tmdbGet<T = any>(path: string, params: Record<string, any> = {}): Promise<T | null> {
     if (!API_KEY) return null;
-    const res = await requestWithRetry(() => http.get(path, { params: { api_key: API_KEY, ...params } }));
+    const res = await trackProvider("tmdb", () =>
+        requestWithRetry(() => http.get(path, { params: { api_key: API_KEY, ...params } }))
+    );
     return res.data as T;
 }
 

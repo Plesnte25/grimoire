@@ -808,15 +808,3 @@ async function runEnrichment(id: string): Promise<{ ok: boolean; error?: string 
         return { ok: false, error: err?.message ?? String(err) };
     }
 }
-
-/**
- * Enriches in the background but waits up to `budgetMs` for it, so a quick
- * provider makes the response complete while a slow one doesn't block it.
- */
-export async function enrichWithinBudget(id: string, budgetMs = 8000) {
-    const job = enrichItem(id).then((r) => {
-        if (!r.ok) console.error(`Enrichment failed for ${id}:`, r.error);
-        return r;
-    });
-    await Promise.race([job, new Promise((r) => setTimeout(r, budgetMs))]);
-}

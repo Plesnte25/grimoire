@@ -324,3 +324,17 @@ model OtpCode {
   attempts        Int       @default(0)
   createdAt       DateTime  @default(now())
 }
+
+model Job {
+  id        String   @id @default(cuid())
+  type      String
+  payload   String   @default("{}") // JSON
+  status    String   @default("pending") // pending | running | parked
+  runAfter  DateTime @default(now())
+  claimedAt DateTime?
+  attempts  Int      @default(0)
+  lastError String?
+  createdAt DateTime @default(now())
+
+  @@index([status, runAfter])
+}

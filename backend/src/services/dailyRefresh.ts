@@ -43,20 +43,3 @@ export async function refreshDueMetadata() {
     console.info(`Scheduled metadata refresh finished: ${due.length - failed}/${due.length} titles updated`);
     return { attempted: due.length, failed };
 }
-
-function nextScheduledAt(now: Date) {
-    const next = new Date(now);
-    next.setHours(4, 0, 0, 0);
-    if (next <= now) next.setDate(next.getDate() + 1);
-    return next;
-}
-
-export function scheduleDailyMetadataRefresh() {
-    const delay = Math.max(1000, nextScheduledAt(new Date()).getTime() - Date.now());
-    const timer = setTimeout(() => {
-        void refreshDueMetadata()
-            .catch((error) => console.error("Daily metadata refresh failed:", error))
-            .finally(scheduleDailyMetadataRefresh);
-    }, delay);
-    timer.unref();
-}

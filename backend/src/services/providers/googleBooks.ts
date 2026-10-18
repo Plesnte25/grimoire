@@ -1,3 +1,4 @@
+import { trackProvider } from "../providerHealth.js";
 import axios from "axios";
 
 const API_KEY = process.env.GOOGLE_BOOKS_API_KEY;
@@ -29,7 +30,11 @@ function sleep(ms: number) {
  * GET against the Books API. Without GOOGLE_BOOKS_API_KEY requests share
  * Google's anonymous quota, which often answers 429, so back off and retry.
  */
-export async function googleBooksGet<T = any>(path: string, params: Record<string, any> = {}): Promise<T> {
+export function googleBooksGet<T = any>(path: string, params: Record<string, any> = {}): Promise<T> {
+    return trackProvider("googlebooks", () => googleBooksFetch<T>(path, params));
+}
+
+async function googleBooksFetch<T>(path: string, params: Record<string, any>): Promise<T> {
     let wait = 2000;
     for (let attempt = 0; ; attempt++) {
         try {

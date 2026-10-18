@@ -1,3 +1,4 @@
+import { trackProvider } from "../providerHealth.js";
 import axios from "axios";
 
 const ENDPOINT = "https://graphql.anilist.co";
@@ -30,7 +31,11 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export async function postAniList<T>(payload: any, cacheKey?: string, ttlMs = 10 * 60 * 1000): Promise<T> {
+export function postAniList<T>(payload: any, cacheKey?: string, ttlMs = 10 * 60 * 1000): Promise<T> {
+  return trackProvider("anilist", () => postAniListRaw<T>(payload, cacheKey, ttlMs));
+}
+
+async function postAniListRaw<T>(payload: any, cacheKey: string | undefined, ttlMs: number): Promise<T> {
   // Fast path: cache hit
   if (cacheKey) {
     const cached = cacheGet<T>(cacheKey);
