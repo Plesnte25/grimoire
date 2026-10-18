@@ -139,14 +139,14 @@ export async function syncWork(db: Db, mediaId: string, opts: SyncOptions = {}) 
 
     if (item.franchiseId) {
         const link = { relation: item.franchiseRole?.toLowerCase() ?? "unknown", order: item.franchiseOrder };
-        await db.franchiseLink.upsert({
-            where: { workId_franchiseId: { workId: item.id, franchiseId: item.franchiseId } },
-            create: { workId: item.id, franchiseId: item.franchiseId, ...link },
-            update: link,
-        });
+        const key = { workId_franchiseId: { workId: item.id, franchiseId: item.franchiseId } };
+        const existing = await db.franchiseLink.findUnique({ where: key });
+        if (!existing) await db.franchiseLink.create({ data: { workId: item.id, franchiseId: item.franchiseId, ...link } });
+        else if (!existing.curated) await db.franchiseLink.update({ where: key, data: link });
     }
+    // Curated links are kept even if MediaItem points elsewhere.
     await db.franchiseLink.deleteMany({
-        where: { workId: item.id, ...(item.franchiseId ? { franchiseId: { not: item.franchiseId } } : {}) },
+        where: { workId: item.id, curated: false, ...(item.franchiseId ? { franchiseId: { not: item.franchiseId } } : {}) },
     });
 }
 

@@ -1,0 +1,16 @@
+# Copy to <name>.yaml to have it loaded by `node dist/scripts/curateFranchise.js`.
+# `franchise` is the Franchise id (AniList id of the root series). A work is its
+# id or "<provider>:<providerId>"; a prerequisite must be another entry below.
+name: Example Franchise
+franchise: "16498"
+entries:
+  - work: anilist:16498
+    relation: main
+    narrativeOrder: 1
+  - work: anilist:25777
+    relation: sequel
+    narrativeOrder: 2
+    prerequisite: anilist:16498
+  - work: anilist:18397
+    relation: ova
+    isEssential: false

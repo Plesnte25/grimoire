@@ -463,15 +463,25 @@ model WatchEvent {
 }
 
 // Franchise membership belongs to the catalog work, not to your tracking state.
+// Rows are first derived from MediaItem by syncWork; a curated row (loaded by
+// scripts/curateFranchise.ts) is never rewritten or removed by that sync.
 model FranchiseLink {
-  id          String    @id @default(uuid())
-  workId      String
-  franchiseId String
-  relation    String // main | movie | ova | ona | special (sequel/prequel/spin-off need provider data)
-  order       Int?
-  work        Work      @relation(fields: [workId], references: [id], onDelete: Cascade)
-  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  id             String  @id @default(uuid())
+  workId         String
+  franchiseId    String
+  relation       String // main | movie | ova | ona | special | sequel | prequel | spin_off
+  order          Int? // legacy airing order from MediaItem.franchiseOrder
+  narrativeOrder Int? // curated watch order
+  isEssential    Boolean @default(true)
+  prerequisiteId String? // the link that must be completed first
+  curated        Boolean @default(false)
+
+  work         Work            @relation(fields: [workId], references: [id], onDelete: Cascade)
+  franchise    Franchise       @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+  prerequisite FranchiseLink?  @relation("Prereq", fields: [prerequisiteId], references: [id], onDelete: SetNull)
+  dependents   FranchiseLink[] @relation("Prereq")
 
   @@unique([workId, franchiseId])
-  @@index([franchiseId, order])
+  @@index([franchiseId, narrativeOrder])
+  @@index([prerequisiteId])
 }
