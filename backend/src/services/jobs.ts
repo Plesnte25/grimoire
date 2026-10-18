@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { enrichItem } from "./enrich.js";
 import { refreshDueMetadata } from "./dailyRefresh.js";
+import { reconcileWorks } from "./works.js";
 
 export type JobType = "enrich-item" | "daily-refresh";
 
@@ -68,6 +69,10 @@ async function runJob(job: { type: string; payload: string }) {
         }
         case "daily-refresh":
             await refreshDueMetadata();
+            // Safety net for the Phase 2 dual-write; must not fail the refresh itself.
+            await reconcileWorks()
+                .then((r) => r.failed.length && console.error(`Work reconcile: ${r.failed.length} items failed`))
+                .catch((err) => console.error("Work reconcile failed:", err));
             return;
     }
 }

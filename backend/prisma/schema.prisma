@@ -28,10 +28,10 @@ model MediaItem {
   globalRatingText String?
 
   // your tracking
-  status     String  @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, ON_HOLD, DROPPED
-  yourRating Float?
+  status       String    @default("PLANNED") // PLANNED, IN_PROGRESS, COMPLETED, ON_HOLD, DROPPED
+  yourRating   Float?
   yourRatingAt DateTime?
-  yourNotes  String?
+  yourNotes    String?
 
   // progress (generic + type-specific optional fields)
   progressText          String? // legacy free text, kept until typed progress replaces it in the UI
@@ -40,7 +40,7 @@ model MediaItem {
   progressEpisode       Int? // TV: episode within that season
   progressTotalOverride Int? // user-set total (e.g. a dub with a different episode split)
   completedSeasonCount  Int? // seasons that existed when you marked it COMPLETED (airing baseline)
-  rewatchCount          Int    @default(0) // times rewatched/reread after the first completion
+  rewatchCount          Int     @default(0) // times rewatched/reread after the first completion
 
   genres    String? // JSON string array
   createdAt DateTime @default(now())
@@ -49,18 +49,18 @@ model MediaItem {
   // Franchise/series grouping ("card stack") — best-effort, provider-sourced.
   // Movies: TMDB belongs_to_collection. Books/TV: left null, no reliable signal.
   // Anime uses franchiseId below instead.
-  collectionId     String?
-  collectionName   String?
-  collectionSource String? // "tmdb" | "anilist"
-  tmdbId           String? // cross-provider TMDB record for AniList anime
-  tmdbMediaType    String? // MOVIE | TV
+  collectionId      String?
+  collectionName    String?
+  collectionSource  String? // "tmdb" | "anilist"
+  tmdbId            String? // cross-provider TMDB record for AniList anime
+  tmdbMediaType     String? // MOVIE | TV
   anilistPopularity Int?
 
   // Anime franchise: the original series this entry belongs under.
-  franchiseId    String?
+  franchiseId       String?
   franchiseOverride Boolean @default(false)
-  franchiseRole  String? // MAIN | MOVIE | OVA | ONA | SPECIAL
-  franchiseOrder Int? // position within the franchise (airing order)
+  franchiseRole     String? // MAIN | MOVIE | OVA | ONA | SPECIAL
+  franchiseOrder    Int? // position within the franchise (airing order)
 
   // Origin + region (regional categories). region is derived from
   // countryOfOrigin; regionOverride is the user's "Move to…" choice.
@@ -105,12 +105,12 @@ model MediaItem {
   metaCheckedAt DateTime?
   airCheckedAt  DateTime?
 
-  franchise Franchise?  @relation(fields: [franchiseId], references: [id])
-  listItems ListItem[]
-  credits   Credit[]
-  tags      MediaTag[]
-  TierEntry TierEntry[]
-  episodeGuide Episode[]
+  franchise         Franchise?           @relation(fields: [franchiseId], references: [id])
+  listItems         ListItem[]
+  credits           Credit[]
+  tags              MediaTag[]
+  TierEntry         TierEntry[]
+  episodeGuide      Episode[]
   episodeGuideCache EpisodeSeasonCache[]
 
   @@unique([provider, providerId])
@@ -133,10 +133,11 @@ model Franchise {
   updatedAt       DateTime @updatedAt
 
   items MediaItem[]
+  links FranchiseLink[]
 }
 
 model Episode {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   mediaId       String
   seasonNumber  Int
   episodeNumber Int
@@ -145,12 +146,20 @@ model Episode {
   airDate       DateTime?
   runtime       Int?
   stillUrl      String?
-  updatedAt     DateTime @updatedAt
+  updatedAt     DateTime  @updatedAt
 
-  media MediaItem @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  // Phase 2 (expand): mirrors mediaId; Work.id is the MediaItem id it was created from.
+  workId   String?
+  seasonId String?
+
+  media    MediaItem         @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  work     Work?             @relation(fields: [workId], references: [id], onDelete: Cascade)
+  season   Season?           @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  progress EpisodeProgress[]
 
   @@unique([mediaId, seasonNumber, episodeNumber])
   @@index([mediaId, seasonNumber, episodeNumber])
+  @@index([workId])
 }
 
 model EpisodeSeasonCache {
@@ -180,11 +189,16 @@ model Credit {
   character     String?
   order         Int     @default(0)
 
+  // Phase 2 (expand): mirrors mediaId.
+  workId String?
+
   media       MediaItem   @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  work        Work?       @relation(fields: [workId], references: [id], onDelete: Cascade)
   contributor Contributor @relation(fields: [contributorId], references: [id], onDelete: Cascade)
 
   @@unique([mediaId, contributorId, role])
   @@index([contributorId])
+  @@index([workId])
 }
 
 // Personal tags ("comfort watch") and moods.
@@ -218,7 +232,7 @@ model CustomList {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  items ListItem[]
+  items  ListItem[]
   shares CustomListShare[]
 
   @@index([kind, mediaType])
@@ -271,11 +285,11 @@ model TierEntry {
 }
 
 model SuggestionDismissal {
-  id        String   @id @default(cuid())
-  provider  String
+  id         String   @id @default(cuid())
+  provider   String
   providerId String
-  mediaType String?
-  createdAt DateTime @default(now())
+  mediaType  String?
+  createdAt  DateTime @default(now())
 
   @@unique([provider, providerId])
   @@index([mediaType])
@@ -284,18 +298,18 @@ model SuggestionDismissal {
 // --- Auth (single-account: PIN unlock on trusted devices, email OTP to trust a new device) ---
 
 model AccountConfig {
-  id                Int       @id @default(1)
-  email             String
-  pinSaltHex        String
-  pinHashHex        String
-  failedPinAttempts Int       @default(0)
-  lockedUntil       DateTime?
-  showAdultContent  Boolean   @default(false)
-  spoilerShield     Boolean   @default(false)
-  watchCountry      String?
-  defaultMediaStatus String   @default("PLANNED")
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                 Int       @id @default(1)
+  email              String
+  pinSaltHex         String
+  pinHashHex         String
+  failedPinAttempts  Int       @default(0)
+  lockedUntil        DateTime?
+  showAdultContent   Boolean   @default(false)
+  spoilerShield      Boolean   @default(false)
+  watchCountry       String?
+  defaultMediaStatus String    @default("PLANNED")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model TrustedDevice {
@@ -326,15 +340,123 @@ model OtpCode {
 }
 
 model Job {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   type      String
-  payload   String   @default("{}") // JSON
-  status    String   @default("pending") // pending | running | parked
-  runAfter  DateTime @default(now())
+  payload   String    @default("{}") // JSON
+  status    String    @default("pending") // pending | running | parked
+  runAfter  DateTime  @default(now())
   claimedAt DateTime?
-  attempts  Int      @default(0)
+  attempts  Int       @default(0)
   lastError String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([status, runAfter])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 (expand): catalog / tracking split. MediaItem stays the source of
+// truth and is dual-written into these tables (see services/works.ts). A Work
+// reuses the id of the MediaItem it mirrors, so every legacy mediaId is also a
+// valid workId.
+// ---------------------------------------------------------------------------
+
+model Work {
+  id            String   @id @default(uuid())
+  type          String // movie | tv | anime | book
+  title         String
+  originalTitle String?
+  year          Int?
+  country       String? // ISO 3166-1 alpha-2
+  language      String? // ISO 639-1
+  overview      String?
+  posterUrl     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  externalIds    ExternalId[]
+  seasons        Season[]
+  episodes       Episode[]
+  credits        Credit[]
+  libraryEntry   LibraryEntry?
+  franchiseLinks FranchiseLink[]
+
+  @@index([type])
+}
+
+model ExternalId {
+  id         String  @id @default(uuid())
+  workId     String
+  source     String // tmdb | anilist | googlebooks | imdb | mal | manual
+  externalId String // tmdb ids are "movie:<id>" / "tv:<id>": TMDB numbers its movies and series separately
+  confidence Float   @default(1.0)
+  isPrimary  Boolean @default(false)
+  work       Work    @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@unique([source, externalId])
+  @@index([workId])
+}
+
+model Season {
+  id       String    @id @default(uuid())
+  workId   String
+  number   Int
+  work     Work      @relation(fields: [workId], references: [id], onDelete: Cascade)
+  episodes Episode[]
+
+  @@unique([workId, number])
+}
+
+// Your tracking state for a Work. One entry per Work; rewatches are a counter.
+model LibraryEntry {
+  id           String    @id @default(uuid())
+  workId       String    @unique
+  status       String // planned | in_progress | completed | on_hold | dropped
+  score        Float?
+  notes        String?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  rewatchCount Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  work            Work              @relation(fields: [workId], references: [id], onDelete: Cascade)
+  episodeProgress EpisodeProgress[]
+  watchEvents     WatchEvent[]
+
+  @@index([status])
+}
+
+model EpisodeProgress {
+  id             String       @id @default(uuid())
+  libraryEntryId String
+  episodeId      String
+  watchedAt      DateTime     @default(now())
+  libraryEntry   LibraryEntry @relation(fields: [libraryEntryId], references: [id], onDelete: Cascade)
+  episode        Episode      @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([libraryEntryId, episodeId])
+}
+
+model WatchEvent {
+  id             String       @id @default(uuid())
+  libraryEntryId String
+  type           String // started | completed | dropped | rewatched
+  occurredAt     DateTime     @default(now())
+  libraryEntry   LibraryEntry @relation(fields: [libraryEntryId], references: [id], onDelete: Cascade)
+
+  @@index([libraryEntryId, occurredAt])
+}
+
+// Franchise membership belongs to the catalog work, not to your tracking state.
+model FranchiseLink {
+  id          String    @id @default(uuid())
+  workId      String
+  franchiseId String
+  relation    String // main | movie | ova | ona | special (sequel/prequel/spin-off need provider data)
+  order       Int?
+  work        Work      @relation(fields: [workId], references: [id], onDelete: Cascade)
+  franchise   Franchise @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
+
+  @@unique([workId, franchiseId])
+  @@index([franchiseId, order])
 }

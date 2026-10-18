@@ -5,6 +5,7 @@ import { tmdbGet, TMDB_IMAGE_BASE } from "./providers/tmdb.js";
 import { postAniList } from "./providers/anilist.js";
 import { bestGoogleBookCover, googleBooksGet } from "./providers/googleBooks.js";
 import { regionForItem } from "../lib/regions.js";
+import { syncWorkSafe } from "./works.js";
 
 // Provider metadata is fetched once per item (on add, or by the backfill
 // script) and stored. Library reads never call providers. metaCheckedAt is set
@@ -733,6 +734,7 @@ export async function saveEnrichment(item: MediaItem, e: Enrichment | null) {
     const now = new Date();
     if (!e) {
         await prisma.mediaItem.update({ where: { id: item.id }, data: { metaCheckedAt: now } });
+        await syncWorkSafe(item.id);
         return;
     }
 
@@ -740,6 +742,9 @@ export async function saveEnrichment(item: MediaItem, e: Enrichment | null) {
         (e.data.countryOfOrigin as string | null | undefined) !== undefined
             ? (e.data.countryOfOrigin as string | null)
             : item.countryOfOrigin;
+
+    // Credits mirror their work id; the Work has to exist before they reference it.
+    const workOk = await syncWorkSafe(item.id);
 
     const ops: Prisma.PrismaPromise<unknown>[] = [];
     if (e.franchise) {
@@ -774,6 +779,7 @@ export async function saveEnrichment(item: MediaItem, e: Enrichment | null) {
             prisma.credit.createMany({
                 data: [...unique.values()].map((c) => ({
                     mediaId: item.id,
+                    workId: workOk ? item.id : null,
                     contributorId: c.contributorId,
                     role: c.role,
                     character: c.character ?? null,
@@ -784,6 +790,7 @@ export async function saveEnrichment(item: MediaItem, e: Enrichment | null) {
     }
 
     await prisma.$transaction(ops);
+    await syncWorkSafe(item.id);
 }
 
 const inFlight = new Map<string, Promise<{ ok: boolean; error?: string }>>();

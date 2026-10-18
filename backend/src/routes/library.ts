@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { parseOrThrow } from "../utils/validate.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { enqueueEnrichment } from "../services/jobs.js";
+import { ensureSeason, syncWorkSafe } from "../services/works.js";
 import { isFinished, progressTotal } from "../lib/progress.js";
 import { setItemTags } from "./tags.js";
 import { effectiveRegion, regionForItem } from "../lib/regions.js";
@@ -241,9 +242,13 @@ libraryRouter.get(
                     ? `https://image.tmdb.org/t/p/w300${episode.still_path}`
                     : null,
             }));
+        const workOk = await syncWorkSafe(item.id);
         await prisma.$transaction(async (tx) => {
+            const seasonId = workOk ? await ensureSeason(tx, item.id, season) : null;
             await tx.episode.deleteMany({ where: { mediaId: item.id, seasonNumber: season } });
-            await tx.episode.createMany({ data: rows });
+            await tx.episode.createMany({
+                data: rows.map((row) => ({ ...row, workId: workOk ? item.id : null, seasonId })),
+            });
             await tx.episodeSeasonCache.upsert({
                 where: { mediaId_seasonNumber: { mediaId: item.id, seasonNumber: season } },
                 create: { mediaId: item.id, seasonNumber: season },
@@ -436,6 +441,8 @@ libraryRouter.post(
             },
         });
 
+        await syncWorkSafe(item.id);
+
         if (!item.metaCheckedAt && item.provider !== "manual") {
             // The client already supplied the core details, so the response doesn't
             // wait on fuller enrichment; the job worker fills in the rest.
@@ -544,6 +551,7 @@ libraryRouter.patch(
             }
         }
         const item = await prisma.mediaItem.update({ where: { id: current.id }, data: updateData });
+        await syncWorkSafe(item.id);
         res.json({ item: withParsedGenres(item) });
     })
 );
@@ -571,6 +579,7 @@ libraryRouter.post(
             where: { id: current.id },
             data: { rewatchCount: next },
         });
+        await syncWorkSafe(item.id);
         res.json({ item: withParsedGenres(item) });
     })
 );
@@ -598,6 +607,7 @@ libraryRouter.post(
             where: { id: item.id },
             data: { franchiseId, franchiseOverride: true },
         });
+        await syncWorkSafe(updated.id);
         res.json({ item: updated });
     })
 );
@@ -647,6 +657,7 @@ libraryRouter.post(
                 imdbId: details.external_ids?.imdb_id ?? item.imdbId,
             },
         });
+        await syncWorkSafe(linked.id);
         res.json({ item: linked });
     })
 );
@@ -654,7 +665,10 @@ libraryRouter.post(
 libraryRouter.delete(
     "/:id",
     asyncHandler(async (req, res) => {
-        await prisma.mediaItem.delete({ where: { id: req.params.id } });
+        await prisma.$transaction([
+            prisma.mediaItem.delete({ where: { id: req.params.id } }),
+            prisma.work.deleteMany({ where: { id: req.params.id } }),
+        ]);
         res.json({ ok: true });
     })
 );

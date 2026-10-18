@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { parseOrThrow } from "../utils/validate.js";
+import { syncWorkSafe } from "../services/works.js";
 
 export const backupRouter = Router();
 
@@ -210,6 +211,10 @@ backupRouter.post("/import", asyncHandler(async (req, res) => {
         }
 
     });
+
+    // Committed separately from the import: the legacy rows are authoritative and
+    // a failed sync is healed by the next reconcile.
+    for (const id of new Set(idMap.values())) await syncWorkSafe(id);
 
     res.json({ ok: true, importedItems: idMap.size });
 }));
