@@ -38,8 +38,23 @@ export function externalIdsFor(item: MediaItem): IdCandidate[] {
     return [...out.values()];
 }
 
+function eventForStatus(status: string) {
+    if (status === "completed") return "completed";
+    if (status === "dropped") return "dropped";
+    if (status === "in_progress") return "started";
+    return "status_changed";
+}
+
 /** Brings the Work side of one MediaItem in line with it (deleting the Work if the item is gone). */
-export async function syncWork(db: Db, mediaId: string) {
+export const DEFAULT_ACCOUNT = "singleton";
+
+type SyncOptions = {
+    // Live writes record WatchEvents and start/finish dates for real transitions;
+    // backfill and reconcile only align state, so they never invent history.
+    recordEvents?: boolean;
+};
+
+export async function syncWork(db: Db, mediaId: string, opts: SyncOptions = {}) {
     const item = await db.mediaItem.findUnique({ where: { id: mediaId } });
     if (!item) {
         await db.work.deleteMany({ where: { id: mediaId } });
@@ -72,6 +87,10 @@ export async function syncWork(db: Db, mediaId: string) {
             await db.externalId.update({ where: key, data: { confidence: c.confidence, isPrimary: c.isPrimary } });
         } else if (c.isPrimary) {
             // The provider id the item was added under beats another work's cross-link.
+            // Surfaced because it can also mean the same title was added twice.
+            console.warn(
+                `ExternalId collision: ${c.source}:${c.externalId} belonged to work ${existing.workId}, now claimed by ${item.id} (possible duplicate)`
+            );
             await db.externalId.update({ where: key, data: { workId: item.id, confidence: c.confidence, isPrimary: true } });
         }
     }
@@ -86,14 +105,37 @@ export async function syncWork(db: Db, mediaId: string) {
     const tracking = {
         status: item.status.toLowerCase(),
         score: item.yourRating,
+        ratedAt: item.yourRatingAt,
         notes: item.yourNotes,
         rewatchCount: item.rewatchCount,
+        legacyProgressValue: item.progressValue,
+        legacyProgressSeason: item.progressSeason,
+        legacyProgressEpisode: item.progressEpisode,
+        legacyProgressTotal: item.progressTotalOverride,
+        legacyProgressText: item.progressText,
+        legacyCompletedSeasons: item.completedSeasonCount,
     };
-    await db.libraryEntry.upsert({
-        where: { workId: item.id },
-        create: { workId: item.id, createdAt: item.createdAt, ...tracking },
-        update: tracking,
-    });
+    const accountKey = { accountId_workId: { accountId: DEFAULT_ACCOUNT, workId: item.id } };
+    const entry = await db.libraryEntry.findUnique({ where: accountKey });
+    if (!entry) {
+        await db.libraryEntry.create({
+            data: { accountId: DEFAULT_ACCOUNT, workId: item.id, createdAt: item.createdAt, ...tracking },
+        });
+    } else {
+        const now = new Date();
+        const dates: { startedAt?: Date; finishedAt?: Date } = {};
+        const events: { type: string }[] = [];
+        if (opts.recordEvents) {
+            if (tracking.status !== entry.status) {
+                events.push({ type: eventForStatus(tracking.status) });
+                if (tracking.status === "in_progress" && !entry.startedAt) dates.startedAt = now;
+                if (tracking.status === "completed" && !entry.finishedAt) dates.finishedAt = now;
+            }
+            if (tracking.rewatchCount > entry.rewatchCount) events.push({ type: "rewatched" });
+        }
+        await db.libraryEntry.update({ where: { id: entry.id }, data: { ...tracking, ...dates } });
+        for (const e of events) await db.watchEvent.create({ data: { libraryEntryId: entry.id, type: e.type, occurredAt: now } });
+    }
 
     if (item.franchiseId) {
         const link = { relation: item.franchiseRole?.toLowerCase() ?? "unknown", order: item.franchiseOrder };
@@ -115,7 +157,7 @@ export async function syncWork(db: Db, mediaId: string) {
  */
 export async function syncWorkSafe(mediaId: string): Promise<boolean> {
     try {
-        await prisma.$transaction((tx) => syncWork(tx, mediaId));
+        await prisma.$transaction((tx) => syncWork(tx, mediaId, { recordEvents: true }));
         return true;
     } catch (err) {
         console.error(`Work sync failed for ${mediaId}:`, err);
@@ -215,7 +257,13 @@ export async function workDrift() {
             WHERE le."status" != lower(m."status")
                OR COALESCE(le."score", -1) != COALESCE(m."yourRating", -1)
                OR COALESCE(le."notes", '') != COALESCE(m."yourNotes", '')
-               OR le."rewatchCount" != m."rewatchCount"`),
+               OR le."rewatchCount" != m."rewatchCount"
+               OR COALESCE(le."legacyProgressValue", -1) != COALESCE(m."progressValue", -1)
+               OR COALESCE(le."legacyProgressSeason", -1) != COALESCE(m."progressSeason", -1)
+               OR COALESCE(le."legacyProgressEpisode", -1) != COALESCE(m."progressEpisode", -1)
+               OR COALESCE(le."legacyProgressTotal", -1) != COALESCE(m."progressTotalOverride", -1)
+               OR COALESCE(le."legacyProgressText", '') != COALESCE(m."progressText", '')
+               OR COALESCE(le."legacyCompletedSeasons", -1) != COALESCE(m."completedSeasonCount", -1)`),
         catalogMismatches: await count(prisma.$queryRaw`
             SELECT COUNT(*) AS n FROM "Work" w JOIN "MediaItem" m ON m."id" = w."id"
             WHERE w."title" != m."title"
@@ -231,4 +279,23 @@ export async function workDrift() {
             WHERE m."franchiseId" IS NOT NULL
               AND m."id" NOT IN (SELECT "workId" FROM "FranchiseLink" WHERE "franchiseId" = m."franchiseId")`),
     };
+}
+
+/**
+ * Read-only pre-flight for the backfill: groups every external id the items
+ * would claim and reports the ones claimed by more than one item. Primary-id
+ * duplicates are the dangerous ones (the later item takes the id over).
+ */
+export async function externalIdCollisions() {
+    const items = await prisma.mediaItem.findMany();
+    const claims = new Map<string, { source: string; externalId: string; items: { id: string; title: string; primary: boolean }[] }>();
+    for (const item of items) {
+        for (const c of externalIdsFor(item)) {
+            const key = `${c.source}|${c.externalId}`;
+            const entry = claims.get(key) ?? { source: c.source, externalId: c.externalId, items: [] };
+            entry.items.push({ id: item.id, title: item.title, primary: c.isPrimary });
+            claims.set(key, entry);
+        }
+    }
+    return [...claims.values()].filter((c) => c.items.length > 1);
 }

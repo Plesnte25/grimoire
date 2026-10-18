@@ -377,7 +377,7 @@ model Work {
   seasons        Season[]
   episodes       Episode[]
   credits        Credit[]
-  libraryEntry   LibraryEntry?
+  libraryEntries LibraryEntry[]
   franchiseLinks FranchiseLink[]
 
   @@index([type])
@@ -406,23 +406,38 @@ model Season {
   @@unique([workId, number])
 }
 
-// Your tracking state for a Work. One entry per Work; rewatches are a counter.
+// Your tracking state for a Work. One entry per (account, work); rewatches are a counter.
 model LibraryEntry {
   id           String    @id @default(uuid())
-  workId       String    @unique
+  accountId    String    @default("singleton")
+  workId       String
   status       String // planned | in_progress | completed | on_hold | dropped
   score        Float?
+  ratedAt      DateTime?
   notes        String?
-  startedAt    DateTime?
+  startedAt    DateTime? // set on real transitions only; never invented for old entries
   finishedAt   DateTime?
   rewatchCount Int       @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+
+  // Pointer-style progress carried over from MediaItem. "Up to" semantics:
+  // progressValue is how many units are done, not which one is current. Cleared
+  // once EpisodeProgress rows take over; no EpisodeProgress is fabricated from it.
+  legacyProgressValue    Int?
+  legacyProgressSeason   Int?
+  legacyProgressEpisode  Int?
+  legacyProgressTotal    Int? // user-set total override
+  legacyProgressText     String?
+  legacyCompletedSeasons Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   work            Work              @relation(fields: [workId], references: [id], onDelete: Cascade)
   episodeProgress EpisodeProgress[]
   watchEvents     WatchEvent[]
 
+  @@unique([accountId, workId])
+  @@index([workId])
   @@index([status])
 }
 
@@ -440,7 +455,7 @@ model EpisodeProgress {
 model WatchEvent {
   id             String       @id @default(uuid())
   libraryEntryId String
-  type           String // started | completed | dropped | rewatched
+  type           String // started | completed | dropped | status_changed | rewatched
   occurredAt     DateTime     @default(now())
   libraryEntry   LibraryEntry @relation(fields: [libraryEntryId], references: [id], onDelete: Cascade)
 
