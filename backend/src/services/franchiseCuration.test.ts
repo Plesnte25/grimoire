@@ -188,3 +188,19 @@ test("removing a work warns about the curated dependents it unlocks", async () =
     assert.match(logged[0], /"d2" is no longer gated/);
     await warnOnUnlockedDependents("d2"); // nothing depends on d2
 });
+
+test("two refs resolving to the same work are rejected", async () => {
+    const sameWork = async (ref: string) => ({ id: "w-same", title: ref });
+    const { problems } = await validateSpec(spec([e("anilist:1"), e("w-same", { narrativeOrder: 2 })]), sameWork);
+    assert.match(problems.join(), /"w-same" and "anilist:1" resolve to the same work/);
+});
+
+test("applySpec creates a missing franchise from the YAML name but keeps an existing title", async () => {
+    await item("n1");
+    await prisma.$transaction((tx) => syncWork(tx, "n1"));
+    await applySpec({ name: "Brand New", franchise: "fresh", entries: [e("anilist:n1")] });
+    assert.equal((await prisma.franchise.findUniqueOrThrow({ where: { id: "fresh" } })).title, "Brand New");
+
+    await applySpec({ name: "Renamed In YAML", franchise: "fresh", entries: [e("anilist:n1")] });
+    assert.equal((await prisma.franchise.findUniqueOrThrow({ where: { id: "fresh" } })).title, "Brand New");
+});

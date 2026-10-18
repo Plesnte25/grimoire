@@ -1,3 +1,6 @@
+// Invariant: prerequisites live within the same franchise (validateSpec enforces it).
+// applySpec relies on this to delete stale curated links without unlocking anything
+// outside the spec. Any other code that sets prerequisiteId must uphold it too.
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { DEFAULT_ACCOUNT } from "./works.js";
@@ -81,6 +84,15 @@ export async function validateSpec(spec: FranchiseSpec, resolve: ResolveWork = r
         }
     }
 
+    const byWorkId = new Map<string, string>();
+    for (const e of spec.entries) {
+        const id = resolved.get(e.work)?.id;
+        if (!id) continue;
+        const first = byWorkId.get(id);
+        if (first) problems.push(`"${e.work}" and "${first}" resolve to the same work`);
+        else byWorkId.set(id, e.work);
+    }
+
     const statuses = await statusOf([...resolved.values()].map((w) => w.id));
     const statusFor = (ref: string) => {
         const id = resolved.get(ref)?.id;
@@ -117,12 +129,16 @@ export async function validateSpec(spec: FranchiseSpec, resolve: ResolveWork = r
 
 /** Writes the curated links. Throws on problems; returns warnings. */
 export async function applySpec(spec: FranchiseSpec, resolve: ResolveWork = resolveWorkRef, statusOf: StatusOf = libraryStatuses) {
-    const franchise = await prisma.franchise.findUnique({ where: { id: spec.franchise }, select: { id: true } });
-    if (!franchise) throw new Error(`franchise ${spec.franchise} not found`);
     const { problems, warnings, resolved } = await validateSpec(spec, resolve, statusOf);
     if (problems.length) throw new Error(problems.join("\n  "));
 
     await prisma.$transaction(async (tx) => {
+        // An existing franchise keeps its enriched title; the YAML only fills in a missing one.
+        await tx.franchise.upsert({
+            where: { id: spec.franchise },
+            create: { id: spec.franchise, title: spec.name },
+            update: {},
+        });
         // The YAML is the whole curated set for this franchise: curated links it no
         // longer lists are removed (the Work stays). Anything that depended on one is
         // either re-declared below or is being removed too, so nothing is silently unlocked.

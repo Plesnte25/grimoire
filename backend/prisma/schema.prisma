@@ -473,7 +473,7 @@ model FranchiseLink {
   order          Int? // legacy airing order from MediaItem.franchiseOrder
   narrativeOrder Int? // curated watch order
   isEssential    Boolean @default(true)
-  prerequisiteId String? // the link that must be completed first
+  prerequisiteId String? // the link that must be completed first; must be in the same franchise (enforced by franchiseCuration.ts)
   curated        Boolean @default(false)
 
   work         Work            @relation(fields: [workId], references: [id], onDelete: Cascade)

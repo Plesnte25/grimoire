@@ -1,3 +1,6 @@
+# Every entry must already be in your library (it needs a Work): add titles you
+# haven't started with status PLANNED first, or the loader fails with "unknown work".
+# `name` is only used if the franchise doesn't exist yet; an existing title wins.
 # Copy to <name>.yaml to have it loaded by `node dist/scripts/curateFranchise.js`.
 # `franchise` is the Franchise id (AniList id of the root series). A work is its
 # id or "<source>:<externalId>" for any ExternalId: anilist:16498, mal:16498,
