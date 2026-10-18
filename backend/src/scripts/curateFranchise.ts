@@ -20,12 +20,15 @@ async function curate(file: string, dryRun: boolean) {
     const spec = franchiseFileSchema.parse(parse(await readFile(file, "utf8")));
     let warnings: string[];
     if (dryRun) {
-        const { problems, warnings: w } = await validateSpec(spec);
+        const { problems, warnings: w, createsFranchise } = await validateSpec(spec);
         if (problems.length) throw new Error(problems.join("\n  "));
         warnings = w;
+        if (createsFranchise) warnings.unshift(`would create franchise "${spec.franchise}" ("${spec.name}"); check for typos if you did not mean to create it.`);
         console.log(`${spec.name}: ${spec.entries.length} entries OK (dry run)`);
     } else {
-        warnings = (await applySpec(spec)).warnings;
+        const result = await applySpec(spec);
+        warnings = result.warnings;
+        if (result.createdFranchise) warnings.unshift(`created franchise "${spec.franchise}" ("${spec.name}"); check for typos if you did not mean to create it.`);
         console.log(`${spec.name}: ${spec.entries.length} entries curated`);
     }
     for (const w of warnings) console.warn(`Warning: ${path.basename(file)}: ${w}`);

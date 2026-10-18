@@ -93,6 +93,11 @@ export async function validateSpec(spec: FranchiseSpec, resolve: ResolveWork = r
         else byWorkId.set(id, e.work);
     }
 
+    const createsFranchise = !(await prisma.franchise.findUnique({ where: { id: spec.franchise }, select: { id: true } }));
+    if (/^\d+$/.test(spec.franchise) && !(await prisma.mediaItem.count({ where: { franchiseId: spec.franchise } }))) {
+        warnings.push(`franchise "${spec.franchise}" looks like an AniList id but no library item references it.`);
+    }
+
     const statuses = await statusOf([...resolved.values()].map((w) => w.id));
     const statusFor = (ref: string) => {
         const id = resolved.get(ref)?.id;
@@ -124,12 +129,12 @@ export async function validateSpec(spec: FranchiseSpec, resolve: ResolveWork = r
     for (const [order, works] of byOrder) {
         if (works.length > 1) warnings.push(`narrativeOrder ${order} is shared by ${works.map((w) => `"${w}"`).join(", ")}; their relative order is arbitrary.`);
     }
-    return { problems, warnings, resolved };
+    return { problems, warnings, resolved, createsFranchise };
 }
 
 /** Writes the curated links. Throws on problems; returns warnings. */
 export async function applySpec(spec: FranchiseSpec, resolve: ResolveWork = resolveWorkRef, statusOf: StatusOf = libraryStatuses) {
-    const { problems, warnings, resolved } = await validateSpec(spec, resolve, statusOf);
+    const { problems, warnings, resolved, createsFranchise } = await validateSpec(spec, resolve, statusOf);
     if (problems.length) throw new Error(problems.join("\n  "));
 
     await prisma.$transaction(async (tx) => {
@@ -175,5 +180,5 @@ export async function applySpec(spec: FranchiseSpec, resolve: ResolveWork = reso
             await tx.franchiseLink.update({ where: { id: linkIds.get(e.work)! }, data: { prerequisiteId: linkIds.get(e.prerequisite)! } });
         }
     });
-    return { warnings };
+    return { warnings, createdFranchise: createsFranchise };
 }

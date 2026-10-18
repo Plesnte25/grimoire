@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { enrichItem } from "./enrich.js";
 import { refreshDueMetadata } from "./dailyRefresh.js";
-import { reconcileWorks } from "./works.js";
+import { reconcileWorks, workDrift } from "./works.js";
 
 export type JobType = "enrich-item" | "daily-refresh";
 
@@ -73,6 +73,9 @@ async function runJob(job: { type: string; payload: string }) {
             await reconcileWorks()
                 .then((r) => r.failed.length && console.error(`Work reconcile: ${r.failed.length} items failed`))
                 .catch((err) => console.error("Work reconcile failed:", err));
+            const drift = await workDrift().catch(() => null);
+            const bad = drift ? Object.entries(drift).filter(([, n]) => n > 0) : [];
+            if (bad.length) console.error("Work drift after reconcile:", Object.fromEntries(bad));
             return;
     }
 }

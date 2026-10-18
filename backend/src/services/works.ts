@@ -70,6 +70,9 @@ export async function syncWork(db: Db, mediaId: string, opts: SyncOptions = {}) 
         language: item.originalLanguage,
         overview: item.description,
         posterUrl: item.posterUrl,
+        totalEpisodes: item.episodes,
+        airedEpisodeCount: item.airedEpisodeCount,
+        totalSeasons: item.seasons,
     };
     await db.work.upsert({
         where: { id: item.id },
@@ -271,13 +274,20 @@ export async function workDrift() {
                OR COALESCE(w."year", -1) != COALESCE(m."year", -1)
                OR COALESCE(w."posterUrl", '') != COALESCE(m."posterUrl", '')
                OR COALESCE(w."overview", '') != COALESCE(m."description", '')
-               OR COALESCE(w."country", '') != COALESCE(m."countryOfOrigin", '')`),
+               OR COALESCE(w."country", '') != COALESCE(m."countryOfOrigin", '')
+               OR COALESCE(w."totalEpisodes", -1) != COALESCE(m."episodes", -1)
+               OR COALESCE(w."airedEpisodeCount", -1) != COALESCE(m."airedEpisodeCount", -1)
+               OR COALESCE(w."totalSeasons", -1) != COALESCE(m."seasons", -1)`),
         creditsWithoutWork: await count(prisma.$queryRaw`SELECT COUNT(*) AS n FROM "Credit" WHERE "workId" IS NULL`),
         episodesWithoutWork: await count(prisma.$queryRaw`SELECT COUNT(*) AS n FROM "Episode" WHERE "workId" IS NULL`),
         franchiseLinkMismatches: await count(prisma.$queryRaw`
             SELECT COUNT(*) AS n FROM "MediaItem" m
             WHERE m."franchiseId" IS NOT NULL
               AND m."id" NOT IN (SELECT "workId" FROM "FranchiseLink" WHERE "franchiseId" = m."franchiseId")`),
+        // A prerequisite must stay inside its franchise (see franchiseCuration.ts).
+        crossFranchisePrerequisites: await count(prisma.$queryRaw`
+            SELECT COUNT(*) AS n FROM "FranchiseLink" a JOIN "FranchiseLink" b ON a."prerequisiteId" = b."id"
+            WHERE a."franchiseId" != b."franchiseId"`),
     };
 }
 

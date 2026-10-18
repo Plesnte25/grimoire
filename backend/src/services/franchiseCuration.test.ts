@@ -204,3 +204,36 @@ test("applySpec creates a missing franchise from the YAML name but keeps an exis
     await applySpec({ name: "Renamed In YAML", franchise: "fresh", entries: [e("anilist:n1")] });
     assert.equal((await prisma.franchise.findUniqueOrThrow({ where: { id: "fresh" } })).title, "Brand New");
 });
+
+test("warns when creating a franchise, and when a numeric id matches no library item", async () => {
+    await item("c1");
+    await prisma.$transaction((tx) => syncWork(tx, "c1"));
+    const typo: Spec = { name: "Typo", franchise: "14698", entries: [e("anilist:c1")] };
+    const dry = await validateSpec(typo);
+    assert.equal(dry.createsFranchise, true);
+    assert.match(dry.warnings.join(), /looks like an AniList id but no library item references it/);
+
+    const real = await applySpec(typo);
+    assert.equal(real.createdFranchise, true);
+    assert.equal((await applySpec(typo)).createdFranchise, false);
+});
+
+test("syncWork carries episode and season counts to the Work", async () => {
+    await item("e1", { mediaType: "TV", episodes: 24, airedEpisodeCount: 12, seasons: 2 });
+    await prisma.$transaction((tx) => syncWork(tx, "e1"));
+    const w = await prisma.work.findUniqueOrThrow({ where: { id: "e1" } });
+    assert.deepEqual([w.totalEpisodes, w.airedEpisodeCount, w.totalSeasons], [24, 12, 2]);
+});
+
+test("drift flags a prerequisite that crosses franchises and a stale episode count", async () => {
+    const { workDrift } = await import("./works.js");
+    await item("x1");
+    await item("x2");
+    await prisma.$transaction(async (tx) => { await syncWork(tx, "x1"); await syncWork(tx, "x2"); });
+    const a = await prisma.franchiseLink.create({ data: { workId: "x1", franchiseId: "f1", relation: "main", curated: true } });
+    await prisma.franchiseLink.create({ data: { workId: "x2", franchiseId: "f2", relation: "main", curated: true, prerequisiteId: a.id } });
+    assert.equal((await workDrift()).crossFranchisePrerequisites, 1);
+
+    await prisma.mediaItem.update({ where: { id: "e1" }, data: { episodes: 30 } });
+    assert.ok((await workDrift()).catalogMismatches >= 1);
+});
